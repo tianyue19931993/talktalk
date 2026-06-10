@@ -17,11 +17,10 @@
  * 需要前端在 Authorization header 中传入用户 accessToken
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { unifiedOrder, isWechatPayConfigured, getConfigStatus } from '../lib/wechat-pay'
 import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   // ============================================================
   // CORS
   // ============================================================

@@ -9,11 +9,10 @@
  * 需要在商户平台配置此 URL 作为支付通知地址。
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAndDecryptNotify, queryOrder } from '../lib/wechat-pay'
 import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   // 微信支付使用 POST + 纯文本 body
   if (req.method !== 'POST') {
     res.status(405).end()

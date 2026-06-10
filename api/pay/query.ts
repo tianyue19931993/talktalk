@@ -7,10 +7,9 @@
  * 响应：{ status: 'pending'|'paid'|'cancelled' }
  */
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { query as supabaseQuery } from '../lib/supabase-admin'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')

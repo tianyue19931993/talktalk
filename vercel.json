@@ -4,5 +4,11 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/pay/*.ts": {
+      "runtime": "nodejs22.x",
+      "memory": 256
+    }
+  }
 }

@@ -33,9 +33,6 @@ export default function LessonDetailPage() {
     )
   }
 
-  const hasImages = question.images && question.images.length > 0
-  const hasDemos = question.htmlDemos && question.htmlDemos.length > 0
-
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-8">
       {/* Fixed back button */}
@@ -57,7 +54,7 @@ export default function LessonDetailPage() {
         {question.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {question.tags.map((tag) => (
-              <Badge key={tag} variant="primary">{tag}</Badge>
+              <Badge key={tag}>{tag}</Badge>
             ))}
           </div>
         )}
@@ -71,10 +68,10 @@ export default function LessonDetailPage() {
         </div>
       </section>
 
-      {/* Image Explanation — moved up */}
-      {hasImages && (
-        <section>
-          <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">图片讲解</h2>
+      {/* Image Explanation — always visible */}
+      <section>
+        <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">图片资源</h2>
+        {question.images && question.images.length > 0 ? (
           <div className="flex flex-col gap-3">
             {question.images.map((img, i) => (
               <div
@@ -93,13 +90,17 @@ export default function LessonDetailPage() {
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 border border-dashed border-[var(--color-hairline)]">
+            <p className="text-sm text-[var(--color-mute)] text-center">暂无图片资源</p>
+          </div>
+        )}
+      </section>
 
-      {/* HTML Interactive Demo — moved up */}
-      {hasDemos && (
-        <section>
-          <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">互动演示</h2>
+      {/* HTML Interactive Demo — always visible */}
+      <section>
+        <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">互动演示</h2>
+        {question.htmlDemos && question.htmlDemos.length > 0 ? (
           <div className="flex flex-col gap-3">
             {question.htmlDemos.map((demo, i) => (
               <button
@@ -111,8 +112,12 @@ export default function LessonDetailPage() {
               </button>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 border border-dashed border-[var(--color-hairline)]">
+            <p className="text-sm text-[var(--color-mute)] text-center">暂无演示动画</p>
+          </div>
+        )}
+      </section>
 
       {/* Text Explanation (Markdown) — moved below */}
       {question.content?.markdown && (

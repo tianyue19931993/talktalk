@@ -28,6 +28,26 @@ export default function LessonEditPage() {
 
   const [form, setForm] = useState<QuestionForm>(defaultForm)
 
+  const uploadHtmlDemo = (index: number) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.html,.htm'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const content = reader.result as string
+        const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
+        const demos = [...form.htmlDemos]
+        demos[index] = { ...demos[index], url: dataUrl }
+        update('htmlDemos', demos)
+      }
+      reader.readAsText(file)
+    }
+    input.click()
+  }
+
   useEffect(() => {
     const unsub = subscribe(() => setTick((t) => t + 1))
     return unsub
@@ -280,12 +300,43 @@ export default function LessonEditPage() {
             {form.htmlDemos.map((demo, i) => (
               <div key={i} className="flex items-start gap-2 p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)]">
                 <GripVertical className="w-4 h-4 mt-3 text-[var(--color-mute)] shrink-0" />
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    placeholder="演示链接或路径"
-                    value={demo.url}
-                    onChange={(e) => updateDemo(i, 'url', e.target.value)}
-                  />
+                <div className="flex-1 flex flex-col gap-2">
+                  {demo.url && demo.url.startsWith('data:text/html') ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[var(--color-success)] bg-green-50 px-2 py-0.5 rounded-full">已上传 HTML 文件</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const previewWindow = window.open('', '_blank')
+                            if (previewWindow) {
+                              const html = decodeURIComponent(demo.url.split(',')[1] || '')
+                              previewWindow.document.write(html)
+                              previewWindow.document.close()
+                            }
+                          }}
+                          className="text-xs text-[var(--color-link)] hover:underline cursor-pointer"
+                        >
+                          预览
+                        </button>
+                      </div>
+                      <span className="text-xs text-[var(--color-mute)] truncate">{demo.url.slice(0, 60)}...</span>
+                    </>
+                  ) : (
+                    <Input
+                      placeholder="演示链接或路径（外部 URL）"
+                      value={demo.url}
+                      onChange={(e) => updateDemo(i, 'url', e.target.value)}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => uploadHtmlDemo(i)}
+                    className="flex items-center gap-1.5 text-xs text-[var(--color-link)] hover:text-[var(--color-link)]/80 transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    {demo.url && demo.url.startsWith('data:text/html') ? '重新上传 HTML 文件' : '上传 HTML 文件'}
+                  </button>
                 </div>
                 <button
                   type="button"

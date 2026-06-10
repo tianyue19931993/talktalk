@@ -1,0 +1,18 @@
+{
+  "project": "talk-app-new1",
+  "git": {
+    "repo": "https://github.com/tianyue19931993/talktalk.git",
+    "token_env": "QCLAW_GIT_TOKEN"
+  },
+  "deploy": {
+    "platform": "Vercel",
+    "auto_deploy": true,
+    "urls": {
+      "mobile": "https://www.next.digit3ds.com",
+      "pc_admin": "https://www.next.digit3ds.com/admin"
+    },
+    "trigger": "git push → Vercel auto deploy"
+  },
+  "status": "testing",
+  "last_synced": "2026-06-10 10:34"
+}

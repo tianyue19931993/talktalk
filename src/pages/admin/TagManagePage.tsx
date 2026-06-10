@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getTags, addTag, updateTag, deleteTag, subscribe } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Plus, Pencil, Trash2, Check, X, Tags } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Tags, FileText } from 'lucide-react'
 import type { Tag } from '../../types'
 
 export default function TagManagePage() {
@@ -15,6 +15,9 @@ export default function TagManagePage() {
   const [editName, setEditName] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+
+  const [showBatchForm, setShowBatchForm] = useState(false)
+  const [batchText, setBatchText] = useState('')
 
   useEffect(() => {
     const unsub = subscribe(() => setTick((t) => t + 1))
@@ -60,10 +63,16 @@ export default function TagManagePage() {
           <Tags className="w-5 h-5 text-[var(--color-ink)]" />
           <h1 className="text-lg font-semibold text-[var(--color-ink)]">标签管理</h1>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowNewForm(true)}>
-          <Plus className="w-4 h-4" />
-          新增标签
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowBatchForm(true)}>
+            <FileText className="w-4 h-4" />
+            批量新增标签
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setShowNewForm(true)}>
+            <Plus className="w-4 h-4" />
+            新增标签
+          </Button>
+        </div>
       </div>
 
       {/* Inline new tag form */}
@@ -162,6 +171,45 @@ export default function TagManagePage() {
           </tbody>
         </table>
       </div>
+
+      {/* Batch add modal */}
+      {showBatchForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l3)] p-6 max-w-lg w-full mx-4">
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mb-2">批量新增标签</h3>
+            <p className="text-xs text-[var(--color-mute)] mb-4">每行或每个中文分号（；）分隔一个标签名称</p>
+            <textarea
+              placeholder={`沪教版；\n期末复习；\n应用题；\n易错题；\n重量问题；\n两端都种`}
+              value={batchText}
+              onChange={(e) => setBatchText(e.target.value)}
+              rows={8}
+              className="w-full px-4 py-2.5 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+                focus:outline-none focus:border-[var(--color-ink)] focus:ring-1 focus:ring-[var(--color-ink)]
+                transition-colors resize-y"
+            />
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <Button variant="secondary" size="sm" onClick={() => { setShowBatchForm(false); setBatchText('') }}>
+                取消
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => {
+                const names = batchText
+                  .replace(/\\n/g, '\n')
+                  .split(/[；;\n]+/)
+                  .map(s => s.trim())
+                  .filter(Boolean)
+                names.forEach(name => {
+                  addTag(name)
+                })
+                setShowBatchForm(false)
+                setBatchText('')
+              }}>
+                批量创建 ({batchText.split(/[；;\n]+/).map(s => s.trim()).filter(Boolean).length} 个)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {deleteTarget && (

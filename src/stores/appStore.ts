@@ -2,6 +2,9 @@ import { useState, useMemo } from 'react'
 import { Question, QuestionType, Tag, QuestionForm } from '../types'
 import { query, insert, update as supdate, remove, isConfigured } from '../lib/supabase'
 
+// eslint-disable-next-line
+const DBG = (msg: string) => console.log('[talktalk]', msg, new Date().toISOString().slice(11, 19))
+
 // ---------- in-memory cache ----------
 let questions: Question[] = []
 let types: QuestionType[] = []
@@ -66,53 +69,23 @@ function computeTagCounts() {
   tags.forEach((t) => { t.count = c[t.name] || 0 })
 }
 
-function syncToLocal() {
-  try {
-    localStorage.setItem('talktalk_questions', JSON.stringify(questions))
-    localStorage.setItem('talktalk_types', JSON.stringify(types))
-    localStorage.setItem('talktalk_tags', JSON.stringify(tags))
-  } catch {}
-}
+// ---------- 完全清空 localStorage，不再读取 ----------
+DBG('clearing localStorage')
+try {
+  localStorage.removeItem('talktalk_questions')
+  localStorage.removeItem('talktalk_types')
+  localStorage.removeItem('talktalk_tags')
+} catch {}
 
-// ---------- load cached data from localStorage (instant) ----------
-function loadFromLocal() {
-  try {
-    // Check if localStorage data is too bloated (old test data w/ base64 URLs)
-    const qRaw = localStorage.getItem('talktalk_questions')
-    if (qRaw && qRaw.length > 500 * 1024) {
-      // >500KB? Likely bloated with old base64 images — clear it
-      console.warn('localStorage questions too large (' + (qRaw.length/1024).toFixed(0) + 'KB), clearing')
-      localStorage.removeItem('talktalk_questions')
-      localStorage.removeItem('talktalk_types')
-      localStorage.removeItem('talktalk_tags')
-      return // keep empty
-    }
+// ---------- sync from Supabase ----------
+DBG('app store ready')
 
-    const rQ = qRaw
-    const rT = localStorage.getItem('talktalk_types')
-    const rTa = localStorage.getItem('talktalk_tags')
-    if (rQ) questions = JSON.parse(rQ)
-    if (rT) types = JSON.parse(rT)
-    if (rTa) tags = JSON.parse(rTa)
-    resolveTypeNames()
-    computeTagCounts()
-  } catch {
-    // JSON parse failed — clear and start fresh
-    localStorage.removeItem('talktalk_questions')
-    localStorage.removeItem('talktalk_types')
-    localStorage.removeItem('talktalk_tags')
-  }
-}
-
-// Initial load from localStorage (instant, no wait)
-loadFromLocal()
-
-// Then sync from Supabase in background
 if (isConfigured()) {
   syncFromSupabase()
 }
 
 async function syncFromSupabase() {
+  DBG('starting Supabase sync...')
   try {
     const [qr, tyr, tar] = await Promise.all([
       query<any[]>('questions', { order: 'created_at', ascending: false }),
@@ -120,8 +93,10 @@ async function syncFromSupabase() {
       query<any[]>('tags', { order: 'created_at' }),
     ])
 
+    DBG('Supabase sync complete')
+
     if (qr.error || tyr.error || tar.error) {
-      console.warn('Supabase sync failed, keeping local data')
+      console.warn('Supabase sync failed:', qr.error, tyr.error, tar.error)
       return
     }
 
@@ -130,15 +105,15 @@ async function syncFromSupabase() {
     tags = (tar.data || []).map(rowToTag)
     resolveTypeNames()
     computeTagCounts()
-    syncToLocal()
     notify()
+    DBG('data loaded, rendered')
   } catch (e) {
-    console.warn('Supabase sync error, keeping local data:', e)
+    console.warn('Supabase sync error:', e)
   }
 }
 
 // ---------- sync accessors ----------
-export function getQuestions(): Question[] { return questions }
+export function getQuestions(): Question[] { DBG('getQuestions called, count=' + questions.length); return questions }
 export function getTypes(): QuestionType[] { return types }
 export function getTags(): Tag[] { return tags }
 
@@ -157,7 +132,7 @@ export function addQuestion(data: QuestionForm): Question {
     createdAt: now, updatedAt: now,
   }
   questions = [q, ...questions]
-  computeTagCounts(); syncToLocal(); notify()
+  computeTagCounts(); notify()
   insert('questions', questionToRow(q)).catch(() => {})
   return q
 }
@@ -167,20 +142,20 @@ export function updateQuestion(id: string, data: QuestionForm) {
   if (i === -1) return
   const t = types.find((t) => t.id === data.typeId)
   questions[i] = { ...questions[i], ...data, typeName: t?.name || '', updatedAt: new Date().toISOString().slice(0, 10) }
-  computeTagCounts(); syncToLocal(); notify()
+  computeTagCounts(); notify()
   supdate('questions', 'id', id, questionToRow(questions[i])).catch(() => {})
 }
 
 export function deleteQuestion(id: string) {
   questions = questions.filter((q) => q.id !== id)
-  computeTagCounts(); syncToLocal(); notify()
+  computeTagCounts(); notify()
   remove('questions', 'id', id).catch(() => {})
 }
 
 export async function addType(data: { name: string; description?: string; icon?: string }): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', { name: data.name, icon: data.icon || '📝', description: data.description || '' })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
-  const t = rowToType(r.data[0]); types = [...types, t]; syncToLocal(); notify()
+  const t = rowToType(r.data[0]); types = [...types, t]; notify()
   return t
 }
 
@@ -188,32 +163,32 @@ export async function updateType(id: string, data: { name?: string; description?
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
   const p: any = {}; if (data.name !== undefined) p.name = data.name; if (data.description !== undefined) p.description = data.description
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
-  resolveTypeNames(); syncToLocal(); notify()
+  resolveTypeNames(); notify()
   supdate('question_types', 'id', parseInt(id, 10), p).catch(() => {})
 }
 
 export async function deleteType(id: string) {
   types = types.filter((t) => t.id !== id)
   questions = questions.map((q) => q.typeId === id ? { ...q, typeId: '', typeName: '' } : q)
-  syncToLocal(); notify()
+  notify()
   remove('question_types', 'id', parseInt(id, 10)).catch(() => {})
 }
 
 export async function addTag(name: string): Promise<Tag> {
   const r = await insert<any[]>('tags', { name })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
-  const t = rowToTag(r.data[0]); tags = [...tags, t]; syncToLocal(); notify()
+  const t = rowToTag(r.data[0]); tags = [...tags, t]; notify()
   return t
 }
 
 export async function updateTag(id: string, name: string) {
   const i = tags.findIndex((t) => t.id === id); if (i === -1) return
-  tags[i] = { ...tags[i], name }; syncToLocal(); notify()
+  tags[i] = { ...tags[i], name }; notify()
   supdate('tags', 'id', parseInt(id, 10), { name }).catch(() => {})
 }
 
 export async function deleteTag(id: string) {
-  tags = tags.filter((t) => t.id !== id); syncToLocal(); notify()
+  tags = tags.filter((t) => t.id !== id); notify()
   remove('tags', 'id', parseInt(id, 10)).catch(() => {})
 }
 

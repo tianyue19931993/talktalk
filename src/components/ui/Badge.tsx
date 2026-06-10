@@ -8,8 +8,8 @@ interface BadgeProps {
 }
 
 const variantStyles = {
-  default: 'bg-[var(--color-canvas-soft)] text-[var(--color-body)]',
-  primary: 'bg-[var(--color-link-bg-soft)] text-[var(--color-link)]',
+  default: 'bg-[var(--color-link-bg-soft)] text-[var(--color-link)]',
+  primary: 'bg-gradient-brand text-white',
   success: 'bg-green-50 text-green-700',
   warning: 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]',
   error: 'bg-[var(--color-error-soft)] text-[var(--color-error)]',

@@ -1,8 +1,7 @@
 import { Outlet, NavLink, useLocation, Link } from 'react-router-dom'
-import { LayoutDashboard, FileText, Tags, BookType, Plus, ChevronLeft } from 'lucide-react'
+import { FileText, Tags, BookType, ChevronLeft } from 'lucide-react'
 
 const sidebarItems = [
-  { path: '/admin', label: '概览', icon: LayoutDashboard, end: true },
   { path: '/admin/lessons', label: '题目管理', icon: FileText },
   { path: '/admin/types', label: '题型管理', icon: BookType },
   { path: '/admin/tags', label: '标签管理', icon: Tags },
@@ -17,7 +16,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-[var(--color-canvas-soft)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 bg-[var(--color-canvas)] border-b border-[var(--color-hairline)]">
+      <header className="sticky top-0 z-40 glass">
         <div className="flex items-center justify-between h-14 px-4 lg:px-6 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             {isEditPage ? (
@@ -54,9 +53,9 @@ export default function AdminLayout() {
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3 py-2 text-sm rounded-[var(--radius-sm)] transition-colors ${
+                    `flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-[var(--radius-md)] transition-all duration-200 ${
                       isActive
-                        ? 'bg-[var(--color-canvas-soft)] text-[var(--color-ink)] font-medium'
+                        ? 'bg-[var(--color-link-bg-soft)] text-[var(--color-link)] font-medium'
                         : 'text-[var(--color-body)] hover:bg-[var(--color-canvas-soft)] hover:text-[var(--color-ink)]'
                     }`
                   }
@@ -71,8 +70,8 @@ export default function AdminLayout() {
 
         {/* Mobile bottom tab bar for admin */}
         {!isEditPage && (
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--color-canvas)] border-t border-[var(--color-hairline)] safe-bottom z-50">
-            <div className="flex items-center justify-around h-12">
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 safe-bottom z-50">
+            <div className="bg-white/72 backdrop-blur-[20px] -webkit-backdrop-blur-[20px] border-t border-white/40 flex items-center justify-around h-14">
               {sidebarItems.map((item) => (
                 <NavLink
                   key={item.path}

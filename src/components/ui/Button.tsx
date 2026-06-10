@@ -11,17 +11,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<Variant, string> = {
   'primary':
-    'bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-[var(--radius-pill)] hover:opacity-90',
+    'bg-gradient-brand text-white rounded-[var(--radius-pill)] shadow-[0_1px_8px_rgba(121,40,202,0.2)] hover:shadow-[0_2px_16px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98]',
   'secondary':
-    'bg-[var(--color-canvas)] text-[var(--color-ink)] rounded-[var(--radius-pill)] border border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)]',
+    'bg-[var(--color-canvas)] text-[var(--color-ink)] rounded-[var(--radius-pill)] border border-[var(--color-hairline)] hover:shadow-[var(--shadow-l2)] hover:border-[var(--color-mute)]',
   'ghost':
-    'bg-transparent text-[var(--color-ink)] rounded-[var(--radius-sm)] hover:bg-[var(--color-canvas-soft-2)]',
+    'bg-transparent text-[var(--color-ink)] rounded-[var(--radius-md)] hover:bg-[var(--color-canvas-soft-2)]',
   'danger':
-    'bg-[var(--color-error)] text-white rounded-sm hover:opacity-90',
+    'bg-[var(--color-error)] text-white rounded-[var(--radius-pill)] hover:opacity-90',
   'primary-sm':
-    'bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-[var(--radius-sm)] hover:opacity-90',
+    'bg-gradient-brand text-white rounded-[var(--radius-md)] shadow-[0_1px_4px_rgba(121,40,202,0.15)] hover:shadow-[0_2px_8px_rgba(121,40,202,0.25)]',
   'secondary-sm':
-    'bg-[var(--color-canvas)] text-[var(--color-ink)] rounded-[var(--radius-sm)] border border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)]',
+    'bg-[var(--color-canvas)] text-[var(--color-ink)] rounded-[var(--radius-md)] border border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)]',
 }
 
 const sizeStyles: Record<Size, string> = {

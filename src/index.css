@@ -1,38 +1,55 @@
 @import "tailwindcss";
 
-/* ─── Vercel-Inspired Design Tokens ─── */
+/* ─── Vercel × Linear Inspired Design Tokens ─── */
 :root {
-  /* Colors */
-  --color-primary: #171717;
-  --color-on-primary: #ffffff;
+  /* Brand colors */
+  --color-brand-primary: #0070f3;
+  --color-gradient-start: #7928ca;
+  --color-gradient-end: #ff0080;
+  --color-accent: #50e3c2;
+
+  /* Text */
   --color-ink: #171717;
   --color-body: #4d4d4d;
   --color-mute: #888888;
-  --color-hairline: #ebebeb;
-  --color-hairline-strong: #a1a1a1;
+
+  /* Surfaces */
   --color-canvas: #ffffff;
   --color-canvas-soft: #fafafa;
   --color-canvas-soft-2: #f5f5f5;
+
+  /* Borders */
+  --color-hairline: #ebebeb;
+  --color-hairline-strong: #a1a1a1;
+
+  /* Interactive */
   --color-link: #0070f3;
   --color-link-deep: #0761d1;
   --color-link-bg-soft: #d3e5ff;
+
+  /* Semantic */
   --color-success: #0070f3;
   --color-error: #ee0000;
-  --color-error-soft: #f7d4d6;
+  --color-error-soft: #fce8e8;
   --color-warning: #f5a623;
   --color-warning-soft: #ffefcf;
+
+  /* Deprecated compatibility aliases — keep for existing component references */
+  --color-primary: #171717;
+  --color-on-primary: #ffffff;
   --color-violet: #7928ca;
   --color-cyan: #50e3c2;
   --color-highlight-pink: #ff0080;
 
-  /* Rounded */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Rounded — Linear-style large radii */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
   --radius-pill-sm: 64px;
-  --radius-pill: 100px;
+  --radius-pill: 999px;
   --radius-full: 9999px;
 
   /* Spacing */
@@ -47,12 +64,21 @@
   --space-4xl: 64px;
   --space-5xl: 96px;
 
-  /* Shadows - stacked elevation */
-  --shadow-l1: 0 0 0 1px rgba(0,0,0,0.08) inset;
-  --shadow-l2: 0 1px 1px rgba(0,0,0,0.02), 0 2px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.08) inset;
-  --shadow-l3: 0 2px 2px rgba(0,0,0,0.04), 0 8px 8px -8px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.08) inset;
-  --shadow-l4: 0 2px 2px rgba(0,0,0,0.04), 0 8px 16px -4px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.08) inset;
-  --shadow-l5: 0 1px 1px rgba(0,0,0,0.02), 0 8px 16px -4px rgba(0,0,0,0.04), 0 24px 32px -8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.08) inset;
+  /* Shadows — clean Linear-style elevation */
+  --shadow-l1: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-l2: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-l3: 0 2px 4px rgba(0,0,0,0.04), 0 8px 16px rgba(0,0,0,0.04);
+  --shadow-l4: 0 2px 8px rgba(0,0,0,0.04), 0 16px 24px rgba(0,0,0,0.04);
+  --shadow-l5: 0 4px 12px rgba(0,0,0,0.04), 0 24px 32px rgba(0,0,0,0.06);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Gradient utility */
+.bg-gradient-brand {
+  background: linear-gradient(135deg, var(--color-gradient-start), var(--color-gradient-end));
 }
 
 /* Font setup */
@@ -76,9 +102,15 @@ body {
   background-color: var(--color-canvas-soft);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
 }
 
-/* Scrollbar styling for admin tables */
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -99,11 +131,29 @@ body {
 /* Card style */
 .card {
   background: var(--color-canvas);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-l2);
+  transition: box-shadow 0.2s var(--ease-smooth);
 }
 
 .card-hover:hover {
   box-shadow: var(--shadow-l3);
-  transition: box-shadow 0.15s ease;
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Tag style (used by Badge) */
+.tag {
+  background: var(--color-link-bg-soft);
+  color: var(--color-link);
+  border-radius: var(--radius-full);
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getQuestions, getTypes, addQuestion, updateQuestion, subscribe } from '../../stores/appStore'
+import { getQuestions, getTypes, getTags, addQuestion, updateQuestion, subscribe } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Plus, X, Save, Send, Upload, GripVertical } from 'lucide-react'
@@ -54,13 +54,7 @@ export default function LessonEditPage() {
   }, [id, isEdit])
 
   const types = getTypes()
-  const allTags = [
-    ...new Set(
-      getQuestions()
-        .flatMap((q) => q.tags)
-        .concat(['沪教版', '期末复习', '应用题', '易错题', '重量问题', '两端都种', '环形植树', '差量问题', '期中考试', '行程问题'])
-    ),
-  ].sort()
+  const allTags = getTags().map((t) => t.name)
 
   const update = <K extends keyof QuestionForm>(key: K, value: QuestionForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -91,8 +85,23 @@ export default function LessonEditPage() {
   }
 
   const addImage = () => {
-    // Placeholder: in real app this would open a file picker
-    update('images', [...form.images, '/assets/placeholder.png'])
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/png,image/jpeg,image/webp'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (file.size > 5 * 1024 * 1024) {
+        alert('图片不能超过 5MB')
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        update('images', [...form.images, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+    }
+    input.click()
   }
 
   const removeImage = (index: number) => {
@@ -104,11 +113,6 @@ export default function LessonEditPage() {
 
   const save = (status: 'draft' | 'published') => {
     const data = { ...form, status }
-
-    if (!data.title.trim()) {
-      alert('请输入题目标题')
-      return
-    }
 
     if (isEdit && id) {
       updateQuestion(id, data)
@@ -126,23 +130,16 @@ export default function LessonEditPage() {
 
       <div className="space-y-8">
         {/* Section 1: Basic Info */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">基础信息</h2>
           <div className="space-y-4">
-            <Input
-              label="标题"
-              placeholder="输入题目标题"
-              value={form.title}
-              onChange={(e) => update('title', e.target.value)}
-            />
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium text-[var(--color-body)]">科目</label>
                 <select
                   value={form.subject}
                   onChange={(e) => update('subject', e.target.value)}
-                  className="h-10 px-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+                  className="h-10 px-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                     text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-ink)] transition-colors"
                 >
                   <option value="数学">数学</option>
@@ -154,7 +151,7 @@ export default function LessonEditPage() {
                 <select
                   value={form.grade}
                   onChange={(e) => update('grade', e.target.value)}
-                  className="h-10 px-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+                  className="h-10 px-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                     text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-ink)] transition-colors"
                 >
                   <option value="">请选择年级</option>
@@ -169,7 +166,7 @@ export default function LessonEditPage() {
                 <select
                   value={form.typeId}
                   onChange={(e) => update('typeId', e.target.value)}
-                  className="h-10 px-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+                  className="h-10 px-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                     text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-ink)] transition-colors"
                 >
                   <option value="">请选择题型</option>
@@ -209,7 +206,7 @@ export default function LessonEditPage() {
         </section>
 
         {/* Section 2: Question content */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">原题内容</h2>
           <div className="flex flex-col gap-1">
             <textarea
@@ -217,7 +214,7 @@ export default function LessonEditPage() {
               value={form.question}
               onChange={(e) => update('question', e.target.value)}
               rows={5}
-              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+              className="w-full px-4 py-2.5 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                 text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
                 focus:outline-none focus:border-[var(--color-ink)] focus:ring-1 focus:ring-[var(--color-ink)]
                 transition-colors resize-y"
@@ -226,7 +223,7 @@ export default function LessonEditPage() {
         </section>
 
         {/* Section 3: Markdown explanation */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">文字讲解</h2>
           <p className="text-xs text-[var(--color-mute)] mb-2">支持 Markdown 格式</p>
           <div className="flex flex-col gap-1">
@@ -235,7 +232,7 @@ export default function LessonEditPage() {
               value={form.markdown}
               onChange={(e) => update('markdown', e.target.value)}
               rows={12}
-              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+              className="w-full px-4 py-2.5 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                 text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono
                 focus:outline-none focus:border-[var(--color-ink)] focus:ring-1 focus:ring-[var(--color-ink)]
                 transition-colors resize-y"
@@ -244,14 +241,16 @@ export default function LessonEditPage() {
         </section>
 
         {/* Section 4: Images */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">图片资源</h2>
           <div className="space-y-3">
             {form.images.map((img, i) => (
               <div key={i} className="flex items-center gap-3 p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)]">
-                <div className="w-16 h-16 bg-[var(--color-canvas)] rounded-[var(--radius-sm)] flex items-center justify-center text-[var(--color-mute)] text-xs border border-[var(--color-hairline)]">
-                  图片
-                </div>
+                <img
+                  src={img}
+                  alt={`图片 ${i + 1}`}
+                  className="w-16 h-16 object-cover rounded-[var(--radius-sm)] border border-[var(--color-hairline)]"
+                />
                 <span className="text-xs text-[var(--color-body)] flex-1 truncate">{img}</span>
                 <button
                   type="button"
@@ -275,18 +274,13 @@ export default function LessonEditPage() {
         </section>
 
         {/* Section 5: HTML Demos */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">HTML 演示</h2>
           <div className="space-y-3">
             {form.htmlDemos.map((demo, i) => (
               <div key={i} className="flex items-start gap-2 p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)]">
                 <GripVertical className="w-4 h-4 mt-3 text-[var(--color-mute)] shrink-0" />
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    placeholder="演示名称"
-                    value={demo.title}
-                    onChange={(e) => updateDemo(i, 'title', e.target.value)}
-                  />
                   <Input
                     placeholder="演示链接或路径"
                     value={demo.url}

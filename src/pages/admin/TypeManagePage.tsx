@@ -72,7 +72,7 @@ export default function TypeManagePage() {
 
       {/* Inline new type form */}
       {showNewForm && (
-        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-4 mb-4">
+        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5 mb-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <Input
               placeholder="题型名称"
@@ -98,29 +98,25 @@ export default function TypeManagePage() {
       )}
 
       {/* Table */}
-      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] overflow-hidden">
+      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--color-hairline)]">
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">图标</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题型名称</th>
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题型编码</th>
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">创建时间</th>
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">更新时间</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
             {types.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-sm text-[var(--color-mute)]">
+                <td colSpan={2} className="text-center py-12 text-sm text-[var(--color-mute)]">
                   暂无题型数据
                 </td>
               </tr>
             ) : (
               types.map((t) => (
                 <tr key={t.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
-                  <td className="px-4 py-3 text-lg">{t.icon || '📝'}</td>
+
                   <td className="px-4 py-3">
                     {editingId === t.id ? (
                       <div className="space-y-2">
@@ -146,9 +142,7 @@ export default function TypeManagePage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-[var(--color-mute)] font-mono">{t.id}</td>
-                  <td className="px-4 py-3 text-xs text-[var(--color-mute)]">{t.createdAt}</td>
-                  <td className="px-4 py-3 text-xs text-[var(--color-mute)]">{t.updatedAt}</td>
+
                   <td className="px-4 py-3 text-right">
                     {editingId === t.id ? (
                       <div className="flex items-center justify-end gap-1">
@@ -196,7 +190,7 @@ export default function TypeManagePage() {
       {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
             <h3 className="text-base font-semibold text-[var(--color-ink)] mb-2">确认删除</h3>
             <p className="text-sm text-[var(--color-body)] mb-1">
               确定要删除题型「{deleteTarget.name}」吗？

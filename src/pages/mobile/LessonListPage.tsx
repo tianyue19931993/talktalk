@@ -1,9 +1,28 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SearchInput } from '../../components/ui/Input'
+import { Search, X } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { getQuestions, getTypes } from '../../stores/appStore'
 import { GRADES, Question } from '../../types'
+
+// Brand tag color palette — deterministic by tag name hash
+const TAG_COLORS: Record<string, { bg: string; text: string }> = {
+  '重量问题': { bg: '#e8faf0', text: '#0d7c3f' },
+  '应用题': { bg: '#f0edff', text: '#5a3ec8' },
+  '两端都种': { bg: '#e6f7ff', text: '#0077b6' },
+  '易错题': { bg: '#fff0f0', text: '#c41e3a' },
+  '期中考试': { bg: '#fff7e6', text: '#b8860b' },
+  '行程问题': { bg: '#e6faf5', text: '#0d9488' },
+  '环形植树': { bg: '#f3e8ff', text: '#7c3aed' },
+  '差量问题': { bg: '#fce7f3', text: '#be185d' },
+}
+
+function tagStyle(tag: string) {
+  const c = TAG_COLORS[tag]
+  if (c) return { backgroundColor: c.bg, color: c.text }
+  // Fallback: use brand blue style
+  return {}
+}
 
 function QuestionCard({ question }: { question: Question }) {
   const navigate = useNavigate()
@@ -12,19 +31,19 @@ function QuestionCard({ question }: { question: Question }) {
 
   return (
     <div
-      className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-4 cursor-pointer hover:opacity-80 transition-opacity"
+      className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 cursor-pointer hover:shadow-[var(--shadow-l3)] hover:-translate-y-0.5 transition-all duration-200 border border-[var(--color-hairline)]"
       onClick={() => navigate(`/lesson/${question.id}`)}
     >
-      <h3 className="text-sm font-semibold text-[var(--color-ink)] mb-2 line-clamp-2">{question.title}</h3>
-      <div className="flex items-center gap-2 text-xs text-[var(--color-mute)] mb-2">
+      <h3 className="text-sm font-semibold text-[var(--color-ink)] mb-2.5 leading-relaxed line-clamp-2">{question.question}</h3>
+      <div className="flex items-center gap-2 text-xs text-[var(--color-mute)] mb-2.5">
         <span>{question.grade}</span>
         <span className="w-1 h-1 rounded-full bg-[var(--color-hairline)]" />
         <span>{question.typeName}</span>
       </div>
       {question.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
           {question.tags.map((tag) => (
-            <Badge key={tag}>{tag}</Badge>
+            <Badge key={tag} className="!bg-[var(--color-link-bg-soft)] !text-[var(--color-link)]">{tag}</Badge>
           ))}
         </div>
       )}
@@ -52,7 +71,6 @@ export default function LessonListPage() {
       const kw = search.trim().toLowerCase()
       result = result.filter(
         (q) =>
-          q.title.toLowerCase().includes(kw) ||
           q.question.toLowerCase().includes(kw) ||
           q.typeName.toLowerCase().includes(kw) ||
           q.tags.some((t) => t.toLowerCase().includes(kw))
@@ -69,22 +87,20 @@ export default function LessonListPage() {
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
-      {/* Search bar */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <SearchInput
-            placeholder="搜索标题、内容、题型、标签…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onClear={() => setSearch('')}
-          />
-        </div>
-        <button
-          onClick={() => navigate('/')}
-          className="shrink-0 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer"
-        >
-          取消
-        </button>
+      {/* Search bar — pill style matching homepage */}
+      <div className="flex items-center gap-2.5 h-12 px-5 bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-full shadow-[var(--shadow-l2)] hover:shadow-[var(--shadow-l3)] hover:border-[var(--color-mute)] transition-all duration-200">
+        <Search className="w-4 h-4 text-[var(--color-mute)] shrink-0" />
+        <input
+          placeholder="搜索题目、内容、题型、标签…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 text-sm bg-transparent text-[var(--color-ink)] placeholder:text-[var(--color-mute)] focus:outline-none"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="text-[var(--color-mute)] hover:text-[var(--color-ink)] transition-colors cursor-pointer shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Grade filter */}

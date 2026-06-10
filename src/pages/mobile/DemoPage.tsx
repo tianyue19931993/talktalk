@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
+
 import { ArrowLeft } from 'lucide-react'
 import { getQuestions } from '../../stores/appStore'
 
@@ -15,13 +16,6 @@ export default function DemoPage() {
   if (!demo) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="self-start inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
         <div className="flex flex-col items-center gap-2 text-[var(--color-mute)]">
           <p className="text-base font-medium">演示未找到</p>
           <p className="text-sm">该演示内容可能已被移除</p>
@@ -31,31 +25,22 @@ export default function DemoPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Top bar with back button */}
-      <div className="flex items-center h-12 px-4 border-b border-[var(--color-hairline)] bg-[var(--color-canvas)] shrink-0">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
-        <span className="ml-3 text-sm font-medium text-[var(--color-body)] truncate">
-          {demo.title}
-        </span>
-      </div>
-
-      {/* IFrame content */}
-      <div className="flex-1 relative">
-        <iframe
-          src={demo.url}
-          title={demo.title}
-          className="absolute inset-0 w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms"
-          allowFullScreen
-        />
-      </div>
+    <div className="h-screen w-full bg-white relative">
+      {/* Floating back button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-4 left-4 z-50 flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full transition-colors cursor-pointer"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        返回
+      </button>
+      <iframe
+        src={demo.url}
+        title="演示"
+        className="w-full h-full border-0"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+        allowFullScreen
+      />
     </div>
   )
 }

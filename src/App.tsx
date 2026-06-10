@@ -6,7 +6,6 @@ import LessonListPage from './pages/mobile/LessonListPage'
 import LessonDetailPage from './pages/mobile/LessonDetailPage'
 import DemoPage from './pages/mobile/DemoPage'
 import MyPage from './pages/mobile/MyPage'
-import DashboardPage from './pages/admin/DashboardPage'
 import LessonManagePage from './pages/admin/LessonManagePage'
 import LessonEditPage from './pages/admin/LessonEditPage'
 import TypeManagePage from './pages/admin/TypeManagePage'
@@ -28,7 +27,7 @@ export default function App() {
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<DashboardPage />} />
+        <Route index element={<Navigate to="/admin/lessons" replace />} />
         <Route path="lessons" element={<LessonManagePage />} />
         <Route path="lesson/edit/:id" element={<LessonEditPage />} />
         <Route path="lesson/new" element={<LessonEditPage />} />

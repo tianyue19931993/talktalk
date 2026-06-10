@@ -23,7 +23,7 @@ export default function LessonManagePage() {
   const filtered = search
     ? questions.filter(
         (q) =>
-          q.title.toLowerCase().includes(search.toLowerCase()) ||
+          q.question.toLowerCase().includes(search.toLowerCase()) ||
           q.id.toLowerCase().includes(search.toLowerCase())
       )
     : questions
@@ -67,16 +67,16 @@ export default function LessonManagePage() {
       </div>
 
       {/* Desktop table */}
-      <div className="hidden md:block bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] overflow-hidden">
+      <div className="hidden md:block bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--color-hairline)]">
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">ID</th>
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">标题</th>
+              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题目</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">科目</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">年级</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题型</th>
-              <th className="text-center text-xs font-medium text-[var(--color-mute)] px-4 py-3">标签数</th>
+
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">状态</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">更新时间</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
@@ -85,7 +85,7 @@ export default function LessonManagePage() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-sm text-[var(--color-mute)]">
+                <td colSpan={8} className="text-center py-12 text-sm text-[var(--color-mute)]">
                   暂无题目数据
                 </td>
               </tr>
@@ -93,11 +93,11 @@ export default function LessonManagePage() {
               filtered.map((q) => (
                 <tr key={q.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
                   <td className="px-4 py-3 text-xs text-[var(--color-mute)] font-mono">{q.id}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--color-ink)] font-medium max-w-[200px] truncate">{q.title}</td>
+                  <td className="px-4 py-3 text-sm text-[var(--color-ink)] max-w-[200px] truncate">{q.question}</td>
                   <td className="px-4 py-3 text-sm text-[var(--color-body)]">{q.subject}</td>
                   <td className="px-4 py-3 text-sm text-[var(--color-body)]">{q.grade}</td>
                   <td className="px-4 py-3 text-sm text-[var(--color-body)]">{q.typeName || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--color-body)] text-center">{q.tags.length}</td>
+
                   <td className="px-4 py-3">{statusBadge(q.status)}</td>
                   <td className="px-4 py-3 text-xs text-[var(--color-mute)]">{q.updatedAt}</td>
                   <td className="px-4 py-3 text-right">
@@ -128,18 +128,18 @@ export default function LessonManagePage() {
       {/* Mobile card list */}
       <div className="md:hidden space-y-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-sm text-[var(--color-mute)] bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-6">
+          <div className="text-center py-12 text-sm text-[var(--color-mute)] bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
             暂无题目数据
           </div>
         ) : (
           filtered.map((q) => (
             <div
               key={q.id}
-              className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-4"
+              className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-medium text-[var(--color-ink)] truncate">{q.title}</h3>
+                  <h3 className="text-sm font-medium text-[var(--color-ink)] line-clamp-2">{q.question}</h3>
                   <p className="text-xs text-[var(--color-mute)] font-mono mt-0.5">{q.id}</p>
                 </div>
                 {statusBadge(q.status)}
@@ -150,8 +150,7 @@ export default function LessonManagePage() {
                 <span>{q.grade}</span>
                 <span className="text-[var(--color-hairline)]">·</span>
                 <span>{q.typeName || '-'}</span>
-                <span className="text-[var(--color-hairline)]">·</span>
-                <span>{q.tags.length} 标签</span>
+
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[var(--color-mute)]">更新于 {q.updatedAt}</span>
@@ -180,7 +179,7 @@ export default function LessonManagePage() {
       {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
             <h3 className="text-base font-semibold text-[var(--color-ink)] mb-2">确认删除</h3>
             <p className="text-sm text-[var(--color-body)] mb-1">
               确定要删除题目「{deleteTarget.title}」吗？

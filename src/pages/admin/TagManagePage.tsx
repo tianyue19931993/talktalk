@@ -68,7 +68,7 @@ export default function TagManagePage() {
 
       {/* Inline new tag form */}
       {showNewForm && (
-        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] p-4 mb-4 flex items-center gap-3">
+        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5 mb-4 flex items-center gap-3">
           <div className="flex-1">
             <Input
               placeholder="标签名称"
@@ -87,19 +87,19 @@ export default function TagManagePage() {
       )}
 
       {/* Table */}
-      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l2)] overflow-hidden">
+      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--color-hairline)]">
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">标签名称</th>
-              <th className="text-center text-xs font-medium text-[var(--color-mute)] px-4 py-3">使用次数</th>
+
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
             {tags.length === 0 ? (
               <tr>
-                <td colSpan={3} className="text-center py-12 text-sm text-[var(--color-mute)]">
+                <td colSpan={2} className="text-center py-12 text-sm text-[var(--color-mute)]">
                   暂无标签数据
                 </td>
               </tr>
@@ -118,11 +118,7 @@ export default function TagManagePage() {
                       <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center justify-center min-w-[24px] px-2 py-0.5 text-xs font-medium rounded-full bg-[var(--color-canvas-soft)] text-[var(--color-body)]">
-                      {t.count}
-                    </span>
-                  </td>
+
                   <td className="px-4 py-3 text-right">
                     {editingId === t.id ? (
                       <div className="flex items-center justify-end gap-1">
@@ -170,7 +166,7 @@ export default function TagManagePage() {
       {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-md)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l3)] p-6 max-w-sm w-full mx-4">
             <h3 className="text-base font-semibold text-[var(--color-ink)] mb-2">确认删除</h3>
             <p className="text-sm text-[var(--color-body)] mb-1">
               确定要删除标签「{deleteTarget.name}」吗？

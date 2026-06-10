@@ -77,7 +77,18 @@ function syncToLocal() {
 // ---------- load cached data from localStorage (instant) ----------
 function loadFromLocal() {
   try {
-    const rQ = localStorage.getItem('talktalk_questions')
+    // Check if localStorage data is too bloated (old test data w/ base64 URLs)
+    const qRaw = localStorage.getItem('talktalk_questions')
+    if (qRaw && qRaw.length > 500 * 1024) {
+      // >500KB? Likely bloated with old base64 images — clear it
+      console.warn('localStorage questions too large (' + (qRaw.length/1024).toFixed(0) + 'KB), clearing')
+      localStorage.removeItem('talktalk_questions')
+      localStorage.removeItem('talktalk_types')
+      localStorage.removeItem('talktalk_tags')
+      return // keep empty
+    }
+
+    const rQ = qRaw
     const rT = localStorage.getItem('talktalk_types')
     const rTa = localStorage.getItem('talktalk_tags')
     if (rQ) questions = JSON.parse(rQ)
@@ -85,7 +96,12 @@ function loadFromLocal() {
     if (rTa) tags = JSON.parse(rTa)
     resolveTypeNames()
     computeTagCounts()
-  } catch {}
+  } catch {
+    // JSON parse failed — clear and start fresh
+    localStorage.removeItem('talktalk_questions')
+    localStorage.removeItem('talktalk_types')
+    localStorage.removeItem('talktalk_tags')
+  }
 }
 
 // Initial load from localStorage (instant, no wait)

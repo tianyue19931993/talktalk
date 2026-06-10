@@ -12,14 +12,10 @@ let loading = false
 
 export function subscribe(fn: () => void) {
   listeners.push(fn)
-  return () => {
-    listeners = listeners.filter((f) => f !== fn)
-  }
+  return () => { listeners = listeners.filter((f) => f !== fn) }
 }
 
-function notify() {
-  listeners.forEach((fn) => fn())
-}
+function notify() { listeners.forEach((fn) => fn()) }
 
 // ---------- data transformation ----------
 
@@ -29,7 +25,7 @@ function rowToQuestion(row: any): Question {
     title: row.title || '',
     subject: row.subject || '数学',
     grade: row.grade || '',
-    typeId: row.type_id || '',
+    typeId: row.type_id ? String(row.type_id) : '',
     typeName: '',
     tags: row.tags || [],
     question: row.question_text || '',
@@ -48,7 +44,7 @@ function questionToRow(q: Question) {
     title: q.title,
     subject: q.subject,
     grade: q.grade,
-    type_id: q.typeId,
+    type_id: q.typeId ? parseInt(q.typeId, 10) : null,
     tags: q.tags,
     question_text: q.question,
     markdown: q.content.markdown,
@@ -60,7 +56,7 @@ function questionToRow(q: Question) {
 
 function rowToType(row: any): QuestionType {
   return {
-    id: row.id,
+    id: String(row.id),
     name: row.name,
     icon: row.icon || '📝',
     description: row.description || '',
@@ -71,7 +67,7 @@ function rowToType(row: any): QuestionType {
 
 function rowToTag(row: any): Tag {
   return {
-    id: row.id,
+    id: String(row.id),
     name: row.name,
     count: 0,
     createdAt: row.created_at?.slice(0, 10) || '',
@@ -80,20 +76,16 @@ function rowToTag(row: any): Tag {
 
 function resolveTypeNames() {
   const typeMap = Object.fromEntries(types.map((t) => [t.id, t.name]))
-  questions.forEach((q) => {
-    q.typeName = typeMap[q.typeId] || ''
-  })
+  questions.forEach((q) => { q.typeName = typeMap[q.typeId] || '' })
 }
 
 function computeTagCounts() {
   const counts: Record<string, number> = {}
-  questions.forEach((q) => {
-    q.tags.forEach((t) => { counts[t] = (counts[t] || 0) + 1 })
-  })
+  questions.forEach((q) => { q.tags.forEach((t) => { counts[t] = (counts[t] || 0) + 1 }) })
   tags.forEach((t) => { t.count = counts[t.name] || 0 })
 }
 
-// ---------- load from Supabase (no localStorage fallback for display) ----------
+// ---------- load from Supabase ----------
 async function ensureLoaded() {
   if (loaded || loading) return
   loading = true
@@ -104,7 +96,6 @@ async function ensureLoaded() {
       supabase.from('question_types').select('*').order('created_at'),
       supabase.from('tags').select('*').order('created_at'),
     ])
-
     if (qr.error) throw qr.error
     if (tyr.error) throw tyr.error
     if (tar.error) throw tar.error
@@ -114,15 +105,8 @@ async function ensureLoaded() {
     tags = (tar.data || []).map(rowToTag)
     resolveTypeNames()
     computeTagCounts()
-
-    // Write-through to localStorage for offline writes, NOT for display
-    try {
-      localStorage.setItem('talktalk_questions', JSON.stringify(questions))
-      localStorage.setItem('talktalk_types', JSON.stringify(types))
-      localStorage.setItem('talktalk_tags', JSON.stringify(tags))
-    } catch {}
+    syncToLocal()
   } catch (e) {
-    // Supabase unreachable — emergency fallback to localStorage (keeps app usable)
     console.warn('Supabase unavailable, using cached data:', e)
     try {
       const rawQ = localStorage.getItem('talktalk_questions')
@@ -141,29 +125,20 @@ async function ensureLoaded() {
   notify()
 }
 
-// Start loading immediately
 ensureLoaded()
 
-// ---------- synchronous accessors (empty until loaded) ----------
-export function getQuestions(): Question[] {
-  return questions
-}
+// ---------- sync accessors ----------
+export function getQuestions(): Question[] { return questions }
+export function getTypes(): QuestionType[] { return types }
+export function getTags(): Tag[] { return tags }
 
-export function getTypes(): QuestionType[] {
-  return types
-}
-
-export function getTags(): Tag[] {
-  return tags
-}
-
-// ---------- mutations (sync cache first, then async Supabase) ----------
+// ---------- mutations ----------
 
 export function addQuestion(data: QuestionForm): Question {
   const id = `lesson-${String(Date.now()).slice(-6)}`
   const now = new Date().toISOString().slice(0, 10)
   const t = types.find((t) => t.id === data.typeId)
-  const question: Question = {
+  const q: Question = {
     id, title: data.title, subject: data.subject, grade: data.grade,
     typeId: data.typeId, typeName: t?.name || '',
     tags: data.tags, question: data.question,
@@ -171,31 +146,23 @@ export function addQuestion(data: QuestionForm): Question {
     htmlDemos: data.htmlDemos, status: data.status,
     createdAt: now, updatedAt: now,
   }
-
-  questions = [question, ...questions]
+  questions = [q, ...questions]
   computeTagCounts()
   syncToLocal()
   notify()
-
-  supabase.from('questions').insert(questionToRow(question))
+  supabase.from('questions').insert(questionToRow(q))
     .then(({ error }) => { if (error) console.warn('addQuestion error:', error) })
-
-  return question
+  return q
 }
 
 export function updateQuestion(id: string, data: QuestionForm) {
   const index = questions.findIndex((q) => q.id === id)
   if (index === -1) return
   const t = types.find((t) => t.id === data.typeId)
-  questions[index] = {
-    ...questions[index], ...data,
-    typeName: t?.name || '',
-    updatedAt: new Date().toISOString().slice(0, 10),
-  }
+  questions[index] = { ...questions[index], ...data, typeName: t?.name || '', updatedAt: new Date().toISOString().slice(0, 10) }
   computeTagCounts()
   syncToLocal()
   notify()
-
   supabase.from('questions').update(questionToRow(questions[index])).eq('id', id)
     .then(({ error }) => { if (error) console.warn('updateQuestion error:', error) })
 }
@@ -205,81 +172,92 @@ export function deleteQuestion(id: string) {
   computeTagCounts()
   syncToLocal()
   notify()
-
   supabase.from('questions').delete().eq('id', id)
     .then(({ error }) => { if (error) console.warn('deleteQuestion error:', error) })
 }
 
-export function addType(data: { name: string; description?: string; icon?: string }) {
-  const id = data.name.toLowerCase().replace(/\s+/g, '')
-  const now = new Date().toISOString().slice(0, 10)
-  const t: QuestionType = { id, name: data.name, icon: data.icon || '📝', description: data.description || '', createdAt: now, updatedAt: now }
+// type_id 现在是 int 自增，先插 DB 拿到 ID 再更新缓存
+export async function addType(data: { name: string; description?: string; icon?: string }): Promise<QuestionType> {
+  const { data: inserted, error } = await supabase.from('question_types').insert({
+    name: data.name, icon: data.icon || '📝', description: data.description || '',
+  }).select().single()
 
+  if (error) throw error
+
+  const t = rowToType(inserted)
   types = [...types, t]
   syncToLocal()
   notify()
-
-  supabase.from('question_types').upsert({
-    id, name: data.name, icon: data.icon || '📝', description: data.description || '',
-  }).then(({ error }) => { if (error) console.warn('addType error:', error) })
+  return t
 }
 
-export function updateType(id: string, data: { name?: string; description?: string }) {
+export async function updateType(id: string, data: { name?: string; description?: string }) {
   const index = types.findIndex((t) => t.id === id)
   if (index === -1) return
   const patch: any = {}
   if (data.name !== undefined) patch.name = data.name
   if (data.description !== undefined) patch.description = data.description
 
+  // Update cache immediately
   types[index] = { ...types[index], ...patch, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames()
   syncToLocal()
   notify()
 
-  supabase.from('question_types').update(patch).eq('id', id)
+  // Background sync to Supabase
+  const numId = parseInt(id, 10)
+  supabase.from('question_types').update(patch).eq('id', numId)
     .then(({ error }) => { if (error) console.warn('updateType error:', error) })
 }
 
-export function deleteType(id: string) {
+export async function deleteType(id: string) {
+  // Update cache immediately
   types = types.filter((t) => t.id !== id)
   questions = questions.map((q) => q.typeId === id ? { ...q, typeId: '', typeName: '' } : q)
   syncToLocal()
   notify()
 
-  supabase.from('question_types').delete().eq('id', id)
+  // Background sync
+  const numId = parseInt(id, 10)
+  supabase.from('question_types').delete().eq('id', numId)
     .then(({ error }) => { if (error) console.warn('deleteType error:', error) })
 }
 
-export function addTag(name: string) {
-  const id = `tag-${String(Date.now()).slice(-6)}`
-  const now = new Date().toISOString().slice(0, 10)
-  const t: Tag = { id, name, count: 0, createdAt: now }
+export async function addTag(name: string): Promise<Tag> {
+  const { data: inserted, error } = await supabase.from('tags').insert({ name }).select().single()
+  if (error) throw error
 
+  const t = rowToTag(inserted)
   tags = [...tags, t]
   syncToLocal()
   notify()
-
-  supabase.from('tags').upsert({ id, name })
-    .then(({ error }) => { if (error) console.warn('addTag error:', error) })
+  return t
 }
 
-export function updateTag(id: string, name: string) {
+export async function updateTag(id: string, name: string) {
   const index = tags.findIndex((t) => t.id === id)
   if (index === -1) return
+
+  // Update cache immediately
   tags[index] = { ...tags[index], name }
   syncToLocal()
   notify()
 
-  supabase.from('tags').update({ name }).eq('id', id)
+  // Background sync
+  const numId = parseInt(id, 10)
+  supabase.from('tags').update({ name }).eq('id', numId)
     .then(({ error }) => { if (error) console.warn('updateTag error:', error) })
 }
 
-export function deleteTag(id: string) {
+export async function deleteTag(id: string) {
+  // Update cache immediately
   tags = tags.filter((t) => t.id !== id)
   syncToLocal()
   notify()
 
-  supabase.from('tags').delete().eq('id', id)
+  // Background sync
+  const numId = parseInt(id, 10)
+  supabase.from('tags').delete().eq('id', numId)
     .then(({ error }) => { if (error) console.warn('deleteTag error:', error) })
 }
 
@@ -294,14 +272,10 @@ function syncToLocal() {
 // ---------- React hook ----------
 export function useStore() {
   const [, setTick] = useState(0)
-
   useMemo(() => {
     const unsub = subscribe(() => setTick((t) => t + 1))
-    if (!loaded) {
-      ensureLoaded().then(() => setTick((t) => t + 1))
-    }
+    if (!loaded) ensureLoaded().then(() => setTick((t) => t + 1))
     return unsub
   }, [])
-
   return { questions, types, tags }
 }

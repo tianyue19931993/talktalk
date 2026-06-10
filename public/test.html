@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>测试页</title></head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:system-ui,sans-serif;background:#fafafa">
+<div style="text-align:center">
+  <h1 style="font-size:24px;color:#171717">✅ 测试页加载成功</h1>
+  <p style="font-size:14px;color:#888" id="time"></p>
+  <p id="log" style="font-size:12px;color:#aaa;margin-top:20px"></p>
+</div>
+<script>
+document.getElementById('time').textContent = new Date().toLocaleString('zh-CN');
+let log = document.getElementById('log');
+try {
+  let q = localStorage.getItem('talktalk_questions');
+  log.textContent = 'localStorage questions 大小: ' + (q ? (q.length/1024).toFixed(0) + 'KB' : '空');
+} catch(e) {
+  log.textContent = 'localStorage 错误: ' + e.message;
+}
+</script>
+</body>
+</html>

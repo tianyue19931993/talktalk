@@ -1,5 +1,5 @@
+import { useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-
 import { ArrowLeft } from 'lucide-react'
 import { getQuestions } from '../../stores/appStore'
 
@@ -12,6 +12,20 @@ export default function DemoPage() {
 
   const demoIndex = demoId ? parseInt(demoId, 10) : -1
   const demo = question?.htmlDemos?.[demoIndex]
+
+  // Decode data: URL → raw HTML for srcdoc (better mobile compatibility)
+  const htmlContent = useMemo(() => {
+    if (!demo?.url) return null
+    if (demo.url.startsWith('data:text/html')) {
+      try {
+        const encoded = demo.url.split(',')[1]
+        return decodeURIComponent(encoded)
+      } catch {
+        return null
+      }
+    }
+    return null
+  }, [demo])
 
   if (!demo) {
     return (
@@ -34,13 +48,25 @@ export default function DemoPage() {
         <ArrowLeft className="w-3.5 h-3.5" />
         返回
       </button>
-      <iframe
-        src={demo.url}
-        title="演示"
-        className="w-full h-full border-0"
-        sandbox="allow-scripts allow-same-origin allow-forms"
-        allowFullScreen
-      />
+
+      {/* srcdoc for uploaded HTML, src for external URLs */}
+      {htmlContent ? (
+        <iframe
+          srcdoc={htmlContent}
+          title="演示"
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin"
+          allowFullScreen
+        />
+      ) : (
+        <iframe
+          src={demo.url}
+          title="演示"
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          allowFullScreen
+        />
+      )}
     </div>
   )
 }

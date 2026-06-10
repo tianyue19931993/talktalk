@@ -1,9 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Question, QuestionType, Tag, QuestionForm } from '../types'
 import { supabase } from '../lib/supabase'
-import initialQuestions from '../data/sampleQuestions'
-import initialTypes from '../data/sampleTypes'
-import initialTags from '../data/sampleTags'
 
 // ---------- in-memory cache ----------
 let questions: Question[] = []
@@ -96,93 +93,47 @@ function computeTagCounts() {
   tags.forEach((t) => { t.count = counts[t.name] || 0 })
 }
 
-function backupToLocal() {
-  try {
-    localStorage.setItem('talktalk_questions', JSON.stringify(questions))
-    localStorage.setItem('talktalk_types', JSON.stringify(types))
-    localStorage.setItem('talktalk_tags', JSON.stringify(tags))
-  } catch {}
-}
-
-// ---------- init: load from Supabase, fallback to localStorage ----------
-async function loadFromFallback() {
-  questions = JSON.parse(localStorage.getItem('talktalk_questions') || 'null') || JSON.parse(JSON.stringify(initialQuestions))
-  types = JSON.parse(localStorage.getItem('talktalk_types') || 'null') || JSON.parse(JSON.stringify(initialTypes))
-  tags = JSON.parse(localStorage.getItem('talktalk_tags') || 'null') || JSON.parse(JSON.stringify(initialTags))
-  resolveTypeNames()
-  computeTagCounts()
-  loaded = true
-  loading = false
-  notify()
-}
-
-async function migrateLocalToSupabase() {
-  const localQuestions: Question[] = JSON.parse(localStorage.getItem('talktalk_questions') || 'null') || [...initialQuestions]
-  const localTypes: QuestionType[] = JSON.parse(localStorage.getItem('talktalk_types') || 'null') || [...initialTypes]
-  const localTags: Tag[] = JSON.parse(localStorage.getItem('talktalk_tags') || 'null') || [...initialTags]
-
-  const promises: Promise<any>[] = []
-  if (localTypes.length) {
-    promises.push(
-      supabase.from('question_types').upsert(
-        localTypes.map((t) => ({ id: t.id, name: t.name, icon: t.icon || '📝', description: t.description || '' }))
-      )
-    )
-  }
-  if (localTags.length) {
-    promises.push(
-      supabase.from('tags').upsert(localTags.map((t) => ({ id: t.id, name: t.name })))
-    )
-  }
-  if (localQuestions.length) {
-    promises.push(
-      supabase.from('questions').upsert(localQuestions.map(questionToRow))
-    )
-  }
-  const results = await Promise.allSettled(promises)
-  results.forEach((r) => {
-    if (r.status === 'rejected') console.warn('migration item failed:', r.reason)
-  })
-}
-
+// ---------- load from Supabase (no localStorage fallback for display) ----------
 async function ensureLoaded() {
   if (loaded || loading) return
   loading = true
 
   try {
-    // Try loading questions first to check if Supabase has data
-    const { data: qData, error: qErr } = await supabase
-      .from('questions')
-      .select('id')
-      .limit(1)
-
-    if (qErr || !qData || qData.length === 0) {
-      // First run or Supabase error — use fallback, then migrate
-      await loadFromFallback()
-      // Attempt migration in background
-      migrateLocalToSupabase().catch((e) => console.warn('bg migration failed:', e))
-      return
-    }
-
-    // Load all data from Supabase
     const [qr, tyr, tar] = await Promise.all([
       supabase.from('questions').select('*').order('created_at', { ascending: false }),
       supabase.from('question_types').select('*').order('created_at'),
       supabase.from('tags').select('*').order('created_at'),
     ])
 
-    if (qr.error || tyr.error || tar.error) throw new Error('Supabase load error')
+    if (qr.error) throw qr.error
+    if (tyr.error) throw tyr.error
+    if (tar.error) throw tar.error
 
     questions = (qr.data || []).map(rowToQuestion)
     types = (tyr.data || []).map(rowToType)
     tags = (tar.data || []).map(rowToTag)
     resolveTypeNames()
     computeTagCounts()
-    backupToLocal()
+
+    // Write-through to localStorage for offline writes, NOT for display
+    try {
+      localStorage.setItem('talktalk_questions', JSON.stringify(questions))
+      localStorage.setItem('talktalk_types', JSON.stringify(types))
+      localStorage.setItem('talktalk_tags', JSON.stringify(tags))
+    } catch {}
   } catch (e) {
-    console.warn('Supabase init failed, falling back to localStorage:', e)
-    await loadFromFallback()
-    return
+    // Supabase unreachable — emergency fallback to localStorage (keeps app usable)
+    console.warn('Supabase unavailable, using cached data:', e)
+    try {
+      const rawQ = localStorage.getItem('talktalk_questions')
+      const rawT = localStorage.getItem('talktalk_types')
+      const rawTa = localStorage.getItem('talktalk_tags')
+      if (rawQ) questions = JSON.parse(rawQ)
+      if (rawT) types = JSON.parse(rawT)
+      if (rawTa) tags = JSON.parse(rawTa)
+      resolveTypeNames()
+      computeTagCounts()
+    } catch {}
   }
 
   loaded = true
@@ -190,76 +141,44 @@ async function ensureLoaded() {
   notify()
 }
 
-// Start loading in background
+// Start loading immediately
 ensureLoaded()
 
-// ---------- synchronous accessors ----------
+// ---------- synchronous accessors (empty until loaded) ----------
 export function getQuestions(): Question[] {
-  if (!loaded) {
-    try {
-      const raw = localStorage.getItem('talktalk_questions')
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
   return questions
 }
 
 export function getTypes(): QuestionType[] {
-  if (!loaded) {
-    try {
-      const raw = localStorage.getItem('talktalk_types')
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
   return types
 }
 
 export function getTags(): Tag[] {
-  if (!loaded) {
-    try {
-      const raw = localStorage.getItem('talktalk_tags')
-      if (raw) return JSON.parse(raw)
-    } catch {}
-  }
   return tags
 }
 
 // ---------- mutations (sync cache first, then async Supabase) ----------
 
-function genId(prefix: string): string {
-  return `${prefix}-${String(Date.now()).slice(-6)}`
-}
-
 export function addQuestion(data: QuestionForm): Question {
-  const id = genId('lesson')
+  const id = `lesson-${String(Date.now()).slice(-6)}`
   const now = new Date().toISOString().slice(0, 10)
   const t = types.find((t) => t.id === data.typeId)
   const question: Question = {
-    id,
-    title: data.title,
-    subject: data.subject,
-    grade: data.grade,
-    typeId: data.typeId,
-    typeName: t?.name || '',
-    tags: data.tags,
-    question: data.question,
-    content: { markdown: data.markdown },
-    images: data.images,
-    htmlDemos: data.htmlDemos,
-    status: data.status,
-    createdAt: now,
-    updatedAt: now,
+    id, title: data.title, subject: data.subject, grade: data.grade,
+    typeId: data.typeId, typeName: t?.name || '',
+    tags: data.tags, question: data.question,
+    content: { markdown: data.markdown }, images: data.images,
+    htmlDemos: data.htmlDemos, status: data.status,
+    createdAt: now, updatedAt: now,
   }
 
-  // Update cache immediately
   questions = [question, ...questions]
   computeTagCounts()
-  backupToLocal()
+  syncToLocal()
   notify()
 
-  // Sync to Supabase in background
   supabase.from('questions').insert(questionToRow(question))
-    .then(({ error }) => { if (error) console.warn('addQuestion supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('addQuestion error:', error) })
 
   return question
 }
@@ -268,53 +187,41 @@ export function updateQuestion(id: string, data: QuestionForm) {
   const index = questions.findIndex((q) => q.id === id)
   if (index === -1) return
   const t = types.find((t) => t.id === data.typeId)
-
-  // Update cache immediately
   questions[index] = {
-    ...questions[index],
-    ...data,
+    ...questions[index], ...data,
     typeName: t?.name || '',
     updatedAt: new Date().toISOString().slice(0, 10),
   }
   computeTagCounts()
-  backupToLocal()
+  syncToLocal()
   notify()
 
-  // Sync to Supabase in background
   supabase.from('questions').update(questionToRow(questions[index])).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('updateQuestion supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('updateQuestion error:', error) })
 }
 
 export function deleteQuestion(id: string) {
-  // Update cache immediately
   questions = questions.filter((q) => q.id !== id)
   computeTagCounts()
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('questions').delete().eq('id', id)
-    .then(({ error }) => { if (error) console.warn('deleteQuestion supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('deleteQuestion error:', error) })
 }
 
 export function addType(data: { name: string; description?: string; icon?: string }) {
   const id = data.name.toLowerCase().replace(/\s+/g, '')
   const now = new Date().toISOString().slice(0, 10)
-  const t: QuestionType = {
-    id,
-    name: data.name,
-    icon: data.icon || '📝',
-    description: data.description || '',
-    createdAt: now,
-    updatedAt: now,
-  }
+  const t: QuestionType = { id, name: data.name, icon: data.icon || '📝', description: data.description || '', createdAt: now, updatedAt: now }
 
   types = [...types, t]
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('question_types').upsert({
     id, name: data.name, icon: data.icon || '📝', description: data.description || '',
-  }).then(({ error }) => { if (error) console.warn('addType supabase error:', error) })
+  }).then(({ error }) => { if (error) console.warn('addType error:', error) })
 }
 
 export function updateType(id: string, data: { name?: string; description?: string }) {
@@ -326,55 +233,62 @@ export function updateType(id: string, data: { name?: string; description?: stri
 
   types[index] = { ...types[index], ...patch, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames()
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('question_types').update(patch).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('updateType supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('updateType error:', error) })
 }
 
 export function deleteType(id: string) {
   types = types.filter((t) => t.id !== id)
   questions = questions.map((q) => q.typeId === id ? { ...q, typeId: '', typeName: '' } : q)
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('question_types').delete().eq('id', id)
-    .then(({ error }) => { if (error) console.warn('deleteType supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('deleteType error:', error) })
 }
 
 export function addTag(name: string) {
-  const id = genId('tag')
+  const id = `tag-${String(Date.now()).slice(-6)}`
   const now = new Date().toISOString().slice(0, 10)
   const t: Tag = { id, name, count: 0, createdAt: now }
 
   tags = [...tags, t]
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('tags').upsert({ id, name })
-    .then(({ error }) => { if (error) console.warn('addTag supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('addTag error:', error) })
 }
 
 export function updateTag(id: string, name: string) {
   const index = tags.findIndex((t) => t.id === id)
   if (index === -1) return
-
   tags[index] = { ...tags[index], name }
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('tags').update({ name }).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('updateTag supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('updateTag error:', error) })
 }
 
 export function deleteTag(id: string) {
   tags = tags.filter((t) => t.id !== id)
-  backupToLocal()
+  syncToLocal()
   notify()
 
   supabase.from('tags').delete().eq('id', id)
-    .then(({ error }) => { if (error) console.warn('deleteTag supabase error:', error) })
+    .then(({ error }) => { if (error) console.warn('deleteTag error:', error) })
+}
+
+function syncToLocal() {
+  try {
+    localStorage.setItem('talktalk_questions', JSON.stringify(questions))
+    localStorage.setItem('talktalk_types', JSON.stringify(types))
+    localStorage.setItem('talktalk_tags', JSON.stringify(tags))
+  } catch {}
 }
 
 // ---------- React hook ----------
@@ -383,7 +297,6 @@ export function useStore() {
 
   useMemo(() => {
     const unsub = subscribe(() => setTick((t) => t + 1))
-    // If not loaded yet, trigger re-render when done
     if (!loaded) {
       ensureLoaded().then(() => setTick((t) => t + 1))
     }
@@ -392,6 +305,3 @@ export function useStore() {
 
   return { questions, types, tags }
 }
-
-// ensureLoaded is already in scope for import
-

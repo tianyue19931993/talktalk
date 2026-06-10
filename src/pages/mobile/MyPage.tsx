@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  User, Crown, Clock, CreditCard, MessageCircle, QrCode,
+  User, Crown, Clock, CreditCard,
   LogIn, LogOut, Sparkles, ChevronRight, Shield
 } from 'lucide-react'
 import { useAuth, resetAuth } from '../../stores/authStore'
@@ -35,8 +35,8 @@ export default function MyPage() {
 
         {/* Quick links */}
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] divide-y divide-[var(--color-hairline)]">
-          <LinkItem icon={Crown} label="开通会员" onClick={() => navigate('/subscribe')} />
-          <LinkItem icon={MessageCircle} label="联系我们" />
+          <LinkItem icon={Crown} label="开通会员" onClick={() => navigate('/login?redirect=/subscribe')} />
+          <LinkItem icon={Sparkles} label="我生成题目演示" disabled badge="暂未开放" />
         </div>
 
         {/* About */}

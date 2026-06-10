@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react'
 import { Question, QuestionType, Tag, QuestionForm } from '../types'
-import { getDb, safeQuery } from '../lib/supabase'
+import { query, insert, update as supdate, remove, isConfigured } from '../lib/supabase'
 
 // ---------- in-memory cache ----------
 let questions: Question[] = []
 let types: QuestionType[] = []
 let tags: Tag[] = []
 let listeners: Array<() => void> = []
-let loaded = true     // ← 标记为已加载，页面立刻渲染（空数据）
-let syncing = false   // 后台同步中...
 
 export function subscribe(fn: () => void) {
   listeners.push(fn)
@@ -76,37 +74,38 @@ function syncToLocal() {
   } catch {}
 }
 
-// ---------- background sync from Supabase ----------
-// Page renders instantly with empty data; Supabase data loads in background
-async function syncFromSupabase() {
-  if (syncing) return
-  syncing = true
-
+// ---------- load cached data from localStorage (instant) ----------
+function loadFromLocal() {
   try {
-    const db = getDb()
-    if (!db) { syncing = false; return }
+    const rQ = localStorage.getItem('talktalk_questions')
+    const rT = localStorage.getItem('talktalk_types')
+    const rTa = localStorage.getItem('talktalk_tags')
+    if (rQ) questions = JSON.parse(rQ)
+    if (rT) types = JSON.parse(rT)
+    if (rTa) tags = JSON.parse(rTa)
+    resolveTypeNames()
+    computeTagCounts()
+  } catch {}
+}
 
+// Initial load from localStorage (instant, no wait)
+loadFromLocal()
+
+// Then sync from Supabase in background
+if (isConfigured()) {
+  syncFromSupabase()
+}
+
+async function syncFromSupabase() {
+  try {
     const [qr, tyr, tar] = await Promise.all([
-      safeQuery((d) => d.from('questions').select('*').order('created_at', { ascending: false }), 6000),
-      safeQuery((d) => d.from('question_types').select('*').order('created_at'), 6000),
-      safeQuery((d) => d.from('tags').select('*').order('created_at'), 6000),
+      query<any[]>('questions', { order: 'created_at', ascending: false }),
+      query<any[]>('question_types', { order: 'created_at' }),
+      query<any[]>('tags', { order: 'created_at' }),
     ])
 
     if (qr.error || tyr.error || tar.error) {
-      console.warn('Supabase sync failed, using local cache')
-      // Try localStorage as fallback
-      try {
-        const rQ = localStorage.getItem('talktalk_questions')
-        const rT = localStorage.getItem('talktalk_types')
-        const rTa = localStorage.getItem('talktalk_tags')
-        if (rQ) questions = JSON.parse(rQ)
-        if (rT) types = JSON.parse(rT)
-        if (rTa) tags = JSON.parse(rTa)
-      } catch {}
-      resolveTypeNames()
-      computeTagCounts()
-      notify()
-      syncing = false
+      console.warn('Supabase sync failed, keeping local data')
       return
     }
 
@@ -116,28 +115,16 @@ async function syncFromSupabase() {
     resolveTypeNames()
     computeTagCounts()
     syncToLocal()
+    notify()
   } catch (e) {
-    console.warn('Supabase sync error:', e)
+    console.warn('Supabase sync error, keeping local data:', e)
   }
-
-  syncing = false
-  notify()
 }
 
-// Start background sync immediately
-syncFromSupabase()
-
-// ---------- sync accessors (return current cache immediately) ----------
+// ---------- sync accessors ----------
 export function getQuestions(): Question[] { return questions }
 export function getTypes(): QuestionType[] { return types }
 export function getTags(): Tag[] { return tags }
-
-// ---------- helpers ----------
-function db() {
-  const d = getDb()
-  if (!d) throw new Error('Supabase not configured')
-  return d
-}
 
 // ---------- mutations ----------
 
@@ -154,10 +141,8 @@ export function addQuestion(data: QuestionForm): Question {
     createdAt: now, updatedAt: now,
   }
   questions = [q, ...questions]
-  computeTagCounts()
-  syncToLocal()
-  notify()
-  try { db().from('questions').insert(questionToRow(q)) } catch {}
+  computeTagCounts(); syncToLocal(); notify()
+  insert('questions', questionToRow(q)).catch(() => {})
   return q
 }
 
@@ -167,21 +152,19 @@ export function updateQuestion(id: string, data: QuestionForm) {
   const t = types.find((t) => t.id === data.typeId)
   questions[i] = { ...questions[i], ...data, typeName: t?.name || '', updatedAt: new Date().toISOString().slice(0, 10) }
   computeTagCounts(); syncToLocal(); notify()
-  try { db().from('questions').update(questionToRow(questions[i])).eq('id', id) } catch {}
+  supdate('questions', 'id', id, questionToRow(questions[i])).catch(() => {})
 }
 
 export function deleteQuestion(id: string) {
   questions = questions.filter((q) => q.id !== id)
   computeTagCounts(); syncToLocal(); notify()
-  try { db().from('questions').delete().eq('id', id) } catch {}
+  remove('questions', 'id', id).catch(() => {})
 }
 
 export async function addType(data: { name: string; description?: string; icon?: string }): Promise<QuestionType> {
-  const { data: inserted, error } = await safeQuery((d) =>
-    d.from('question_types').insert({ name: data.name, icon: data.icon || '📝', description: data.description || '' }).select().single()
-  )
-  if (error || !inserted) throw error || new Error('insert failed')
-  const t = rowToType(inserted); types = [...types, t]; syncToLocal(); notify()
+  const r = await insert<any[]>('question_types', { name: data.name, icon: data.icon || '📝', description: data.description || '' })
+  if (r.error || !r.data) throw r.error || new Error('insert failed')
+  const t = rowToType(r.data[0]); types = [...types, t]; syncToLocal(); notify()
   return t
 }
 
@@ -190,34 +173,32 @@ export async function updateType(id: string, data: { name?: string; description?
   const p: any = {}; if (data.name !== undefined) p.name = data.name; if (data.description !== undefined) p.description = data.description
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames(); syncToLocal(); notify()
-  try { db().from('question_types').update(p).eq('id', parseInt(id, 10)) } catch {}
+  supdate('question_types', 'id', parseInt(id, 10), p).catch(() => {})
 }
 
 export async function deleteType(id: string) {
   types = types.filter((t) => t.id !== id)
   questions = questions.map((q) => q.typeId === id ? { ...q, typeId: '', typeName: '' } : q)
   syncToLocal(); notify()
-  try { db().from('question_types').delete().eq('id', parseInt(id, 10)) } catch {}
+  remove('question_types', 'id', parseInt(id, 10)).catch(() => {})
 }
 
 export async function addTag(name: string): Promise<Tag> {
-  const { data: inserted, error } = await safeQuery((d) =>
-    d.from('tags').insert({ name }).select().single()
-  )
-  if (error || !inserted) throw error || new Error('insert failed')
-  const t = rowToTag(inserted); tags = [...tags, t]; syncToLocal(); notify()
+  const r = await insert<any[]>('tags', { name })
+  if (r.error || !r.data) throw r.error || new Error('insert failed')
+  const t = rowToTag(r.data[0]); tags = [...tags, t]; syncToLocal(); notify()
   return t
 }
 
 export async function updateTag(id: string, name: string) {
   const i = tags.findIndex((t) => t.id === id); if (i === -1) return
   tags[i] = { ...tags[i], name }; syncToLocal(); notify()
-  try { db().from('tags').update({ name }).eq('id', parseInt(id, 10)) } catch {}
+  supdate('tags', 'id', parseInt(id, 10), { name }).catch(() => {})
 }
 
 export async function deleteTag(id: string) {
   tags = tags.filter((t) => t.id !== id); syncToLocal(); notify()
-  try { db().from('tags').delete().eq('id', parseInt(id, 10)) } catch {}
+  remove('tags', 'id', parseInt(id, 10)).catch(() => {})
 }
 
 // ---------- React hook ----------

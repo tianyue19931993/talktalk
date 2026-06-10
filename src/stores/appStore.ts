@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Question, QuestionType, Tag, QuestionForm } from '../types'
-import { supabase } from '../lib/supabase'
+import { getDb, safeQuery } from '../lib/supabase'
 
 // ---------- in-memory cache ----------
 let questions: Question[] = []
@@ -85,17 +85,29 @@ function computeTagCounts() {
   tags.forEach((t) => { t.count = counts[t.name] || 0 })
 }
 
-// ---------- load from Supabase ----------
+function syncToLocal() {
+  try {
+    localStorage.setItem('talktalk_questions', JSON.stringify(questions))
+    localStorage.setItem('talktalk_types', JSON.stringify(types))
+    localStorage.setItem('talktalk_tags', JSON.stringify(tags))
+  } catch {}
+}
+
+// ---------- load from Supabase with timeout ----------
 async function ensureLoaded() {
   if (loaded || loading) return
   loading = true
 
   try {
+    const db = getDb()
+    if (!db) throw new Error('Supabase not configured')
+
     const [qr, tyr, tar] = await Promise.all([
-      supabase.from('questions').select('*').order('created_at', { ascending: false }),
-      supabase.from('question_types').select('*').order('created_at'),
-      supabase.from('tags').select('*').order('created_at'),
+      safeQuery((d) => d.from('questions').select('*').order('created_at', { ascending: false })),
+      safeQuery((d) => d.from('question_types').select('*').order('created_at')),
+      safeQuery((d) => d.from('tags').select('*').order('created_at')),
     ])
+
     if (qr.error) throw qr.error
     if (tyr.error) throw tyr.error
     if (tar.error) throw tar.error
@@ -106,8 +118,8 @@ async function ensureLoaded() {
     resolveTypeNames()
     computeTagCounts()
     syncToLocal()
-  } catch (e) {
-    console.warn('Supabase unavailable, using cached data:', e)
+  } catch (e: any) {
+    console.warn('Supabase unavailable, using cached data:', e?.message || e)
     try {
       const rawQ = localStorage.getItem('talktalk_questions')
       const rawT = localStorage.getItem('talktalk_types')
@@ -132,6 +144,13 @@ export function getQuestions(): Question[] { return questions }
 export function getTypes(): QuestionType[] { return types }
 export function getTags(): Tag[] { return tags }
 
+// ---------- helpers ----------
+function db() {
+  const d = getDb()
+  if (!d) throw new Error('Supabase not configured')
+  return d
+}
+
 // ---------- mutations ----------
 
 export function addQuestion(data: QuestionForm): Question {
@@ -150,8 +169,10 @@ export function addQuestion(data: QuestionForm): Question {
   computeTagCounts()
   syncToLocal()
   notify()
-  supabase.from('questions').insert(questionToRow(q))
-    .then(({ error }) => { if (error) console.warn('addQuestion error:', error) })
+  try {
+    db().from('questions').insert(questionToRow(q))
+      .then(({ error }) => { if (error) console.warn('addQuestion error:', error) })
+  } catch {}
   return q
 }
 
@@ -163,8 +184,10 @@ export function updateQuestion(id: string, data: QuestionForm) {
   computeTagCounts()
   syncToLocal()
   notify()
-  supabase.from('questions').update(questionToRow(questions[index])).eq('id', id)
-    .then(({ error }) => { if (error) console.warn('updateQuestion error:', error) })
+  try {
+    db().from('questions').update(questionToRow(questions[index])).eq('id', id)
+      .then(({ error }) => { if (error) console.warn('updateQuestion error:', error) })
+  } catch {}
 }
 
 export function deleteQuestion(id: string) {
@@ -172,17 +195,19 @@ export function deleteQuestion(id: string) {
   computeTagCounts()
   syncToLocal()
   notify()
-  supabase.from('questions').delete().eq('id', id)
-    .then(({ error }) => { if (error) console.warn('deleteQuestion error:', error) })
+  try {
+    db().from('questions').delete().eq('id', id)
+      .then(({ error }) => { if (error) console.warn('deleteQuestion error:', error) })
+  } catch {}
 }
 
-// type_id 现在是 int 自增，先插 DB 拿到 ID 再更新缓存
 export async function addType(data: { name: string; description?: string; icon?: string }): Promise<QuestionType> {
-  const { data: inserted, error } = await supabase.from('question_types').insert({
-    name: data.name, icon: data.icon || '📝', description: data.description || '',
-  }).select().single()
-
-  if (error) throw error
+  const { data: inserted, error } = await safeQuery((d) =>
+    d.from('question_types').insert({
+      name: data.name, icon: data.icon || '📝', description: data.description || '',
+    }).select().single()
+  )
+  if (error || !inserted) throw error || new Error('insert returned no data')
 
   const t = rowToType(inserted)
   types = [...types, t]
@@ -198,34 +223,36 @@ export async function updateType(id: string, data: { name?: string; description?
   if (data.name !== undefined) patch.name = data.name
   if (data.description !== undefined) patch.description = data.description
 
-  // Update cache immediately
   types[index] = { ...types[index], ...patch, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames()
   syncToLocal()
   notify()
 
-  // Background sync to Supabase
-  const numId = parseInt(id, 10)
-  supabase.from('question_types').update(patch).eq('id', numId)
-    .then(({ error }) => { if (error) console.warn('updateType error:', error) })
+  try {
+    const numId = parseInt(id, 10)
+    db().from('question_types').update(patch).eq('id', numId)
+      .then(({ error }) => { if (error) console.warn('updateType error:', error) })
+  } catch {}
 }
 
 export async function deleteType(id: string) {
-  // Update cache immediately
   types = types.filter((t) => t.id !== id)
   questions = questions.map((q) => q.typeId === id ? { ...q, typeId: '', typeName: '' } : q)
   syncToLocal()
   notify()
 
-  // Background sync
-  const numId = parseInt(id, 10)
-  supabase.from('question_types').delete().eq('id', numId)
-    .then(({ error }) => { if (error) console.warn('deleteType error:', error) })
+  try {
+    const numId = parseInt(id, 10)
+    db().from('question_types').delete().eq('id', numId)
+      .then(({ error }) => { if (error) console.warn('deleteType error:', error) })
+  } catch {}
 }
 
 export async function addTag(name: string): Promise<Tag> {
-  const { data: inserted, error } = await supabase.from('tags').insert({ name }).select().single()
-  if (error) throw error
+  const { data: inserted, error } = await safeQuery((d) =>
+    d.from('tags').insert({ name }).select().single()
+  )
+  if (error || !inserted) throw error || new Error('insert returned no data')
 
   const t = rowToTag(inserted)
   tags = [...tags, t]
@@ -238,34 +265,26 @@ export async function updateTag(id: string, name: string) {
   const index = tags.findIndex((t) => t.id === id)
   if (index === -1) return
 
-  // Update cache immediately
   tags[index] = { ...tags[index], name }
   syncToLocal()
   notify()
 
-  // Background sync
-  const numId = parseInt(id, 10)
-  supabase.from('tags').update({ name }).eq('id', numId)
-    .then(({ error }) => { if (error) console.warn('updateTag error:', error) })
+  try {
+    const numId = parseInt(id, 10)
+    db().from('tags').update({ name }).eq('id', numId)
+      .then(({ error }) => { if (error) console.warn('updateTag error:', error) })
+  } catch {}
 }
 
 export async function deleteTag(id: string) {
-  // Update cache immediately
   tags = tags.filter((t) => t.id !== id)
   syncToLocal()
   notify()
 
-  // Background sync
-  const numId = parseInt(id, 10)
-  supabase.from('tags').delete().eq('id', numId)
-    .then(({ error }) => { if (error) console.warn('deleteTag error:', error) })
-}
-
-function syncToLocal() {
   try {
-    localStorage.setItem('talktalk_questions', JSON.stringify(questions))
-    localStorage.setItem('talktalk_types', JSON.stringify(types))
-    localStorage.setItem('talktalk_tags', JSON.stringify(tags))
+    const numId = parseInt(id, 10)
+    db().from('tags').delete().eq('id', numId)
+      .then(({ error }) => { if (error) console.warn('deleteTag error:', error) })
   } catch {}
 }
 

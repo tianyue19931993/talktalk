@@ -1,17 +1,38 @@
-import { Outlet, NavLink, useLocation, Link } from 'react-router-dom'
-import { FileText, Tags, BookType, ChevronLeft } from 'lucide-react'
+import { useEffect } from 'react'
+import { Outlet, NavLink, useLocation, Link, useNavigate } from 'react-router-dom'
+import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft } from 'lucide-react'
+import { useAuth } from '../../stores/authStore'
 
 const sidebarItems = [
   { path: '/admin/lessons', label: '题目管理', icon: FileText },
   { path: '/admin/types', label: '题型管理', icon: BookType },
   { path: '/admin/tags', label: '标签管理', icon: Tags },
+  { path: '/admin/users', label: '用户管理', icon: Users },
+  { path: '/admin/subscriptions', label: '订阅管理', icon: Crown },
+  { path: '/admin/orders', label: '订单管理', icon: Receipt },
+  { path: '/admin/plans', label: '套餐管理', icon: Crown },
 ]
 
 export default function AdminLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { isAdmin, isLoading, isLoggedIn } = useAuth()
 
-  // Hide sidebar on edit page (full-width form)
+  // Admin 权限守卫：未登录去登录页，非 admin 回首页
+  useEffect(() => {
+    if (isLoading) return
+    if (!isAdmin) {
+      const target = isLoggedIn ? '/' : '/login?redirect=/admin'
+      navigate(target, { replace: true })
+    }
+  }, [isLoading, isAdmin, isLoggedIn, navigate])
+
   const isEditPage = location.pathname.includes('/admin/lesson/edit') || location.pathname.includes('/admin/lesson/new')
+
+  // 加载中或非 admin → 不渲染内容（等待重定向）
+  if (isLoading || !isAdmin) {
+    return <div className="min-h-screen bg-[var(--color-canvas-soft)]" />
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-canvas-soft)]">
@@ -68,7 +89,7 @@ export default function AdminLayout() {
           </aside>
         )}
 
-        {/* Mobile bottom tab bar for admin */}
+        {/* Mobile bottom tab bar */}
         {!isEditPage && (
           <nav className="md:hidden fixed bottom-0 left-0 right-0 safe-bottom z-50">
             <div className="bg-white/72 backdrop-blur-[20px] -webkit-backdrop-blur-[20px] border-t border-white/40 flex items-center justify-around h-14">

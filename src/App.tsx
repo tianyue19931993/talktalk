@@ -6,10 +6,17 @@ import LessonListPage from './pages/mobile/LessonListPage'
 import LessonDetailPage from './pages/mobile/LessonDetailPage'
 import DemoPage from './pages/mobile/DemoPage'
 import MyPage from './pages/mobile/MyPage'
+import LoginPage from './pages/mobile/LoginPage'
+import SubscribePage from './pages/mobile/SubscribePage'
+import OrdersPage from './pages/mobile/OrdersPage'
 import LessonManagePage from './pages/admin/LessonManagePage'
 import LessonEditPage from './pages/admin/LessonEditPage'
 import TypeManagePage from './pages/admin/TypeManagePage'
 import TagManagePage from './pages/admin/TagManagePage'
+import UserManagePage from './pages/admin/UserManagePage'
+import PlanManagePage from './pages/admin/PlanManagePage'
+import SubscriptionManagePage from './pages/admin/SubscriptionManagePage'
+import OrderManagePage from './pages/admin/OrderManagePage'
 
 export default function App() {
   return (
@@ -20,6 +27,9 @@ export default function App() {
         <Route path="/lessons" element={<LessonListPage />} />
         <Route path="/lesson/:id" element={<LessonDetailPage />} />
         <Route path="/my" element={<MyPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/subscribe" element={<SubscribePage />} />
+        <Route path="/orders" element={<OrdersPage />} />
       </Route>
 
       {/* Demo - full screen, no layout */}
@@ -33,6 +43,10 @@ export default function App() {
         <Route path="lesson/new" element={<LessonEditPage />} />
         <Route path="types" element={<TypeManagePage />} />
         <Route path="tags" element={<TagManagePage />} />
+        <Route path="users" element={<UserManagePage />} />
+        <Route path="plans" element={<PlanManagePage />} />
+        <Route path="subscriptions" element={<SubscriptionManagePage />} />
+        <Route path="orders" element={<OrderManagePage />} />
       </Route>
 
       {/* Fallback */}

@@ -2,18 +2,23 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Maximize2 } from 'lucide-react'
+import { ArrowLeft, Maximize2, Lock, Crown } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { getQuestions } from '../../stores/appStore'
+import { useAuth } from '../../stores/authStore'
+import { canViewDemo } from '../../lib/supabase-auth'
 
 export default function LessonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
+  const { subscription, isLoggedIn } = useAuth()
 
   const questions = getQuestions()
   const question = questions.find((q) => q.id === id)
+
+  const hasDemoAccess = canViewDemo(subscription)
 
   if (!question) {
     return (
@@ -68,7 +73,7 @@ export default function LessonDetailPage() {
         </div>
       </section>
 
-      {/* Image Explanation — always visible */}
+      {/* Image Explanation — 所有人可看 */}
       <section>
         <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">图片资源</h2>
         {question.images && question.images.length > 0 ? (
@@ -97,29 +102,49 @@ export default function LessonDetailPage() {
         )}
       </section>
 
-      {/* HTML Interactive Demo — always visible */}
+      {/* HTML Interactive Demo — 需要权限 */}
       <section>
         <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">互动演示</h2>
-        {question.htmlDemos && question.htmlDemos.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {question.htmlDemos.map((demo, i) => (
-              <button
-                key={i}
-                onClick={() => navigate(`/demo/${question.id}/${i}`)}
-                className="w-full py-3 px-5 bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] text-white text-sm font-medium rounded-full shadow-[0_2px_12px_rgba(121,40,202,0.2)] hover:shadow-[0_4px_20px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
-              >
-                查看演示动画
-              </button>
-            ))}
-          </div>
+        {hasDemoAccess ? (
+          // 有权限 → 显示演示按钮
+          question.htmlDemos && question.htmlDemos.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {question.htmlDemos.map((demo, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigate(`/demo/${question.id}/${i}`)}
+                  className="w-full py-3 px-5 bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] text-white text-sm font-medium rounded-full shadow-[0_2px_12px_rgba(121,40,202,0.2)] hover:shadow-[0_4px_20px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                >
+                  查看演示动画
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 border border-dashed border-[var(--color-hairline)]">
+              <p className="text-sm text-[var(--color-mute)] text-center">暂无演示动画</p>
+            </div>
+          )
         ) : (
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 border border-dashed border-[var(--color-hairline)]">
-            <p className="text-sm text-[var(--color-mute)] text-center">暂无演示动画</p>
+          // 无权限 → 显示锁定状态
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-6 border border-[var(--color-hairline)] text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center">
+              <Lock className="w-6 h-6 text-[var(--color-mute)]" />
+            </div>
+            <p className="text-sm font-medium text-[var(--color-ink)] mb-1">互动演示已锁定</p>
+            <p className="text-xs text-[var(--color-mute)] mb-4">开通基础会员后即可查看全部互动演示</p>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(isLoggedIn ? '/subscribe' : '/login')}
+            >
+              <Crown className="w-4 h-4" />
+              {isLoggedIn ? '开通会员' : '登录开通'}
+            </Button>
           </div>
         )}
       </section>
 
-      {/* Text Explanation (Markdown) — moved below */}
+      {/* Text Explanation (Markdown) — 所有人可看 */}
       {question.content?.markdown && (
         <section className="relative">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">讲解</h2>

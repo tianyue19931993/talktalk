@@ -1,4 +1,4 @@
-// api/debug.js - ESM 写法
+// GET /api/debug - 环境变量诊断（ESM 版）
 export default (req, res) => {
   const data = {
     ok: true,

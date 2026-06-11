@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
-import { createUserQuestion, getMyQuestions } from '../../lib/user-questions'
-import type { UserQuestion } from '../../types/auth'
+import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -12,12 +12,17 @@ export default function HomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
+  const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (isLoggedIn) {
-      getMyQuestions().then((list) => {
-        if (list.length > 0) setLatestQuestion(list[0])
+      getMyQuestions().then(async (list) => {
+        if (list.length > 0) {
+          setLatestQuestion(list[0])
+          const demos = await getQuestionDemos(list[0].id)
+          setLatestDemos(demos)
+        }
       })
     }
   }, [isLoggedIn, submitted])
@@ -125,19 +130,19 @@ export default function HomePage() {
           <p className="text-sm text-[var(--color-ink)] leading-relaxed line-clamp-2 whitespace-pre-wrap mb-3">
             {latestQuestion.questionText}
           </p>
-          {latestQuestion.htmlDemos && latestQuestion.htmlDemos.length > 0 ? (
+          {latestDemos.length > 0 ? (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--color-hairline)]">
-              {latestQuestion.htmlDemos.map((demo, i) => (
+              {latestDemos.map((demo) => (
                 <button
-                  key={i}
-                  onClick={() => navigate(`/my/demo/${latestQuestion.id}/${i}`)}
+                  key={demo.id}
+                  onClick={() => navigate(`/my/demo/${demo.id}`)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
                     text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
                     rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
                     transition-all duration-200 cursor-pointer"
                 >
                   <Play className="w-3 h-3" />
-                  查看 {demo.title || `演示 ${i + 1}`}
+                  查看 {demo.title || '演示'}
                 </button>
               ))}
             </div>

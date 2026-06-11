@@ -41,8 +41,9 @@ function questionToRow(q: Question) {
 
 function rowToType(row: any): QuestionType {
   return {
-    id: String(row.id), name: row.name, icon: row.icon || '📝',
+    id: String(row.id), name: row.name,
     description: row.description || '',
+    typePrompt: row.type_prompt || '',
     createdAt: row.created_at?.slice(0, 10) || '',
     updatedAt: row.updated_at?.slice(0, 10) || '',
   }
@@ -152,16 +153,16 @@ export function deleteQuestion(id: string) {
   })
 }
 
-export async function addType(data: { name: string; description?: string; icon?: string }): Promise<QuestionType> {
-  const r = await insert<any[]>('question_types', { name: data.name, icon: data.icon || '📝', description: data.description || '' })
+export async function addType(data: { name: string; description?: string; typePrompt?: string }): Promise<QuestionType> {
+  const r = await insert<any[]>('question_types', { name: data.name, description: data.description || '', type_prompt: data.typePrompt || '' })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
   const t = rowToType(r.data[0]); types = [...types, t]; notify()
   return t
 }
 
-export async function updateType(id: string, data: { name?: string; description?: string }) {
+export async function updateType(id: string, data: { name?: string; description?: string; typePrompt?: string }) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
-  const p: any = {}; if (data.name !== undefined) p.name = data.name; if (data.description !== undefined) p.description = data.description
+  const p: any = {}; if (data.name !== undefined) p.name = data.name; if (data.description !== undefined) p.description = data.description; if (data.typePrompt !== undefined) p.type_prompt = data.typePrompt
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames(); notify()
   supdate('question_types', 'id', parseInt(id, 10), p).catch((e) => {

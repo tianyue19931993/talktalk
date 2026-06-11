@@ -3,7 +3,7 @@ export interface QuestionType {
   id: string
   name: string
   description?: string
-  icon?: string
+  typePrompt?: string
   createdAt: string
   updatedAt: string
 }

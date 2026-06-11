@@ -39,7 +39,7 @@ export default function App() {
       {/* Mobile full-screen pages (no bottom nav) */}
       <Route path="/my/questions" element={<MyQuestionsPage />} />
       <Route path="/my/question/:id" element={<MyQuestionDetailPage />} />
-      <Route path="/my/demo/:questionId/:demoIndex" element={<MyDemoPage />} />
+      <Route path="/my/demo/:demoId" element={<MyDemoPage />} />
 
       {/* Demo - full screen, no layout */}
       <Route path="/demo/:lessonId/:demoId" element={<DemoPage />} />

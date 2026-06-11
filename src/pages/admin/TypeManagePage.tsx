@@ -11,10 +11,12 @@ export default function TypeManagePage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newPrompt, setNewPrompt] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [editPrompt, setEditPrompt] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null)
 
@@ -30,9 +32,10 @@ export default function TypeManagePage() {
 
   const handleAdd = () => {
     if (!newName.trim()) return
-    addType({ name: newName.trim(), description: newDesc.trim() })
+    addType({ name: newName.trim(), description: newDesc.trim(), typePrompt: newPrompt.trim() })
     setNewName('')
     setNewDesc('')
+    setNewPrompt('')
     setShowNewForm(false)
   }
 
@@ -40,11 +43,12 @@ export default function TypeManagePage() {
     setEditingId(t.id)
     setEditName(t.name)
     setEditDesc(t.description || '')
+    setEditPrompt(t.typePrompt || '')
   }
 
   const handleUpdate = () => {
     if (!editingId || !editName.trim()) return
-    updateType(editingId, { name: editName.trim(), description: editDesc.trim() })
+    updateType(editingId, { name: editName.trim(), description: editDesc.trim(), typePrompt: editPrompt.trim() })
     setEditingId(null)
   }
 
@@ -94,9 +98,14 @@ export default function TypeManagePage() {
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
             />
+            <Input
+              placeholder="提示词模板（可选）"
+              value={newPrompt}
+              onChange={(e) => setNewPrompt(e.target.value)}
+            />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewPrompt('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -141,12 +150,21 @@ export default function TypeManagePage() {
                           placeholder="描述（可选）"
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
                         />
+                        <input
+                          value={editPrompt}
+                          onChange={(e) => setEditPrompt(e.target.value)}
+                          placeholder="提示词模板（可选）"
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
+                        />
                       </div>
                     ) : (
                       <div>
                         <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
                         {t.description && (
                           <p className="text-xs text-[var(--color-mute)] mt-0.5">{t.description}</p>
+                        )}
+                        {t.typePrompt && (
+                          <p className="text-[10px] text-[var(--color-mute)] mt-0.5 italic line-clamp-1">{t.typePrompt}</p>
                         )}
                       </div>
                     )}

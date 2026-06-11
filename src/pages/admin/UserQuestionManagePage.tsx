@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, Search, Eye, Trash2, Plus } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { Pagination } from '../../components/ui/Pagination'
-import { getAllUserQuestions, updateUserQuestionDemos, adminUploadUserQuestionHtml } from '../../lib/user-questions'
-import type { UserQuestion } from '../../types/auth'
+import { getAllUserQuestions, getQuestionDemos, adminUploadUserQuestionHtml, deleteQuestionDemo } from '../../lib/user-questions'
+import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const PAGE_SIZE = 20
 
@@ -18,6 +18,7 @@ export default function UserQuestionManagePage() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
   const [questions, setQuestions] = useState<UserQuestion[]>([])
+  const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -30,12 +31,21 @@ export default function UserQuestionManagePage() {
 
   async function loadData() {
     setLoading(true)
-    const data = await getAllUserQuestions()
-    setQuestions(data)
+    const list = await getAllUserQuestions()
+    setQuestions(list)
+
+    // 并行加载所有题目的 demos
+    const map: Record<string, QuestionDemo[]> = {}
+    await Promise.all(
+      list.map(async (q) => {
+        map[q.id] = await getQuestionDemos(q.id)
+      })
+    )
+    setDemosMap(map)
     setLoading(false)
   }
 
-  const handleUploadHtml = async (id: string) => {
+  const handleUploadHtml = async (questionId: string) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.html,.htm'
@@ -43,7 +53,7 @@ export default function UserQuestionManagePage() {
       const file = input.files?.[0]
       if (!file) return
       try {
-        await adminUploadUserQuestionHtml(id, file)
+        await adminUploadUserQuestionHtml(questionId, file)
         await loadData()
       } catch {
         alert('上传失败')
@@ -52,9 +62,8 @@ export default function UserQuestionManagePage() {
     input.click()
   }
 
-  const handleRemoveDemo = async (q: UserQuestion, demoIndex: number) => {
-    const demos = q.htmlDemos.filter((_, i) => i !== demoIndex)
-    await updateUserQuestionDemos(q.id, demos)
+  const handleRemoveDemo = async (demoId: string) => {
+    await deleteQuestionDemo(demoId)
     await loadData()
   }
 
@@ -62,10 +71,7 @@ export default function UserQuestionManagePage() {
     if (url.startsWith('data:text/html')) {
       const html = decodeURIComponent(url.split(',')[1] || '')
       const win = window.open('', '_blank')
-      if (win) {
-        win.document.write(html)
-        win.document.close()
-      }
+      if (win) { win.document.write(html); win.document.close() }
     } else {
       window.open(url, '_blank')
     }
@@ -127,6 +133,7 @@ export default function UserQuestionManagePage() {
               paginated.map((q) => {
                 const st = STATUS_MAP[q.status] || STATUS_MAP.pending
                 const isExpanded = editingId === q.id
+                const demos = demosMap[q.id] || []
                 return (
                   <tr key={q.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
                     <td className="px-4 py-3">
@@ -137,7 +144,7 @@ export default function UserQuestionManagePage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
-                      {q.htmlDemos?.length || 0} 个
+                      {demos.length} 个
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
                       {new Date(q.createdAt).toLocaleDateString('zh-CN')}
@@ -146,7 +153,6 @@ export default function UserQuestionManagePage() {
                       <button
                         onClick={() => toggleExpand(q.id)}
                         className="p-1.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] hover:bg-[var(--color-link-bg-soft)] transition-colors cursor-pointer text-xs"
-                        title="展开详情"
                       >
                         {isExpanded ? '收起' : '详情'}
                       </button>
@@ -159,10 +165,10 @@ export default function UserQuestionManagePage() {
         </table>
       </div>
 
-      {/* 展开的 HTML Demo 管理区域 */}
       {editingId && (() => {
         const q = questions.find((x) => x.id === editingId)
         if (!q) return null
+        const demos = demosMap[q.id] || []
         return (
           <div className="mt-4 bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5">
             <div className="flex items-center justify-between mb-4">
@@ -179,30 +185,27 @@ export default function UserQuestionManagePage() {
 
             <p className="text-sm text-[var(--color-body)] mb-4 line-clamp-2">{q.questionText}</p>
 
-            {q.htmlDemos.length === 0 ? (
+            {demos.length === 0 ? (
               <p className="text-xs text-[var(--color-mute)] py-4 text-center">暂无演示，点击上方按钮上传</p>
             ) : (
               <div className="space-y-2">
-                {q.htmlDemos.map((demo, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-md)]">
+                {demos.map((demo) => (
+                  <div key={demo.id} className="flex items-center justify-between p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-md)]">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-medium text-[var(--color-body)] shrink-0">
-                        {i + 1}.
-                      </span>
                       <span className="text-sm text-[var(--color-ink)] truncate">
-                        {demo.title || `演示 ${i + 1}`}
+                        {demo.title || '演示'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
-                        onClick={() => handlePreviewHtml(demo.url)}
+                        onClick={() => handlePreviewHtml(demo.htmlUrl)}
                         className="p-1.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] hover:bg-[var(--color-link-bg-soft)] transition-colors cursor-pointer"
                         title="预览"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleRemoveDemo(q, i)}
+                        onClick={() => handleRemoveDemo(demo.id)}
                         className="p-1.5 rounded text-[var(--color-body)] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                         title="删除"
                       >

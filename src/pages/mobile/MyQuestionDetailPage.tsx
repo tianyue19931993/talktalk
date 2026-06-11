@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Download, Clock, Play } from 'lucide-react'
-import { getUserQuestion } from '../../lib/user-questions'
-import type { UserQuestion } from '../../types/auth'
+import { getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
+import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: '待生成', color: 'text-yellow-700 bg-yellow-50' },
@@ -14,32 +14,24 @@ export default function MyQuestionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [question, setQuestion] = useState<UserQuestion | null>(null)
+  const [demos, setDemos] = useState<QuestionDemo[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    loadQuestion()
+    loadAll()
   }, [id])
 
-  async function loadQuestion() {
+  async function loadAll() {
     if (!id) return
     setLoading(true)
-    const data = await getUserQuestion(id)
-    setQuestion(data)
-    setLoading(false)
-  }
-
-  const openHtml = (url: string) => {
-    if (url.startsWith('data:text/html')) {
-      const html = decodeURIComponent(url.split(',')[1] || '')
-      const win = window.open('', '_blank')
-      if (win) {
-        win.document.write(html)
-        win.document.close()
-      }
-    } else {
-      window.open(url, '_blank')
+    const q = await getUserQuestion(id)
+    setQuestion(q)
+    if (q) {
+      const d = await getQuestionDemos(q.id)
+      setDemos(d)
     }
+    setLoading(false)
   }
 
   const downloadHtml = (url: string, label: string) => {
@@ -66,12 +58,8 @@ export default function MyQuestionDetailPage() {
   if (!question) {
     return (
       <div className="flex flex-col gap-4 px-4 pt-4 bg-[var(--color-canvas-soft)] min-h-screen">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer">
+          <ArrowLeft className="w-4 h-4" />返回
         </button>
         <div className="flex flex-col items-center justify-center py-20 text-[var(--color-mute)]">
           <p className="text-base font-medium">题目未找到</p>
@@ -81,11 +69,9 @@ export default function MyQuestionDetailPage() {
   }
 
   const st = STATUS_MAP[question.status] || STATUS_MAP.pending
-  const hasDemos = question.htmlDemos && question.htmlDemos.length > 0
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-4 pt-4 pb-8 max-w-lg mx-auto">
-      {/* Back */}
       <button
         onClick={() => navigate(-1)}
         className="sticky top-0 z-10 inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer bg-[var(--color-canvas-soft)] py-2"
@@ -94,7 +80,6 @@ export default function MyQuestionDetailPage() {
         返回
       </button>
 
-      {/* 题目正文 */}
       <section className="mt-2">
         <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">题目原文</h2>
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
@@ -102,48 +87,39 @@ export default function MyQuestionDetailPage() {
         </div>
       </section>
 
-      {/* 状态 */}
       <section className="mt-4">
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
           <div className="flex items-center justify-between">
-            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>
-              {st.label}
-            </span>
-            <span className="text-xs text-[var(--color-mute)]">
-              提交于 {new Date(question.createdAt).toLocaleDateString('zh-CN')}
-            </span>
+            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
+            <span className="text-xs text-[var(--color-mute)]">提交于 {new Date(question.createdAt).toLocaleDateString('zh-CN')}</span>
           </div>
         </div>
       </section>
 
-      {/* HTML 演示列表 */}
       <section className="mt-4">
         <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">互动演示</h2>
-        {hasDemos ? (
+        {demos.length > 0 ? (
           <div className="space-y-3">
-            {question.htmlDemos.map((demo, i) => (
-              <div key={i} className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
-                <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || `演示 ${i + 1}`}</p>
+            {demos.map((demo) => (
+              <div key={demo.id} className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
+                <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || '演示'}</p>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => openHtml(demo.url)}
+                    onClick={() => navigate(`/my/demo/${demo.id}`)}
                     className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium text-white rounded-full
                       bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                      shadow-[0_1px_4px_rgba(121,40,202,0.15)]
-                      hover:shadow-[0_2px_8px_rgba(121,40,202,0.25)] hover:scale-[1.02]
-                      active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                      shadow-[0_1px_4px_rgba(121,40,202,0.15)] hover:scale-[1.02] active:scale-[0.98]
+                      transition-all duration-200 cursor-pointer"
                   >
-                    <Play className="w-3.5 h-3.5" />
-                    观看
+                    <Play className="w-3.5 h-3.5" />观看
                   </button>
                   <button
-                    onClick={() => downloadHtml(demo.url, demo.title || `demo-${i + 1}`)}
+                    onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
                     className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
                       bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
                       hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    下载
+                    <Download className="w-3.5 h-3.5" />下载
                   </button>
                 </div>
               </div>

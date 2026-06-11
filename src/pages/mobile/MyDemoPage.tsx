@@ -1,39 +1,39 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { getUserQuestion } from '../../lib/user-questions'
 
 export default function MyDemoPage() {
-  const { questionId, demoIndex } = useParams<{ questionId: string; demoIndex: string }>()
+  const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    if (!questionId || demoIndex === undefined) return
+    if (!demoId) return
     loadDemo()
-  }, [questionId, demoIndex])
+  }, [demoId])
 
   async function loadDemo() {
-    if (!questionId || demoIndex === undefined) return
-    const q = await getUserQuestion(questionId)
-    const idx = parseInt(demoIndex, 10)
-    const demo = q?.htmlDemos?.[idx]
-    if (!demo?.url) {
+    if (!demoId) return
+
+    // 通过 authedRequest 从 question_demos 读取
+    const { authedRequest } = await import('../../lib/supabase-auth')
+    const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
+    const demo = data?.[0]
+    if (!demo?.html_url) {
       setNotFound(true)
       return
     }
 
-    if (demo.url.startsWith('data:text/html')) {
+    if (demo.html_url.startsWith('data:text/html')) {
       try {
-        const encoded = demo.url.split(',')[1]
+        const encoded = demo.html_url.split(',')[1]
         setHtmlContent(decodeURIComponent(encoded))
       } catch {
         setNotFound(true)
       }
     } else {
-      // 外部 URL 直接跳转
-      window.location.href = demo.url
+      window.location.href = demo.html_url
     }
   }
 
@@ -55,7 +55,6 @@ export default function MyDemoPage() {
 
   return (
     <div className="h-screen w-full bg-white relative">
-      {/* 返回按钮 */}
       <button
         onClick={() => navigate(-1)}
         className="absolute top-4 left-4 z-50 flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full transition-colors cursor-pointer"

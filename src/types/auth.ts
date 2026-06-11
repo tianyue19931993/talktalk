@@ -66,19 +66,32 @@ export interface AuthSession {
   }
 }
 
-/** HTML 互动演示（复用，与 index.ts 中保持一致） */
-export interface UserHtmlDemo {
-  title: string
-  url: string
-}
-
 /** 用户录入的题目（与题库 questions 表区分） */
 export interface UserQuestion {
   id: string
   userId: string
   questionText: string
-  htmlDemos: UserHtmlDemo[]
+  questionType: string
   status: 'pending' | 'completed' | 'uploaded'
+  createdAt: string
+  updatedAt: string
+}
+
+/** 用户题目的演示 / 生成记录 */
+export interface QuestionDemo {
+  id: string
+  questionId: string
+  htmlUrl: string
+  title: string
+  createdAt: string
+}
+
+/** 用户 AI 生成统计 */
+export interface UserGeneration {
+  id: string
+  userId: string
+  totalCount: number
+  usedCount: number
   createdAt: string
   updatedAt: string
 }

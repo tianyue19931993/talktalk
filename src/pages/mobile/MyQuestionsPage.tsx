@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download } from 'lucide-react'
-import { getMyQuestions } from '../../lib/user-questions'
+import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
-import type { UserQuestion } from '../../types/auth'
+import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
@@ -16,6 +16,7 @@ export default function MyQuestionsPage() {
   const navigate = useNavigate()
   const { isLoggedIn } = useAuth()
   const [questions, setQuestions] = useState<UserQuestion[]>([])
+  const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -23,24 +24,33 @@ export default function MyQuestionsPage() {
       navigate('/login?redirect=/my/questions')
       return
     }
-    loadQuestions()
+    loadAll()
   }, [isLoggedIn])
 
-  async function loadQuestions() {
+  async function loadAll() {
     setLoading(true)
-    const data = await getMyQuestions()
-    setQuestions(data)
+    const list = await getMyQuestions()
+    setQuestions(list)
+
+    // 并行加载每个题目的 demos
+    const map: Record<string, QuestionDemo[]> = {}
+    await Promise.all(
+      list.map(async (q) => {
+        map[q.id] = await getQuestionDemos(q.id)
+      })
+    )
+    setDemosMap(map)
     setLoading(false)
   }
 
-  const downloadHtml = (htmlUrl: string, label: string) => {
+  const downloadHtml = (url: string, label: string) => {
     const link = document.createElement('a')
-    if (htmlUrl.startsWith('data:text/html')) {
-      const content = decodeURIComponent(htmlUrl.split(',')[1] || '')
+    if (url.startsWith('data:text/html')) {
+      const content = decodeURIComponent(url.split(',')[1] || '')
       const blob = new Blob([content], { type: 'text/html' })
       link.href = URL.createObjectURL(blob)
     } else {
-      link.href = htmlUrl
+      link.href = url
     }
     link.download = `${label || 'demo'}.html`
     link.click()
@@ -83,18 +93,16 @@ export default function MyQuestionsPage() {
           questions.map((q) => {
             const st = STATUS_MAP[q.status] || STATUS_MAP.pending
             const StatusIcon = st.icon
-            const hasDemos = q.htmlDemos && q.htmlDemos.length > 0
+            const demos = demosMap[q.id] || []
             return (
               <div
                 key={q.id}
                 className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]"
               >
-                {/* 题目文字 */}
                 <p className="text-sm text-[var(--color-ink)] leading-relaxed line-clamp-3 whitespace-pre-wrap mb-3">
                   {q.questionText}
                 </p>
 
-                {/* 状态标签 + 时间 */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${st.color}`}>
                     <StatusIcon className="w-3 h-3" />
@@ -105,23 +113,23 @@ export default function MyQuestionsPage() {
                   </span>
                 </div>
 
-                {/* HTML 演示入口 — 每个 HTML 演示一个按钮 */}
-                {hasDemos ? (
+                {/* demos */}
+                {demos.length > 0 ? (
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--color-hairline)]">
-                    {q.htmlDemos.map((demo, i) => (
-                      <div key={i} className="flex items-center gap-1.5">
+                    {demos.map((demo) => (
+                      <div key={demo.id} className="flex items-center gap-1.5">
                         <button
-                          onClick={() => navigate(`/my/demo/${q.id}/${i}`)}
+                          onClick={() => navigate(`/my/demo/${demo.id}`)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
                             text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
                             rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
                             transition-all duration-200 cursor-pointer"
                         >
                           <Play className="w-3 h-3" />
-                          观看 {demo.title || `演示 ${i + 1}`}
+                          观看 {demo.title || '演示'}
                         </button>
                         <button
-                          onClick={() => downloadHtml(demo.url, demo.title || `demo-${i + 1}`)}
+                          onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
                           className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
                           title="下载 HTML"
                         >

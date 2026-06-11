@@ -54,6 +54,8 @@ module.exports = async (req, res) => {
     if (orderError || !order || order.length === 0) { res.status(500).json({ error: '创建订单失败', detail: orderError }); return; }
 
     // 调微信支付统一下单（Native 扫码模式）
+    console.log('[pay/create-order] WECHAT_PAY_APPID:', process.env.WECHAT_PAY_APPID);
+
     const paymentResult = await unifiedOrder({
       description: `TalkTalk ${plan.name}`,
       outTradeNo: orderNo,

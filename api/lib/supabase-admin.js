@@ -41,6 +41,12 @@ export function query(table, options = {}) {
   params.set('select', options.select || '*')
   if (options.order) params.set('order', `${options.order}.${options.ascending !== false ? 'asc' : 'desc'}`)
   if (options.limit) params.set('limit', String(options.limit))
+  // 应用筛选条件
+  if (options.filters) {
+    Object.entries(options.filters).forEach(([k, v]) => {
+      params.set(k, `eq.${String(v)}`)
+    })
+  }
   return request(`/${table}?${params.toString()}`)
 }
 

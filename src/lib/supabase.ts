@@ -75,6 +75,11 @@ export function query<T>(
     params.order = `${options.order}.${options.ascending !== false ? 'asc' : 'desc'}`
   }
   if (options.limit) params.limit = String(options.limit)
+  if (options.filters) {
+    Object.entries(options.filters).forEach(([k, v]) => {
+      params[k] = `eq.${v}`
+    })
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)

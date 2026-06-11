@@ -131,7 +131,7 @@ export default function LessonDetailPage() {
               <Lock className="w-6 h-6 text-[var(--color-mute)]" />
             </div>
             <p className="text-sm font-medium text-[var(--color-ink)] mb-1">互动演示已锁定</p>
-            <p className="text-xs text-[var(--color-mute)] mb-4">开通基础会员后即可查看全部互动演示</p>
+            <p className="text-xs text-[var(--color-mute)] mb-4">开通会员后即可查看全部互动演示</p>
             <Button
               variant="primary"
               size="sm"

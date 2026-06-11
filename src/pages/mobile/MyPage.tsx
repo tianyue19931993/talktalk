@@ -116,6 +116,25 @@ export default function MyPage() {
             </Button>
           </div>
         )}
+
+        {/* 其他套餐（通用展示） */}
+        {isSubscribed && !isBasic && !isAi && (
+          <div className="bg-[var(--color-canvas-soft)] rounded-[var(--radius-xl)] p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Crown className="w-4 h-4 text-[var(--color-link)]" />
+              <span className="text-sm font-semibold text-[var(--color-link)]">{subscription.planName}</span>
+            </div>
+            {subscription.expireAt && (
+              <div className="flex items-center gap-1.5 text-xs text-[var(--color-body)] mb-3">
+                <Clock className="w-3.5 h-3.5" />
+                <span>到期 {new Date(subscription.expireAt).toLocaleDateString('zh-CN')}</span>
+              </div>
+            )}
+            <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
+              续费
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Quick links */}

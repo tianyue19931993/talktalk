@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Sparkles, Lock, Smartphone } from 'lucide-react'
+import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Download } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { getPlans, loadSession } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
@@ -176,6 +176,14 @@ export default function SubscribePage() {
     }
   }
 
+  // 重新检查支付状态
+  const retryPolling = () => {
+    setPayError('')
+    if (payParams) {
+      setPayState('polling')
+    }
+  }
+
   // ============================================================
   // 渲染
   // ============================================================
@@ -227,25 +235,40 @@ export default function SubscribePage() {
           </div>
 
           <h2 className="text-base font-semibold text-[var(--color-ink)] mb-1">请使用微信扫码支付</h2>
-          <p className="text-xs text-[var(--color-mute)] mb-4">
+          <p className="text-xs text-[var(--color-mute)] mb-2">
             二维码有效期 {countdown}s
           </p>
+          <p className="text-xs text-[var(--color-mute)] mb-4">
+            用另一台手机微信扫码，或截图保存后打开微信扫一扫
+          </p>
 
-          <div className="flex items-center gap-3 mb-6">
-            <Button variant="primary" size="sm" onClick={startPolling}>
-              已完成支付
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setPayState('idle')
-                setPayParams(null)
-                setSelectedPlan(null)
-              }}
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <Button variant="primary" size="sm" onClick={startPolling}>
+                已完成支付
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setPayState('idle')
+                  setPayParams(null)
+                  setSelectedPlan(null)
+                }}
+              >
+                取消
+              </Button>
+            </div>
+            <a
+              href={qrImageUrl || '#'}
+              download="wechat-pay-qr.png"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline"
             >
-              取消
-            </Button>
+              <Download className="w-3 h-3" />
+              保存二维码
+            </a>
           </div>
 
           <p className="text-xs text-[var(--color-mute)]">
@@ -267,6 +290,9 @@ export default function SubscribePage() {
           <h2 className="text-lg font-semibold text-[var(--color-ink)] mb-2">支付异常</h2>
           <p className="text-sm text-[var(--color-body)] mb-6">{payError || '支付过程中出现问题'}</p>
           <div className="flex items-center gap-3">
+            <Button variant="primary" size="sm" onClick={retryPolling}>
+              重新检查
+            </Button>
             <Button variant="primary" size="sm" onClick={() => {
               setPayState('idle')
               setPayParams(null)

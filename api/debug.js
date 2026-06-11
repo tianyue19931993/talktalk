@@ -1,5 +1,5 @@
-// 自包含测试函数，不依赖任何文件
-module.exports = (req, res) => {
+// api/debug.js - ESM 写法
+export default (req, res) => {
   const data = {
     ok: true,
     time: new Date().toISOString(),

@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Crown, Search } from 'lucide-react'
 import { authedRequest } from '../../lib/supabase-auth'
 import { useAuth } from '../../stores/authStore'
+import { Pagination } from '../../components/ui/Pagination'
+
+const PAGE_SIZE = 20
 
 interface SubRow {
   id: string
@@ -21,6 +24,7 @@ export default function SubscriptionManagePage() {
   const [rows, setRows] = useState<SubRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (!isAdmin) { navigate('/admin/lessons'); return }
@@ -54,9 +58,19 @@ export default function SubscriptionManagePage() {
     setLoading(false)
   }
 
-  const filtered = search
-    ? rows.filter((r) => r.email.toLowerCase().includes(search.toLowerCase()) || r.planName.includes(search))
-    : rows
+  const filtered = useMemo(() => {
+    const result = search
+      ? rows.filter((r) => r.email.toLowerCase().includes(search.toLowerCase()) || r.planName.includes(search))
+      : rows
+    return result
+  }, [rows, search])
+
+  // 分页
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const safePage = Math.min(page, Math.max(1, pageCount))
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [search])
 
   if (loading) return <div className="text-center py-12 text-sm text-[var(--color-mute)]">加载中...</div>
 
@@ -66,7 +80,7 @@ export default function SubscriptionManagePage() {
         <div className="flex items-center gap-2">
           <Crown className="w-5 h-5 text-[var(--color-ink)]" />
           <h1 className="text-lg font-semibold text-[var(--color-ink)]">订阅管理</h1>
-          <span className="text-xs text-[var(--color-mute)] bg-[var(--color-canvas-soft)] px-2 py-0.5 rounded-full">{rows.length} 条</span>
+          <span className="text-xs text-[var(--color-mute)] bg-[var(--color-canvas-soft)] px-2 py-0.5 rounded-full">{filtered.length} 条</span>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
@@ -91,10 +105,10 @@ export default function SubscriptionManagePage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无订阅数据</td></tr>
             ) : (
-              filtered.map((r) => (
+              paginated.map((r) => (
                 <tr key={r.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
                   <td className="px-4 py-3 text-sm text-[var(--color-ink)]">{r.email}</td>
                   <td className="px-4 py-3">
@@ -118,6 +132,8 @@ export default function SubscriptionManagePage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination current={safePage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
     </div>
   )
 }

@@ -35,7 +35,6 @@ export interface Question {
   content: {
     markdown: string
   }
-  images: string[]
   htmlDemos: HtmlDemo[]
   status: 'draft' | 'published'
   createdAt: string
@@ -51,7 +50,6 @@ export interface QuestionForm {
   tags: string[]
   question: string
   markdown: string
-  images: string[]
   htmlDemos: HtmlDemo[]
   status: 'draft' | 'published'
 }

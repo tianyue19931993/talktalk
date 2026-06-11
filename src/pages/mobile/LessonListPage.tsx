@@ -2,31 +2,11 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
-import { getQuestions, getTypes } from '../../stores/appStore'
+import { getQuestions } from '../../stores/appStore'
 import { GRADES, Question } from '../../types'
-
-// Brand tag color palette — deterministic by tag name hash
-const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  '重量问题': { bg: '#e8faf0', text: '#0d7c3f' },
-  '应用题': { bg: '#f0edff', text: '#5a3ec8' },
-  '两端都种': { bg: '#e6f7ff', text: '#0077b6' },
-  '易错题': { bg: '#fff0f0', text: '#c41e3a' },
-  '期中考试': { bg: '#fff7e6', text: '#b8860b' },
-  '行程问题': { bg: '#e6faf5', text: '#0d9488' },
-  '环形植树': { bg: '#f3e8ff', text: '#7c3aed' },
-  '差量问题': { bg: '#fce7f3', text: '#be185d' },
-}
-
-function tagStyle(tag: string) {
-  const c = TAG_COLORS[tag]
-  if (c) return { backgroundColor: c.bg, color: c.text }
-  // Fallback: use brand blue style
-  return {}
-}
 
 function QuestionCard({ question }: { question: Question }) {
   const navigate = useNavigate()
-  const imageCount = question.images?.length || 0
   const demoCount = question.htmlDemos?.length || 0
 
   return (
@@ -47,10 +27,9 @@ function QuestionCard({ question }: { question: Question }) {
           ))}
         </div>
       )}
-      {(imageCount > 0 || demoCount > 0) && (
+      {demoCount > 0 && (
         <div className="flex items-center gap-3 text-xs text-[var(--color-mute)]">
-          {imageCount > 0 && <span>{imageCount}张图片</span>}
-          {demoCount > 0 && <span>{demoCount}个演示</span>}
+          <span>{demoCount}个演示</span>
         </div>
       )}
     </div>
@@ -58,7 +37,6 @@ function QuestionCard({ question }: { question: Question }) {
 }
 
 export default function LessonListPage() {
-  const navigate = useNavigate()
   const allQuestions = getQuestions().filter((q) => q.status === 'published')
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')

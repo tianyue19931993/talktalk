@@ -1,6 +1,6 @@
 // 认证与订阅状态管理
 import { useState, useEffect } from 'react'
-import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession, loadSession } from '../lib/supabase-auth'
+import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession } from '../lib/supabase-auth'
 import type { Profile, Subscription } from '../types/auth'
 
 // ============================================================

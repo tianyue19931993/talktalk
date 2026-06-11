@@ -1,8 +1,7 @@
-import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Maximize2, Lock, Crown } from 'lucide-react'
+import { ArrowLeft, Lock, Crown } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { getQuestions } from '../../stores/appStore'
@@ -12,13 +11,12 @@ import { canViewDemo } from '../../lib/supabase-auth'
 export default function LessonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const { subscription, isLoggedIn } = useAuth()
 
   const questions = getQuestions()
   const question = questions.find((q) => q.id === id)
 
-  const hasDemoAccess = canViewDemo(subscription)
+  const hasDemoAccess = canViewDemo(subscription) && isLoggedIn
 
   if (!question) {
     return (
@@ -73,35 +71,6 @@ export default function LessonDetailPage() {
         </div>
       </section>
 
-      {/* Image Explanation — 所有人可看 */}
-      <section>
-        <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">图片资源</h2>
-        {question.images && question.images.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {question.images.map((img, i) => (
-              <div
-                key={i}
-                className="relative bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] overflow-hidden cursor-pointer group border border-[var(--color-hairline)]"
-                onClick={() => setLightboxImage(img)}
-              >
-                <img
-                  src={img}
-                  alt={`讲解图片 ${i + 1}`}
-                  className="w-full h-auto object-contain max-h-80"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors">
-                  <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-80 transition-opacity" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 border border-dashed border-[var(--color-hairline)]">
-            <p className="text-sm text-[var(--color-mute)] text-center">暂无图片资源</p>
-          </div>
-        )}
-      </section>
-
       {/* HTML Interactive Demo — 需要权限 */}
       <section>
         <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-3">互动演示</h2>
@@ -109,7 +78,7 @@ export default function LessonDetailPage() {
           // 有权限 → 显示演示按钮
           question.htmlDemos && question.htmlDemos.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {question.htmlDemos.map((demo, i) => (
+              {question.htmlDemos.map((_demo, i) => (
                 <button
                   key={i}
                   onClick={() => navigate(`/demo/${question.id}/${i}`)}
@@ -160,19 +129,6 @@ export default function LessonDetailPage() {
         </section>
       )}
 
-      {/* Lightbox overlay */}
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setLightboxImage(null)}
-        >
-          <img
-            src={lightboxImage}
-            alt="放大预览"
-            className="max-w-full max-h-full object-contain"
-          />
-        </div>
-      )}
     </div>
   )
 }

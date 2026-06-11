@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users, Search, Shield, User as UserIcon, Ban, CheckCircle, Crown } from 'lucide-react'
 import { authedRequest } from '../../lib/supabase-auth'
 import { useAuth } from '../../stores/authStore'
-import { Button } from '../../components/ui/Button'
+import { Pagination } from '../../components/ui/Pagination'
+
+const PAGE_SIZE = 20
 
 interface UserRow {
   id: string
@@ -22,6 +24,7 @@ export default function UserManagePage() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (!isAdmin) { navigate('/admin/lessons'); return }
@@ -56,14 +59,24 @@ export default function UserManagePage() {
     setLoading(false)
   }
 
-  const filtered = search
-    ? users.filter(
-        (u) =>
-          u.email.toLowerCase().includes(search.toLowerCase()) ||
-          u.nickname.toLowerCase().includes(search.toLowerCase()) ||
-          u.id.includes(search)
-      )
-    : users
+  const filtered = useMemo(() => {
+    const result = search
+      ? users.filter(
+          (u) =>
+            u.email.toLowerCase().includes(search.toLowerCase()) ||
+            u.nickname.toLowerCase().includes(search.toLowerCase()) ||
+            u.id.includes(search)
+        )
+      : users
+    return result
+  }, [users, search])
+
+  // 分页
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
+  const safePage = Math.min(page, Math.max(1, pageCount))
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [search])
 
   const toggleStatus = async (user: UserRow) => {
     const newStatus = user.status === 'active' ? 'disabled' : 'active'
@@ -91,6 +104,7 @@ export default function UserManagePage() {
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-[var(--color-ink)]" />
           <h1 className="text-lg font-semibold text-[var(--color-ink)]">用户管理</h1>
+          <span className="text-xs text-[var(--color-mute)] bg-[var(--color-canvas-soft)] px-2 py-0.5 rounded-full">{filtered.length} 条</span>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
@@ -115,10 +129,10 @@ export default function UserManagePage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无用户数据</td></tr>
             ) : (
-              filtered.map((u) => (
+              paginated.map((u) => (
                 <tr key={u.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -187,6 +201,8 @@ export default function UserManagePage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination current={safePage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
     </div>
   )
 }

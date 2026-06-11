@@ -15,7 +15,6 @@ const defaultForm: QuestionForm = {
   tags: [],
   question: '',
   markdown: '',
-  images: [],
   htmlDemos: [],
   status: 'draft',
 }
@@ -66,7 +65,6 @@ export default function LessonEditPage() {
           tags: question.tags,
           question: question.question,
           markdown: question.content.markdown,
-          images: question.images,
           htmlDemos: question.htmlDemos,
           status: question.status,
         })
@@ -102,33 +100,6 @@ export default function LessonEditPage() {
     update(
       'htmlDemos',
       form.htmlDemos.filter((_, i) => i !== index)
-    )
-  }
-
-  const addImage = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/png,image/jpeg,image/webp'
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      if (file.size > 5 * 1024 * 1024) {
-        alert('图片不能超过 5MB')
-        return
-      }
-      const reader = new FileReader()
-      reader.onload = () => {
-        update('images', [...form.images, reader.result as string])
-      }
-      reader.readAsDataURL(file)
-    }
-    input.click()
-  }
-
-  const removeImage = (index: number) => {
-    update(
-      'images',
-      form.images.filter((_, i) => i !== index)
     )
   }
 
@@ -300,40 +271,7 @@ export default function LessonEditPage() {
           </div>
         </section>
 
-        {/* Section 4: Images */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
-          <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">图片资源</h2>
-          <div className="space-y-3">
-            {form.images.map((img, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)]">
-                <img
-                  src={img}
-                  alt={`图片 ${i + 1}`}
-                  className="w-16 h-16 object-cover rounded-[var(--radius-sm)] border border-[var(--color-hairline)]"
-                />
-                <span className="text-xs text-[var(--color-body)] flex-1 truncate">{img}</span>
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  className="p-1 rounded text-[var(--color-body)] hover:text-red-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addImage}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-body)] border border-dashed border-[var(--color-hairline)] rounded-[var(--radius-sm)] hover:border-[var(--color-mute)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
-            >
-              <Upload className="w-4 h-4" />
-              上传图片
-            </button>
-            <p className="text-xs text-[var(--color-mute)]">支持 PNG、JPG、WebP 格式，单张不超过 5MB</p>
-          </div>
-        </section>
-
-        {/* Section 5: HTML Demos */}
+        {/* Section 4: HTML Demos */}
         <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">HTML 演示</h2>
           <div className="space-y-3">

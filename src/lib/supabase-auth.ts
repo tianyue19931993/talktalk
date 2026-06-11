@@ -253,7 +253,7 @@ export async function getProfile(): Promise<AuthResponse<Profile>> {
   if (!session) return { data: null, error: 'Not authenticated' }
 
   const id = session.user.id
-  return authedRequest<Profile[]>(`/profiles?id=eq.${id}`, { method: 'GET' }).then(
+  return authedRequest<any[]>(`/profiles?id=eq.${id}`, { method: 'GET' }).then(
     (r) => {
       if (r.error) return { data: null, error: r.error }
       const data = r.data?.[0]
@@ -351,15 +351,20 @@ export async function getActiveSubscription(): Promise<AuthResponse<Subscription
 
 /** 创建订阅（下单成功后调用） */
 export async function createSubscription(userId: string, planId: string): Promise<AuthResponse<Subscription>> {
+  // 读取套餐信息获取 duration_days
+  const { data: planData } = await authedRequest<any[]>('/plans?id=eq.' + planId, { method: 'GET' })
+  const plan = planData?.[0]
+  const durationDays = plan?.duration_days || 30
+
   // 先取消旧订阅
   await authedRequest(`/subscriptions?user_id=eq.${userId}&status=eq.active`, {
     method: 'PATCH',
     body: { status: 'cancelled' },
   })
 
-  // 计算到期时间：basic = 30天，其他默认 30天
+  // 按套餐 duration_days 计算到期时间
   const now = new Date()
-  const expireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const expireAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000)
 
   const { data, error } = await authedRequest<any[]>('/subscriptions', {
     method: 'POST',

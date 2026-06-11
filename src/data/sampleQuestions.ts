@@ -45,7 +45,6 @@ const questions: Question[] = [
 
 > 关键点：不要被"空瓶"迷惑，找到固定部分和变化部分的差异。`,
     },
-    images: [],
     htmlDemos: [],
     status: 'published',
     createdAt: '2026-06-09',
@@ -91,7 +90,6 @@ const questions: Question[] = [
 如果是在小路的两边都种树呢？
 \`21 × 2 = 42（棵）\``,
     },
-    images: [],
     htmlDemos: [
       {
         title: '植树问题动画演示',
@@ -144,10 +142,6 @@ const questions: Question[] = [
 
 > **关键：** 用假设法找到差异，每只动物腿数差异为2。`,
     },
-    images: [
-      '/assets/lesson003/jitu1.png',
-      '/assets/lesson003/jitu2.png',
-    ],
     htmlDemos: [
       {
         title: '鸡兔同笼互动演示',
@@ -196,7 +190,6 @@ const questions: Question[] = [
 - 甲比乙每小时多走：\`5 - 4 = 1（千米）\`
 - 3小时多走：\`1 × 3 = 3（千米）\``,
     },
-    images: [],
     htmlDemos: [],
     status: 'published',
     createdAt: '2026-06-09',
@@ -237,7 +230,6 @@ const questions: Question[] = [
 
 > 关键：先归一，再倍比。`,
     },
-    images: [],
     htmlDemos: [],
     status: 'draft',
     createdAt: '2026-06-09',

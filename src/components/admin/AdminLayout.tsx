@@ -1,9 +1,16 @@
 import { useEffect } from 'react'
 import { Outlet, NavLink, useLocation, Link, useNavigate } from 'react-router-dom'
-import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft } from 'lucide-react'
+import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 
-const sidebarItems = [
+interface SidebarItem {
+  path: string
+  label: string
+  icon: any
+  end?: boolean
+}
+
+const sidebarItems: SidebarItem[] = [
   { path: '/admin/lessons', label: '题目管理', icon: FileText },
   { path: '/admin/types', label: '题型管理', icon: BookType },
   { path: '/admin/tags', label: '标签管理', icon: Tags },
@@ -12,6 +19,8 @@ const sidebarItems = [
   { path: '/admin/orders', label: '订单管理', icon: Receipt },
   { path: '/admin/plans', label: '套餐管理', icon: Crown },
 ]
+
+// 移动端只显示前 5 个核心菜单，其余折叠到
 
 export default function AdminLayout() {
   const location = useLocation()
@@ -89,25 +98,39 @@ export default function AdminLayout() {
           </aside>
         )}
 
-        {/* Mobile bottom tab bar */}
+        {/* Mobile bottom tab bar — 最多 5 项，超出的折叠到「更多」 */}
         {!isEditPage && (
           <nav className="md:hidden fixed bottom-0 left-0 right-0 safe-bottom z-50">
-            <div className="bg-white/72 backdrop-blur-[20px] -webkit-backdrop-blur-[20px] border-t border-white/40 flex items-center justify-around h-14">
-              {sidebarItems.map((item) => (
+            <div className="bg-white/72 backdrop-blur-[20px] -webkit-backdrop-blur-[20px] border-t border-white/40 flex items-center justify-around h-14 overflow-x-auto">
+              {sidebarItems.slice(0, 5).map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   end={item.end}
                   className={({ isActive }) =>
-                    `flex flex-col items-center gap-0.5 px-3 py-1 ${
+                    `flex flex-col items-center gap-0.5 px-2.5 py-1 ${
                       isActive ? 'text-[var(--color-ink)]' : 'text-[var(--color-mute)]'
                     }`
                   }
                 >
                   <item.icon className="w-4 h-4" />
-                  <span className="text-[10px]">{item.label}</span>
+                  <span className="text-[10px] whitespace-nowrap">{item.label}</span>
                 </NavLink>
               ))}
+              {/* 折叠更多 — 直接显示为当前页 */}
+              <NavLink
+                to={sidebarItems[5].path}
+                className={({ isActive }) =>
+                  `flex flex-col items-center gap-0.5 px-2.5 py-1 ${
+                    isActive || sidebarItems.slice(5).some((s) => location.pathname.startsWith(s.path))
+                      ? 'text-[var(--color-ink)]'
+                      : 'text-[var(--color-mute)]'
+                  }`
+                }
+              >
+                <MoreHorizontal className="w-4 h-4" />
+                <span className="text-[10px] whitespace-nowrap">更多</span>
+              </NavLink>
             </div>
           </nav>
         )}

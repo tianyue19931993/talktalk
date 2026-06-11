@@ -58,7 +58,7 @@ export default function PlanManagePage() {
 
   async function loadPlans() {
     setLoading(true)
-    const { data, error } = await authedRequest<any[]>('/plans?order=sort.asc')
+    const { data } = await authedRequest<any[]>('/plans?order=sort.asc')
     if (data) setPlans(data.map(rowToPlan))
     setLoading(false)
   }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { signIn, signUp, loadSession } from '../../lib/supabase-auth'
+import { signIn, signUp } from '../../lib/supabase-auth'
 import { refreshUserData } from '../../stores/authStore'
 
 type Mode = 'login' | 'register'
@@ -10,7 +10,7 @@ type Mode = 'login' | 'register'
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || -1
+  const redirectPath = searchParams.get('redirect')
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,14 +29,14 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
-        const { data, error } = await signIn(email, password)
+        const { error } = await signIn(email, password)
         if (error) { setError(error); setLoading(false); return }
       } else {
-        const { data, error } = await signUp(email, password)
+        const { error } = await signUp(email, password)
         if (error) { setError(error); setLoading(false); return }
 
         // 注册后自动登录（有些场景需要确认邮箱，先尝试登录）
-        const { data: loginData, error: loginError } = await signIn(email, password)
+        const { error: loginError } = await signIn(email, password)
         if (loginError) {
           setError('注册成功，请前往邮箱验证后登录')
           setLoading(false)
@@ -46,14 +46,11 @@ export default function LoginPage() {
 
       await refreshUserData()
 
-      // 登录后检查是否被禁用
-      if (!loadSession()) {
-        setError('账号已被禁用，无法登录')
-        setLoading(false)
-        return
+      if (redirectPath) {
+        navigate(redirectPath)
+      } else {
+        navigate(-1)
       }
-
-      navigate(redirectTo)
     } catch (e: any) {
       setError(e.message || '操作失败')
     }

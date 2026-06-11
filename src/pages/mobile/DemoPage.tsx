@@ -52,7 +52,7 @@ export default function DemoPage() {
       {/* srcdoc for uploaded HTML, src for external URLs */}
       {htmlContent ? (
         <iframe
-          srcdoc={htmlContent}
+          srcDoc={htmlContent}
           title="演示"
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin"

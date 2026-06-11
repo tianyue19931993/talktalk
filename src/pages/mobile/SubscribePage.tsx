@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Download } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { getPlans, loadSession } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
 import type { Plan } from '../../types/auth'
+import QRCode from 'qrcode'
 
 /** 支付状态 */
 type PayState = 'idle' | 'creating' | 'waiting' | 'polling' | 'success' | 'error'
@@ -20,9 +21,9 @@ interface PayParams {
 
 export default function SubscribePage() {
   const navigate = useNavigate()
-  const { user, subscription, isLoggedIn } = useAuth()
+  const { subscription, isLoggedIn } = useAuth()
   const [plans, setPlans] = useState<Plan[]>([])
-  const [loading, setLoading] = useState(false)
+  const [_loading, setLoading] = useState(false)
 
   // 支付状态
   const [payState, setPayState] = useState<PayState>('idle')
@@ -30,6 +31,28 @@ export default function SubscribePage() {
   const [payError, setPayError] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [countdown, setCountdown] = useState(0)
+
+  // QR 码 canvas 引用 + 渲染
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const codeUrl = payParams?.payment?.codeUrl
+    if (payState === 'waiting' && codeUrl && qrCanvasRef.current) {
+      QRCode.toCanvas(qrCanvasRef.current, codeUrl, {
+        width: 260,
+        margin: 2,
+        color: { dark: '#1a1a1a', light: '#ffffff' },
+      })
+    }
+  }, [payState, payParams])
+
+  const handleDownloadQr = () => {
+    const canvas = qrCanvasRef.current
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = 'wechat-pay-qr.png'
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+  }
 
   useEffect(() => {
     getPlans().then((r) => {
@@ -199,7 +222,7 @@ export default function SubscribePage() {
           <h2 className="text-xl font-semibold text-[var(--color-ink)] mb-2">开通成功！🎉</h2>
           <p className="text-sm text-[var(--color-body)] mb-2">您现在可以解锁全部互动演示了</p>
           {selectedPlan && (
-            <p className="text-xs text-[var(--color-mute)] mb-8">{selectedPlan.name} · 有效期30天</p>
+            <p className="text-xs text-[var(--color-mute)] mb-8">{selectedPlan.name} · 有效期{selectedPlan.durationDays}天</p>
           )}
           <Button variant="primary" size="lg" onClick={() => navigate('/lessons')}>
             开始学习
@@ -211,27 +234,12 @@ export default function SubscribePage() {
 
   // 支付等待页（展示微信支付二维码）
   if (payState === 'waiting') {
-    const codeUrl = payParams.payment.codeUrl
-    const qrImageUrl = codeUrl
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(codeUrl)}`
-      : null
-
     return (
       <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-6 pt-20">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          {/* QR Code */}
+          {/* QR Code Canvas — 由顶层 hook 渲染 */}
           <div className="bg-white rounded-[var(--radius-2xl)] shadow-[var(--shadow-l3)] p-6 mb-6">
-            {qrImageUrl ? (
-              <img
-                src={qrImageUrl}
-                alt="微信支付二维码"
-                className="w-60 h-60"
-              />
-            ) : (
-              <div className="w-60 h-60 bg-[var(--color-canvas-soft-2)] rounded-[var(--radius-md)] flex items-center justify-center text-sm text-[var(--color-mute)]">
-                加载中...
-              </div>
-            )}
+            <canvas ref={qrCanvasRef} className="w-60 h-60" />
           </div>
 
           <h2 className="text-base font-semibold text-[var(--color-ink)] mb-1">请使用微信扫码支付</h2>
@@ -259,20 +267,17 @@ export default function SubscribePage() {
                 取消
               </Button>
             </div>
-            <a
-              href={qrImageUrl || '#'}
-              download="wechat-pay-qr.png"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline"
+            <button
+              onClick={handleDownloadQr}
+              className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline cursor-pointer"
             >
               <Download className="w-3 h-3" />
               保存二维码
-            </a>
+            </button>
           </div>
 
           <p className="text-xs text-[var(--color-mute)]">
-            {selectedPlan?.name} · ¥{selectedPlan?.price} · 有效期30天
+            {selectedPlan?.name} · ¥{selectedPlan?.price} · 有效期{selectedPlan?.durationDays}天
           </p>
         </div>
       </div>

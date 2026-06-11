@@ -10,6 +10,24 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+
+  // 诊断：无需登录，查看环境变量配置
+  if (req.query?.debug === 'env') {
+    res.status(200).json({
+      env: {
+        WECHAT_PAY_APPID: process.env.WECHAT_PAY_APPID,
+        WECHAT_PAY_MCHID: process.env.WECHAT_PAY_MCHID ? '***' : undefined,
+        WECHAT_PAY_API_V3_KEY: process.env.WECHAT_PAY_API_V3_KEY ? '***' : undefined,
+        WECHAT_PAY_MCH_SERIAL: process.env.WECHAT_PAY_MCH_SERIAL ? '***' : undefined,
+        WECHAT_PAY_PRIVATE_KEY: process.env.WECHAT_PAY_PRIVATE_KEY ? '***' : undefined,
+        WECHAT_PAY_NOTIFY_URL: process.env.WECHAT_PAY_NOTIFY_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL ? '***' : undefined,
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '***' : undefined,
+      },
+    })
+    return
+  }
+
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   if (!isWechatPayConfigured()) {

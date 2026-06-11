@@ -28,12 +28,6 @@ export default function SubscribePage() {
   const [payState, setPayState] = useState<PayState>('idle')
   const [payParams, setPayParams] = useState<PayParams | null>(null)
   const [payError, setPayError] = useState('')
-
-  // 是否在微信内置浏览器中
-  const [isWeChatBrowser, setIsWeChatBrowser] = useState(false)
-  useEffect(() => {
-    setIsWeChatBrowser(/MicroMessenger/i.test(navigator.userAgent))
-  }, [])
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [countdown, setCountdown] = useState(0)
 
@@ -245,9 +239,7 @@ export default function SubscribePage() {
             二维码有效期 {countdown}s
           </p>
           <p className="text-xs text-[var(--color-mute)] mb-4">
-            {isWeChatBrowser
-              ? '长按二维码即可识别支付'
-              : '用另一台手机微信扫码，或截图保存后打开微信扫一扫'}
+            用另一台手机微信扫码，或截图保存后打开微信扫一扫
           </p>
 
           <div className="flex flex-col items-center gap-3 mb-6">

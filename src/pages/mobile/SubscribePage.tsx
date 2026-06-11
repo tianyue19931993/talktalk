@@ -213,7 +213,7 @@ export default function SubscribePage() {
   if (payState === 'waiting') {
     const codeUrl = payParams.payment.codeUrl
     const qrImageUrl = codeUrl
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(codeUrl)}`
+      ? `/api/qr?data=${encodeURIComponent(codeUrl)}`
       : null
 
     return (

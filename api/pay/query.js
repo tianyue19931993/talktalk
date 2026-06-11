@@ -48,21 +48,29 @@ export default async (req, res) => {
             paid_at: wxResult.successTime || now.toISOString(),
           })
 
-          // 取消旧订阅
+          // 取消旧订阅（幂等操作）
           await updateWhere('subscriptions', { user_id: order.user_id, status: 'active' }, { status: 'cancelled' }).catch(() => {})
 
-          // 创建新订阅
-          const subResult = await insert('subscriptions', {
-            user_id: order.user_id,
-            plan_id: order.plan_id,
-            status: 'active',
-            start_at: now.toISOString(),
-            expire_at: expireAt.toISOString(),
+          // 防重复检查：确认没有活跃订阅再创建
+          const { data: existingSub } = await supabaseQuery('subscriptions', {
+            filters: { user_id: order.user_id, plan_id: order.plan_id, status: 'active' },
+            select: 'id',
+            limit: 1,
           })
 
-          if (subResult.error) {
-            console.error('[pay/query] create subscription failed:', subResult.error)
-            // 虽然订阅创建失败，订单已标记 paid，返回 paid 让前端展示成功
+          if (!existingSub || existingSub.length === 0) {
+            const subResult = await insert('subscriptions', {
+              user_id: order.user_id,
+              plan_id: order.plan_id,
+              status: 'active',
+              start_at: now.toISOString(),
+              expire_at: expireAt.toISOString(),
+            })
+            if (subResult.error) {
+              console.error('[pay/query] create subscription failed:', subResult.error)
+            }
+          } else {
+            console.log('[pay/query] subscription already exists, skip creation')
           }
 
           console.log('[pay/query] synced from WeChat:', { orderNo, userId: order.user_id })

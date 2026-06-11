@@ -55,21 +55,24 @@ export default async (req, res) => {
 
     await updateWhere('orders', { order_no: outTradeNo }, { status: 'paid', paid_at: payResult.success_time || new Date().toISOString() })
 
-    // 取消旧订阅
     await updateWhere('subscriptions', { user_id: order.user_id, status: 'active' }, { status: 'cancelled' }).catch(() => {})
 
-    // 创建新订阅
-    const now = new Date()
-    const expireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-    await insert('subscriptions', {
-      user_id: order.user_id, plan_id: order.plan_id, status: 'active',
-      start_at: now.toISOString(), expire_at: expireAt.toISOString(),
+    // 防重复检查：确认没有活跃订阅再创建
+    const { data: existingSub } = await supabaseQuery('subscriptions', {
+      filters: { user_id: order.user_id, plan_id: order.plan_id, status: 'active' },
+      select: 'id',
+      limit: 1,
     })
 
-    console.log('[pay/notify] activated:', { userId: order.user_id, orderNo: outTradeNo, planId: order.plan_id })
-    res.status(200).json({ code: 'SUCCESS', message: '支付成功' })
-  } catch (e) {
-    console.error('[pay/notify] error:', e.message)
-    res.status(500).json({ code: 'FAIL', message: e.message || '处理失败' })
-  }
-}
+    if (!existingSub || existingSub.length === 0) {
+      // 创建新订阅
+      const now = new Date()
+      const expireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+      await insert('subscriptions', {
+        user_id: order.user_id, plan_id: order.plan_id, status: 'active',
+        start_at: now.toISOString(), expire_at: expireAt.toISOString(),
+      })
+      console.log('[pay/notify] activated:', { userId: order.user_id, orderNo: outTradeNo, planId: order.plan_id })
+    } else {
+      console.log('[pay/notify] subscription already exists, skip creation')
+    }

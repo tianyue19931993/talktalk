@@ -69,6 +69,7 @@ CREATE TABLE plans (
   permissions JSONB DEFAULT '[]'::jsonb,   -- 权限列表，如 ["view_demo"]
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
   sort INT DEFAULT 0,
+  duration_days INT NOT NULL DEFAULT 30, -- 有效期天数
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -78,9 +79,9 @@ CREATE TRIGGER trg_plans_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- 初始套餐数据
-INSERT INTO plans (code, name, price, description, permissions, sort) VALUES
-  ('basic', '基础会员', 1, '每月1元，解锁全部互动演示', '["view_demo"]', 1),
-  ('ai', 'AI会员', 0, 'AI功能即将开放（价格待定）', '["view_demo", "create_demo"]', 2)
+INSERT INTO plans (code, name, price, description, permissions, sort, duration_days) VALUES
+  ('basic', '基础会员', 1, '每月1元，解锁全部互动演示', '["view_demo"]', 1, 30),
+  ('ai', 'AI会员', 0, 'AI功能即将开放（价格待定）', '["view_demo", "create_demo"]', 2, 365)
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================

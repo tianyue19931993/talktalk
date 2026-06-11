@@ -59,7 +59,15 @@ export default async (req, res) => {
 
           // 用微信支付成功时间或订单创建时间作为订阅开始日期
           const actualStart = new Date(wxResult.successTime || order.created_at || now)
-          const expireAt = new Date(actualStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+          // 获取套餐有效期
+          const { data: planData } = await supabaseQuery('plans', {
+            filters: { id: order.plan_id },
+            select: 'duration_days',
+            limit: 1,
+          })
+          const durationDays = (planData && planData[0]?.duration_days) || 30
+          const expireAt = new Date(actualStart.getTime() + durationDays * 24 * 60 * 60 * 1000)
 
           if (!existingSub || existingSub.length === 0) {
             const subResult = await insert('subscriptions', {

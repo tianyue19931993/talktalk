@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Crown, Plus, Pencil, Trash2, Check, X, DollarSign } from 'lucide-react'
+import { Crown, Plus, Pencil, Trash2, Check, X, DollarSign, Calendar } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { authedRequest } from '../../lib/supabase-auth'
@@ -17,6 +17,7 @@ function rowToPlan(row: any): Plan {
     permissions: row.permissions || [],
     status: row.status,
     sort: row.sort || 0,
+    durationDays: row.duration_days || 30,
     createdAt: row.created_at,
   }
 }
@@ -33,12 +34,14 @@ export default function PlanManagePage() {
   const [newName, setNewName] = useState('')
   const [newPrice, setNewPrice] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newDuration, setNewDuration] = useState('30')
 
   // 编辑
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [editDuration, setEditDuration] = useState('30')
 
   useEffect(() => {
     if (!isAdmin) { navigate('/admin/lessons'); return }
@@ -61,12 +64,13 @@ export default function PlanManagePage() {
         name: newName.trim(),
         price: Number(newPrice),
         description: newDesc.trim(),
+        duration_days: Number(newDuration) || 30,
         permissions: [],
         sort: plans.length + 1,
       },
     })
     setShowNew(false)
-    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc('')
+    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc(''); setNewDuration('30')
     loadPlans()
   }
 
@@ -75,13 +79,19 @@ export default function PlanManagePage() {
     setEditName(plan.name)
     setEditPrice(String(plan.price))
     setEditDesc(plan.description)
+    setEditDuration(String(plan.durationDays))
   }
 
   const handleUpdate = async () => {
     if (!editingId || !editName.trim() || !editPrice.trim()) return
     await authedRequest(`/plans?id=eq.${editingId}`, {
       method: 'PATCH',
-      body: { name: editName.trim(), price: Number(editPrice), description: editDesc.trim() },
+      body: {
+        name: editName.trim(),
+        price: Number(editPrice),
+        description: editDesc.trim(),
+        duration_days: Number(editDuration) || 30,
+      },
     })
     setEditingId(null)
     loadPlans()
@@ -111,10 +121,11 @@ export default function PlanManagePage() {
       {/* New form */}
       {showNew && (
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-3">
             <Input placeholder="套餐编码 (basic)" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
             <Input placeholder="套餐名称" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <Input placeholder="价格" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} type="number" />
+            <Input placeholder="有效期(天)" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} type="number" />
             <Input placeholder="描述（可选）" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
           </div>
           <div className="flex justify-end gap-2">
@@ -132,13 +143,13 @@ export default function PlanManagePage() {
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">编码</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">名称</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">价格</th>
-
+              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">有效期</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
             {plans.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无套餐数据</td></tr>
+              <tr><td colSpan={5} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无套餐数据</td></tr>
             ) : (
               plans.map((plan) => (
                 <tr key={plan.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
@@ -166,7 +177,16 @@ export default function PlanManagePage() {
                       </span>
                     )}
                   </td>
-
+                  <td className="px-4 py-3">
+                    {editingId === plan.id ? (
+                      <input value={editDuration} onChange={(e) => setEditDuration(e.target.value)} type="number" className="w-20 px-2 py-1 text-sm border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" />
+                    ) : (
+                      <span className="flex items-center gap-1 text-sm text-[var(--color-ink)]">
+                        <Calendar className="w-3.5 h-3.5 text-[var(--color-mute)]" />
+                        {plan.durationDays} 天
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {editingId === plan.id ? (
                       <div className="flex justify-end gap-1">

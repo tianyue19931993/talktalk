@@ -25,6 +25,7 @@ export interface Plan {
   permissions: string[]
   status: string
   sort: number
+  durationDays: number
   createdAt: string
 }
 

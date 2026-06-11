@@ -308,6 +308,7 @@ function rowToPlan(row: any): Plan {
     permissions: row.permissions || [],
     status: row.status,
     sort: row.sort || 0,
+    durationDays: row.duration_days || 30,
     createdAt: row.created_at,
   }
 }

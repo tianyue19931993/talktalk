@@ -65,9 +65,17 @@ export default async (req, res) => {
     })
 
     if (!existingSub || existingSub.length === 0) {
+      // 获取套餐有效期
+      const { data: planData } = await supabaseQuery('plans', {
+        filters: { id: order.plan_id },
+        select: 'duration_days',
+        limit: 1,
+      })
+      const durationDays = (planData && planData[0]?.duration_days) || 30
+
       // 用微信支付成功时间作为订阅开始日期
       const actualStart = new Date(payResult.success_time || new Date())
-      const expireAt = new Date(actualStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+      const expireAt = new Date(actualStart.getTime() + durationDays * 24 * 60 * 60 * 1000)
       await insert('subscriptions', {
         user_id: order.user_id, plan_id: order.plan_id, status: 'active',
         start_at: actualStart.toISOString(), expire_at: expireAt.toISOString(),

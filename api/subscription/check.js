@@ -73,7 +73,15 @@ export default async (req, res) => {
               // 微信确认已支付 → 同步订单和订阅
               const now = new Date()
               const actualStart = new Date(wxResult.successTime || order.created_at || now)
-              const expireAt = new Date(actualStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+              // 获取套餐有效期
+              const { data: planData } = await query('plans', {
+                filters: { id: order.plan_id },
+                select: 'duration_days',
+                limit: 1,
+              })
+              const durationDays = (planData && planData[0]?.duration_days) || 30
+              const expireAt = new Date(actualStart.getTime() + durationDays * 24 * 60 * 60 * 1000)
 
               await updateWhere('orders', { order_no: order.order_no }, {
                 status: 'paid',

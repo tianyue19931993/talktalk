@@ -65,12 +65,12 @@ export default async (req, res) => {
     })
 
     if (!existingSub || existingSub.length === 0) {
-      // 创建新订阅
-      const now = new Date()
-      const expireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+      // 用微信支付成功时间作为订阅开始日期
+      const actualStart = new Date(payResult.success_time || new Date())
+      const expireAt = new Date(actualStart.getTime() + 30 * 24 * 60 * 60 * 1000)
       await insert('subscriptions', {
         user_id: order.user_id, plan_id: order.plan_id, status: 'active',
-        start_at: now.toISOString(), expire_at: expireAt.toISOString(),
+        start_at: actualStart.toISOString(), expire_at: expireAt.toISOString(),
       })
       console.log('[pay/notify] activated:', { userId: order.user_id, orderNo: outTradeNo, planId: order.plan_id })
     } else {

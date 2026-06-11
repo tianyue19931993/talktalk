@@ -41,7 +41,6 @@ export default async (req, res) => {
         if (wxResult.tradeState === 'SUCCESS') {
           // 微信说已支付 → 更新订单和订阅
           const now = new Date()
-          const expireAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
           await updateWhere('orders', { order_no: orderNo }, {
             status: 'paid',
@@ -58,12 +57,16 @@ export default async (req, res) => {
             limit: 1,
           })
 
+          // 用微信支付成功时间或订单创建时间作为订阅开始日期
+          const actualStart = new Date(wxResult.successTime || order.created_at || now)
+          const expireAt = new Date(actualStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+
           if (!existingSub || existingSub.length === 0) {
             const subResult = await insert('subscriptions', {
               user_id: order.user_id,
               plan_id: order.plan_id,
               status: 'active',
-              start_at: now.toISOString(),
+              start_at: actualStart,
               expire_at: expireAt.toISOString(),
             })
             if (subResult.error) {

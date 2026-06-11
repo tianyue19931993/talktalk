@@ -1,14 +1,33 @@
 /**
  * POST /api/pay/notify - 微信支付回调通知
+ *
+ * 安全说明：签名验证必须用原始请求体（字节流），不能重新 JSON.stringify。
+ * 这里先尝试从请求流读取原始 body，失败时降级使用 req.body。
  */
 const { verifyAndDecryptNotify } = require('../lib/wechat-pay');
 const { query: supabaseQuery, updateWhere, insert } = require('../lib/supabase-admin');
+
+/** 从请求流读取原始 body（UTF-8） */
+function readRawBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    // 流已读完但事件未触发时的兜底
+    setTimeout(() => resolve(''), 100);
+  });
+}
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
   try {
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    // 优先从流读取原始 body（保证签名验签的完整性）
+    let rawBody = await readRawBody(req);
+    if (!rawBody) {
+      // 流已被消费（Vercel 内部 parser），降级使用 parsed body
+      rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    }
     const wechatSignature = req.headers['wechatpay-signature'];
     const wechatTimestamp = req.headers['wechatpay-timestamp'];
     const wechatNonce = req.headers['wechatpay-nonce'];

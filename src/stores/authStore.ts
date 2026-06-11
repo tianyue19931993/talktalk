@@ -1,6 +1,6 @@
 // 认证与订阅状态管理
 import { useState, useEffect } from 'react'
-import { loadSession, clearSession, getProfile, getActiveSubscription, isLoggedIn } from '../lib/supabase-auth'
+import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession } from '../lib/supabase-auth'
 import type { Profile, Subscription } from '../types/auth'
 
 // ============================================================
@@ -24,7 +24,7 @@ function notify() { listeners.forEach((fn) => fn()) }
 // 初始化：加载缓存的 session + 拉取 profile / 订阅
 // ============================================================
 
-if (isLoggedIn()) {
+if (hasStoredSession()) {
   loadUserData()
 }
 
@@ -33,6 +33,19 @@ async function loadUserData() {
   loading = true
 
   try {
+    // 第一步：获取有效 session（过期自动刷新 token）
+    const session = await ensureValidSession()
+    if (!session) {
+      // 无有效 session（没登录 / token 过期且刷新失败）
+      clearSession()
+      currentUser = null
+      currentSubscription = null
+      initialized = true
+      loading = false
+      notify()
+      return
+    }
+
     const [profileRes, subRes] = await Promise.all([
       getProfile(),
       getActiveSubscription(),
@@ -78,7 +91,7 @@ export async function refreshUserData() {
   currentUser = null
   currentSubscription = null
 
-  if (isLoggedIn()) {
+  if (hasStoredSession()) {
     await loadUserData()
   }
 
@@ -111,7 +124,7 @@ export function useAuth() {
     user: currentUser,
     subscription: currentSubscription,
     isLoggedIn: !!currentUser,
-    isLoading: !initialized && isLoggedIn(),
+    isLoading: !initialized && hasStoredSession(),
     isAdmin: currentUser?.role === 'admin',
   }
 }

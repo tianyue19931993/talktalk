@@ -53,23 +53,16 @@ module.exports = async (req, res) => {
     });
     if (orderError || !order || order.length === 0) { res.status(500).json({ error: '创建订单失败', detail: orderError }); return; }
 
-    // 调微信支付统一下单
-    const userAgent = req.headers['user-agent'] || '';
-    const isMobile = /mobile|android|iphone|ipad/i.test(userAgent);
-    const payerIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const mode = isMobile ? 'h5' : 'native';
-
+    // 调微信支付统一下单（Native 扫码模式）
     const paymentResult = await unifiedOrder({
       description: `TalkTalk ${plan.name}`,
       outTradeNo: orderNo,
       amount: priceInYuan,
-      payerClientIp: payerIp,
-      mode,
     });
 
     res.status(200).json({
       orderNo,
-      payment: { mode, codeUrl: paymentResult.codeUrl, h5Url: paymentResult.h5Url, prepayId: paymentResult.prepayId },
+      payment: { mode: 'native', codeUrl: paymentResult.codeUrl },
     });
   } catch (e) {
     console.error('[pay/create-order] error:', e);

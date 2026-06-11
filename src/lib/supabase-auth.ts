@@ -19,15 +19,53 @@ export function saveSession(session: AuthSession) {
   } catch {}
 }
 
+/** 同步：从 localStorage 读取原始 session（不过期检查） */
+export function getStoredSession(): AuthSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) as AuthSession : null
+  } catch {
+    return null
+  }
+}
+
+/** 异步：获取有效 session，过期时自动刷新 */
+export async function ensureValidSession(): Promise<AuthSession | null> {
+  const stored = getStoredSession()
+  if (!stored) return null
+
+  // token 仍有效
+  if (!stored.expiresAt || Date.now() < stored.expiresAt * 1000) {
+    return stored
+  }
+
+  // token 过期 → 用 refresh_token 续期
+  if (stored.refreshToken) {
+    const { data } = await refreshSession()
+    if (data) return data
+  }
+
+  // 续期失败
+  clearSession()
+  return null
+}
+
+/** 同步：检查 localStorage 是否有 session（过期也算有，后续走异步刷新） */
+export function hasStoredSession(): boolean {
+  return getStoredSession() !== null
+}
+
+/**
+ * 同步：读取 session，过期直接返回 null（简单场景用）
+ * 后台启动恢复场景请用 ensureValidSession()
+ */
 export function loadSession(): AuthSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const session = JSON.parse(raw) as AuthSession
-    // 检查是否过期
     if (session.expiresAt && Date.now() > session.expiresAt * 1000) {
-      clearSession()
-      return null
+      return null // 不在这里 clear，留给 ensuresValidSession 做刷新
     }
     return session
   } catch {
@@ -169,7 +207,7 @@ export async function signIn(email: string, password: string): Promise<AuthRespo
 
 /** 刷新 token */
 export async function refreshSession(): Promise<AuthResponse<AuthSession>> {
-  const current = loadSession()
+  const current = getStoredSession()
   if (!current?.refreshToken) return { data: null, error: 'No refresh token' }
 
   const { data, error } = await authRequest<any>('/token?grant_type=refresh_token', {

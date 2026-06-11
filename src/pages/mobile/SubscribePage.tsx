@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Monitor } from 'lucide-react'
+import { ArrowLeft, Check, Sparkles, Lock, Smartphone } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { getPlans, loadSession } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
@@ -13,10 +13,8 @@ type PayState = 'idle' | 'creating' | 'waiting' | 'polling' | 'success' | 'error
 interface PayParams {
   orderNo: string
   payment: {
-    mode: 'native' | 'h5'
+    mode: 'native'
     codeUrl?: string
-    h5Url?: string
-    prepayId: string
   }
 }
 
@@ -160,16 +158,8 @@ export default function SubscribePage() {
       if (!res.ok) throw new Error(data.error || data.detail || '下单失败')
 
       setPayParams(data)
-
-      // H5 模式：直接跳转到微信支付
-      if (data.payment.mode === 'h5' && data.payment.h5Url) {
-        setPayState('waiting')
-        // 在新窗口/当前窗口跳转微信支付
-        window.location.href = data.payment.h5Url
-      } else {
-        // Native 模式：显示二维码
-        setPayState('waiting')
-      }
+      // Native 模式：显示二维码
+      setPayState('waiting')
     } catch (e: any) {
       setPayError(e.message)
       setPayState('error')
@@ -211,26 +201,8 @@ export default function SubscribePage() {
     )
   }
 
-  // 支付等待页（H5 模式 - 已跳转微信）
-  if (payState === 'waiting' && payParams?.payment.mode === 'h5') {
-    return (
-      <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-6 pt-20">
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 mb-4">
-            <div className="w-full h-full rounded-full border-4 border-[var(--color-link)] border-t-transparent animate-spin" />
-          </div>
-          <h2 className="text-lg font-semibold text-[var(--color-ink)] mb-2">正在跳转微信支付…</h2>
-          <p className="text-sm text-[var(--color-body)] mb-6">请在新打开的页面中完成支付</p>
-          <Button variant="secondary" size="sm" onClick={startPolling}>
-            已完成支付
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // 支付等待页（Native 模式 - 展示二维码）
-  if (payState === 'waiting' && payParams?.payment.mode === 'native') {
+  // 支付等待页（展示微信支付二维码）
+  if (payState === 'waiting') {
     const codeUrl = payParams.payment.codeUrl
     const qrImageUrl = codeUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(codeUrl)}`
@@ -348,15 +320,9 @@ export default function SubscribePage() {
 
       {/* 支付方式提示 */}
       <div className="px-6 pt-3">
-        <div className="flex items-center gap-4 text-xs text-[var(--color-mute)] bg-[var(--color-canvas)] rounded-[var(--radius-md)] px-4 py-2.5">
-          <div className="flex items-center gap-1">
-            <Smartphone className="w-3.5 h-3.5" />
-            <span>手机端：微信内直接支付</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Monitor className="w-3.5 h-3.5" />
-            <span>电脑端：扫码支付</span>
-          </div>
+        <div className="flex items-center gap-2 text-xs text-[var(--color-mute)] bg-[var(--color-canvas)] rounded-[var(--radius-md)] px-4 py-2.5">
+          <Smartphone className="w-3.5 h-3.5 shrink-0" />
+          <span>微信扫码支付 · 手机/电脑通用</span>
         </div>
       </div>
 

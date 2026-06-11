@@ -84,18 +84,7 @@ async function unifiedOrder(params) {
     amount: { total: totalFee, currency: 'CNY' },
   };
 
-  if (params.mode !== 'native') {
-    bodyObj.scene_info = {
-      payer_client_ip: params.payerClientIp,
-      h5_info: { type: 'Wap' },
-    };
-  }
-
-  const endpoint = params.mode === 'native'
-    ? '/v3/pay/transactions/native'
-    : '/v3/pay/transactions/h5';
-
-  const res = await httpsRequest('POST', endpoint, JSON.stringify(bodyObj));
+  const res = await httpsRequest('POST', '/v3/pay/transactions/native', JSON.stringify(bodyObj));
 
   if (res.code !== 200 && res.code !== 201 && res.code !== 204) {
     throw new Error(`微信支付下单失败 (${res.code}): ${JSON.stringify(res.body)}`);
@@ -103,8 +92,6 @@ async function unifiedOrder(params) {
 
   return {
     codeUrl: res.body?.code_url,
-    h5Url: res.body?.h5_url,
-    prepayId: res.body?.prepay_id || '',
   };
 }
 

@@ -9,6 +9,9 @@ import MyPage from './pages/mobile/MyPage'
 import LoginPage from './pages/mobile/LoginPage'
 import SubscribePage from './pages/mobile/SubscribePage'
 import OrdersPage from './pages/mobile/OrdersPage'
+import MyQuestionsPage from './pages/mobile/MyQuestionsPage'
+import MyQuestionDetailPage from './pages/mobile/MyQuestionDetailPage'
+import MyDemoPage from './pages/mobile/MyDemoPage'
 import LessonManagePage from './pages/admin/LessonManagePage'
 import LessonEditPage from './pages/admin/LessonEditPage'
 import TypeManagePage from './pages/admin/TypeManagePage'
@@ -17,6 +20,7 @@ import UserManagePage from './pages/admin/UserManagePage'
 import PlanManagePage from './pages/admin/PlanManagePage'
 import SubscriptionManagePage from './pages/admin/SubscriptionManagePage'
 import OrderManagePage from './pages/admin/OrderManagePage'
+import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
 
 export default function App() {
   return (
@@ -31,6 +35,11 @@ export default function App() {
         <Route path="/subscribe" element={<SubscribePage />} />
         <Route path="/orders" element={<OrdersPage />} />
       </Route>
+
+      {/* Mobile full-screen pages (no bottom nav) */}
+      <Route path="/my/questions" element={<MyQuestionsPage />} />
+      <Route path="/my/question/:id" element={<MyQuestionDetailPage />} />
+      <Route path="/my/demo/:questionId/:demoIndex" element={<MyDemoPage />} />
 
       {/* Demo - full screen, no layout */}
       <Route path="/demo/:lessonId/:demoId" element={<DemoPage />} />
@@ -47,6 +56,7 @@ export default function App() {
         <Route path="plans" element={<PlanManagePage />} />
         <Route path="subscriptions" element={<SubscriptionManagePage />} />
         <Route path="orders" element={<OrderManagePage />} />
+        <Route path="user-questions" element={<UserQuestionManagePage />} />
       </Route>
 
       {/* Fallback */}

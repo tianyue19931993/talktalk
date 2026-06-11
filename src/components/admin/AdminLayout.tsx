@@ -14,6 +14,7 @@ const sidebarItems: SidebarItem[] = [
   { path: '/admin/lessons', label: '题目管理', icon: FileText },
   { path: '/admin/types', label: '题型管理', icon: BookType },
   { path: '/admin/tags', label: '标签管理', icon: Tags },
+  { path: '/admin/user-questions', label: '用户题目管理', icon: FileText },
   { path: '/admin/users', label: '用户管理', icon: Users },
   { path: '/admin/subscriptions', label: '订阅管理', icon: Crown },
   { path: '/admin/orders', label: '订单管理', icon: Receipt },

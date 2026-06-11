@@ -36,7 +36,6 @@ export default function MyPage() {
         {/* Quick links */}
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] divide-y divide-[var(--color-hairline)]">
           <LinkItem icon={Crown} label="开通会员" onClick={() => navigate('/login?redirect=/subscribe')} />
-          <LinkItem icon={Sparkles} label="我生成题目演示" disabled badge="暂未开放" />
         </div>
 
         {/* About */}
@@ -149,7 +148,6 @@ export default function MyPage() {
         {isAdmin && (
           <LinkItem icon={Shield} label="管理后台" onClick={() => navigate('/admin')} />
         )}
-        <LinkItem icon={Sparkles} label="我生成题目演示" disabled badge="暂未开放" />
         <LinkItem
           icon={LogOut}
           label="退出登录"

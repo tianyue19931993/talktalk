@@ -66,6 +66,23 @@ export interface AuthSession {
   }
 }
 
+/** HTML 互动演示（复用，与 index.ts 中保持一致） */
+export interface UserHtmlDemo {
+  title: string
+  url: string
+}
+
+/** 用户录入的题目（与题库 questions 表区分） */
+export interface UserQuestion {
+  id: string
+  userId: string
+  questionText: string
+  htmlDemos: UserHtmlDemo[]
+  status: 'pending' | 'completed' | 'uploaded'
+  createdAt: string
+  updatedAt: string
+}
+
 /** 权限标识常量 */
 export const PERMISSIONS = {
   VIEW_DEMO: 'view_demo',

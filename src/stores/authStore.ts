@@ -1,6 +1,6 @@
 // 认证与订阅状态管理
 import { useState, useEffect } from 'react'
-import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession } from '../lib/supabase-auth'
+import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession, loadSession } from '../lib/supabase-auth'
 import type { Profile, Subscription } from '../types/auth'
 
 // ============================================================
@@ -45,6 +45,13 @@ async function loadUserData() {
       notify()
       return
     }
+
+    // 检查订阅是否过期（服务端自动标记 expired）
+    try {
+      await fetch('/api/subscription/check', {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      })
+    } catch {}
 
     const [profileRes, subRes] = await Promise.all([
       getProfile(),

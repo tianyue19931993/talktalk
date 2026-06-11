@@ -48,6 +48,34 @@ export default async (req, res) => {
     const priceInYuan = Number(plan.price)
     if (priceInYuan <= 0) { res.status(400).json({ error: '免费套餐无需支付' }); return }
 
+    // 检查是否已有有效订阅
+    const { data: activeSubs } = await supabaseQuery('active_subscriptions', {
+      filters: { user_id: userId, plan_id: planId },
+      select: 'id',
+      limit: 1,
+    })
+    if (activeSubs && activeSubs.length > 0) {
+      res.status(400).json({ error: '该套餐已订阅，无需重复购买' })
+      return
+    }
+
+    // 检查是否有该套餐的待支付订单（防止重复下单）
+    const { data: pendingOrders } = await supabaseQuery('orders', {
+      filters: { user_id: userId, plan_id: planId, status: 'pending' },
+      select: 'id,order_no,created_at',
+      limit: 1,
+    })
+    if (pendingOrders && pendingOrders.length > 0) {
+      // 有未支付的订单，直接返回已存在的信息
+      const existing = pendingOrders[0]
+      console.log('[pay/create-order] existing pending order:', existing.order_no)
+      res.status(200).json({
+        orderNo: existing.order_no,
+        payment: { mode: 'native', codeUrl: null, message: '有未完成的订单，请先支付或取消' },
+      })
+      return
+    }
+
     // 创建订单
     const orderNo = `ORD${Date.now()}${String(Math.random()).slice(2, 8)}`
     const { data: order, error: orderError } = await insert('orders', {

@@ -12,8 +12,6 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-
   if (!isWechatPayConfigured()) {
     res.status(500).json({ error: '微信支付未配置完整', config: getConfigStatus() });
     return;

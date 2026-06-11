@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button'
 import { getPlans, loadSession } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
 import type { Plan } from '../../types/auth'
-import QRCode from 'qrcode'
 
 /** 支付状态 */
 type PayState = 'idle' | 'creating' | 'waiting' | 'polling' | 'success' | 'error'
@@ -35,18 +34,6 @@ export default function SubscribePage() {
   useEffect(() => {
     setIsWeChatBrowser(/MicroMessenger/i.test(navigator.userAgent))
   }, [])
-
-  // 客户端生成二维码（避免依赖外部 CDN，微信内长按才能识别）
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (payParams?.payment?.codeUrl) {
-      QRCode.toDataURL(payParams.payment.codeUrl, { width: 280, margin: 1 })
-        .then(setQrDataUrl)
-        .catch(() => setQrDataUrl(null))
-    } else {
-      setQrDataUrl(null)
-    }
-  }, [payParams?.payment?.codeUrl])
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [countdown, setCountdown] = useState(0)
 
@@ -231,15 +218,18 @@ export default function SubscribePage() {
   // 支付等待页（展示微信支付二维码）
   if (payState === 'waiting') {
     const codeUrl = payParams.payment.codeUrl
+    const qrImageUrl = codeUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(codeUrl)}`
+      : null
 
     return (
       <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-6 pt-20">
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           {/* QR Code */}
           <div className="bg-white rounded-[var(--radius-2xl)] shadow-[var(--shadow-l3)] p-6 mb-6">
-            {qrDataUrl ? (
+            {qrImageUrl ? (
               <img
-                src={qrDataUrl}
+                src={qrImageUrl}
                 alt="微信支付二维码"
                 className="w-60 h-60"
               />
@@ -278,7 +268,7 @@ export default function SubscribePage() {
               </Button>
             </div>
             <a
-              href={qrDataUrl || '#'}
+              href={qrImageUrl || '#'}
               download="wechat-pay-qr.png"
               target="_blank"
               rel="noopener noreferrer"

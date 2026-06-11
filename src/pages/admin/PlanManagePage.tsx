@@ -22,6 +22,12 @@ function rowToPlan(row: any): Plan {
   }
 }
 
+// 可用权限列表
+const PERMISSION_OPTIONS = [
+  { key: 'view_demo', label: '查看互动演示' },
+  { key: 'create_demo', label: '创建互动演示' },
+]
+
 export default function PlanManagePage() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
@@ -35,6 +41,7 @@ export default function PlanManagePage() {
   const [newPrice, setNewPrice] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newDuration, setNewDuration] = useState('30')
+  const [newPermissions, setNewPermissions] = useState<string[]>([])
 
   // 编辑
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -42,6 +49,7 @@ export default function PlanManagePage() {
   const [editPrice, setEditPrice] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editDuration, setEditDuration] = useState('30')
+  const [editPermissions, setEditPermissions] = useState<string[]>([])
 
   useEffect(() => {
     if (!isAdmin) { navigate('/admin/lessons'); return }
@@ -65,12 +73,12 @@ export default function PlanManagePage() {
         price: Number(newPrice),
         description: newDesc.trim(),
         duration_days: Number(newDuration) || 30,
-        permissions: [],
+        permissions: newPermissions,
         sort: plans.length + 1,
       },
     })
     setShowNew(false)
-    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc(''); setNewDuration('30')
+    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc(''); setNewDuration('30'); setNewPermissions([])
     loadPlans()
   }
 
@@ -80,6 +88,7 @@ export default function PlanManagePage() {
     setEditPrice(String(plan.price))
     setEditDesc(plan.description)
     setEditDuration(String(plan.durationDays))
+    setEditPermissions(plan.permissions || [])
   }
 
   const handleUpdate = async () => {
@@ -91,6 +100,7 @@ export default function PlanManagePage() {
         price: Number(editPrice),
         description: editDesc.trim(),
         duration_days: Number(editDuration) || 30,
+        permissions: editPermissions,
       },
     })
     setEditingId(null)
@@ -128,6 +138,27 @@ export default function PlanManagePage() {
             <Input placeholder="有效期(天)" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} type="number" />
             <Input placeholder="描述（可选）" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
           </div>
+          {/* 权限勾选 */}
+          <div className="flex items-center gap-4 mb-3">
+            <span className="text-xs text-[var(--color-mute)] shrink-0">权限：</span>
+            {PERMISSION_OPTIONS.map((opt) => (
+              <label key={opt.key} className="flex items-center gap-1.5 text-sm text-[var(--color-body)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newPermissions.includes(opt.key)}
+                  onChange={(e) => {
+                    setNewPermissions(
+                      e.target.checked
+                        ? [...newPermissions, opt.key]
+                        : newPermissions.filter((p) => p !== opt.key)
+                    )
+                  }}
+                  className="accent-[var(--color-link)]"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setShowNew(false)}>取消</Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>创建</Button>
@@ -159,6 +190,25 @@ export default function PlanManagePage() {
                       <div className="space-y-1">
                         <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-2 py-1 text-sm border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" autoFocus />
                         <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="描述" className="w-full px-2 py-1 text-xs border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" />
+                        <div className="flex items-center gap-3 pt-1">
+                          {PERMISSION_OPTIONS.map((opt) => (
+                            <label key={opt.key} className="flex items-center gap-1 text-xs text-[var(--color-body)] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editPermissions.includes(opt.key)}
+                                onChange={(e) => {
+                                  setEditPermissions(
+                                    e.target.checked
+                                      ? [...editPermissions, opt.key]
+                                      : editPermissions.filter((p) => p !== opt.key)
+                                  )
+                                }}
+                                className="accent-[var(--color-link)]"
+                              />
+                              {opt.label}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <div>

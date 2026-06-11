@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { getPlans, loadSession } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
 import type { Plan } from '../../types/auth'
+import QRCode from 'qrcode'
 
 /** 支付状态 */
 type PayState = 'idle' | 'creating' | 'waiting' | 'polling' | 'success' | 'error'
@@ -35,26 +36,16 @@ export default function SubscribePage() {
     setIsWeChatBrowser(/MicroMessenger/i.test(navigator.userAgent))
   }, [])
 
-  // 客户端生成二维码（用 blob URL 避免微信扫码识别异常）
+  // 客户端生成二维码（避免依赖外部 CDN）
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   useEffect(() => {
     const codeUrl = payParams?.payment?.codeUrl
     if (!codeUrl) { setQrDataUrl(null); return }
 
     let cancelled = false
-    ;(async () => {
-      try {
-        const canvas = document.createElement('canvas')
-        const QRCode = (await import('qrcode')).default
-        await QRCode.toCanvas(canvas, codeUrl, { width: 280, margin: 1 })
-        if (cancelled) return
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
-        if (cancelled || !blob) { setQrDataUrl(null); return }
-        setQrDataUrl(URL.createObjectURL(blob))
-      } catch {
-        if (!cancelled) setQrDataUrl(null)
-      }
-    })()
+    QRCode.toDataURL(codeUrl, { width: 280, margin: 1 })
+      .then((url) => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => { if (!cancelled) setQrDataUrl(null) })
 
     return () => { cancelled = true }
   }, [payParams?.payment?.codeUrl])

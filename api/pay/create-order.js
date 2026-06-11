@@ -10,28 +10,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
-
-  // 诊断：无需登录，查看环境变量配置
-  try {
-    const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
-    if (reqUrl.searchParams.get('debug') === 'env') {
-      res.status(200).json({
-        env: {
-          WECHAT_PAY_APPID: process.env.WECHAT_PAY_APPID || '(not set)',
-          WECHAT_PAY_MCHID: process.env.WECHAT_PAY_MCHID ? '***' : '(not set)',
-          WECHAT_PAY_API_V3_KEY: process.env.WECHAT_PAY_API_V3_KEY ? '***' : '(not set)',
-          WECHAT_PAY_MCH_SERIAL: process.env.WECHAT_PAY_MCH_SERIAL ? '***' : '(not set)',
-          WECHAT_PAY_PRIVATE_KEY: process.env.WECHAT_PAY_PRIVATE_KEY ? '***' : '(not set)',
-          WECHAT_PAY_NOTIFY_URL: process.env.WECHAT_PAY_NOTIFY_URL || '(not set)',
-          SUPABASE_URL: process.env.SUPABASE_URL ? '***' : '(not set)',
-          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '***' : '(not set)',
-        },
-      })
-      return
-    }
-  } catch (e) {
-    // URL parse error, continue
-  }
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
@@ -77,7 +56,6 @@ module.exports = async (req, res) => {
     if (orderError || !order || order.length === 0) { res.status(500).json({ error: '创建订单失败', detail: orderError }); return; }
 
     // 调微信支付统一下单（Native 扫码模式）
-    console.log('[pay/create-order] WECHAT_PAY_APPID:', process.env.WECHAT_PAY_APPID);
 
     const paymentResult = await unifiedOrder({
       description: `TalkTalk ${plan.name}`,

@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
+  pending: { label: '生成中', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
   completed: { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle },
   uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50', icon: CheckCircle },
 }
@@ -150,9 +150,12 @@ export default function MyQuestionsPage() {
           </div>
         ) : (
           filteredQuestions.map((q) => {
-            const st = STATUS_MAP[q.status] || STATUS_MAP.pending
-            const StatusIcon = st.icon
             const demos = demosMap[q.id] || []
+            // 已有演示 → 显示已生成（兼容旧数据状态未更新的情况）
+            const st = demos.length > 0
+              ? { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
+              : (STATUS_MAP[q.status] || STATUS_MAP.pending)
+            const StatusIcon = st.icon
             return (
               <div
                 key={q.id}

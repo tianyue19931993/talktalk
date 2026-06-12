@@ -11,34 +11,21 @@
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
 
-interface AICallOptions {
-  /** 用户消息（主要输入） */
-  prompt: string
-  /** 系统消息（角色设定 / prompt 模板） */
-  systemPrompt?: string
-  /** 温度，默认 0.7 */
-  temperature?: number
-  /** 最大输出 token，默认 4096 */
-  maxTokens?: number
-  /** 输出格式：text 或 json_object */
-  responseFormat?: 'text' | 'json_object'
-  /** 超时秒数（默认 7） */
-  timeoutSeconds?: number
-}
-
-interface AICallResult {
-  success: boolean
-  content: string
-  error?: string
-}
-
 /**
  * 调用 AI（当前为 DeepSeek Chat）
  * 
  * 未配置 API Key 时返回 mock 数据，方便前端调试。
  * 配置 DEEPSEEK_API_KEY 后自动切换为真实调用。
+ * 
+ * @param {Object} options
+ * @param {string} options.prompt - 用户消息（主要输入）
+ * @param {string} [options.systemPrompt] - 系统消息（角色设定 / prompt 模板）
+ * @param {number} [options.temperature] - 温度，默认 0.7
+ * @param {number} [options.maxTokens] - 最大输出 token，默认 4096
+ * @param {string} [options.responseFormat] - 输出格式：text 或 json_object
+ * @param {number} [options.timeoutSeconds] - 超时秒数（默认 7）
  */
-export async function callAI(options: AICallOptions): Promise<AICallResult> {
+export async function callAI(options) {
   const apiKey = process.env.DEEPSEEK_API_KEY
 
   if (!apiKey) {
@@ -46,7 +33,7 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
     return mockAI(options)
   }
 
-  const messages: any[] = []
+  const messages = []
   if (options.systemPrompt) {
     messages.push({ role: 'system', content: options.systemPrompt })
   }
@@ -85,7 +72,7 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
     const data = await res.json()
     const content = data.choices?.[0]?.message?.content || ''
     return { success: true, content }
-  } catch (e: any) {
+  } catch (e) {
     clearTimeout(timeoutId)
     if (e.name === 'AbortError') {
       return { success: false, content: '', error: 'AI 请求超时' }
@@ -96,7 +83,7 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
 
 // ─── Mock 模式（无 API Key 时使用） ───────────────────────
 
-function mockAI(options: AICallOptions): AICallResult {
+function mockAI(options) {
   // 如果 prompt 包含 analysis_prompt 字样，返回分析 JSON
   if (options.responseFormat === 'json_object' || options.prompt.includes('严格按照以下 JSON')) {
     return {
@@ -137,7 +124,6 @@ h1{font-size:24px;color:#171717;margin:0 0 16px}
   <div class="step">✅ 答案：3米 = 300厘米</div>
   <div class="footer">TalkTalk · AI 生成</div>
 </div>
-</body>
 </html>`,
     }
   }
@@ -149,7 +135,7 @@ h1{font-size:24px;color:#171717;margin:0 0 16px}
   }
 }
 
-function mockQuestionType(prompt: string): string {
+function mockQuestionType(prompt) {
   const types = ['植树问题', '鸡兔同笼', '和差问题', '相遇问题', '归一问题', '工程问题']
   return types[Math.floor(Math.random() * types.length)]
 }

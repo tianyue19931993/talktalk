@@ -11,12 +11,21 @@ import { canViewDemo } from '../../lib/supabase-auth'
 export default function LessonDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { subscription, isLoggedIn } = useAuth()
+  const { subscription, isLoggedIn, isLoading } = useAuth()
 
   const questions = getQuestions()
   const question = questions.find((q) => q.id === id)
 
   const hasDemoAccess = canViewDemo(subscription) && isLoggedIn
+
+  // 认证加载中 → 不渲染，避免订阅状态还没加载出来就显示锁定状态
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)]">
+        <div className="text-sm text-[var(--color-mute)]">加载中...</div>
+      </div>
+    )
+  }
 
   if (!question) {
     return (

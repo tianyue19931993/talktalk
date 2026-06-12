@@ -462,10 +462,28 @@ function rowToOrder(row: any): Order {
 // Permission Check
 // ============================================================
 
+/**
+ * 内置套餐权限映射（当 subscription.permissions 为空时降级使用）
+ * key = planCode, value = 拥有的权限列表
+ */
+const BUILTIN_PLAN_PERMISSIONS: Record<string, string[]> = {
+  basic: ['view_demo'],
+  ai: ['view_demo', 'create_demo'],
+}
+
+/** 获取套餐实际权限（优先用数据库配置，降级用内置映射） */
+function getPermissions(subscription: Subscription | null): string[] {
+  if (!subscription) return []
+  const dbPerms = subscription.permissions
+  if (dbPerms && dbPerms.length > 0) return dbPerms
+  // 数据库权限为空 → 降级使用内置套餐权限映射
+  return BUILTIN_PLAN_PERMISSIONS[subscription.planCode] || []
+}
+
 /** 检查当前用户是否有指定权限 */
 export function can(permission: string, subscription: Subscription | null): boolean {
   if (!subscription) return false
-  return subscription.permissions.includes(permission)
+  return getPermissions(subscription).includes(permission)
 }
 
 /** 是否可查看互动演示 */

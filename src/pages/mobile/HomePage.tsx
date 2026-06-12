@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { generateDemo } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 export default function HomePage() {
@@ -11,6 +12,8 @@ export default function HomePage() {
   const [questionText, setQuestionText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generateStatus, setGenerateStatus] = useState('')
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -36,15 +39,37 @@ export default function HomePage() {
     }
 
     setSubmitting(true)
+    setGenerateStatus('正在保存题目...')
     try {
-      await createUserQuestion(questionText.trim())
+      const saved = await createUserQuestion(questionText.trim())
+      if (!saved) { alert('保存失败'); return }
+
       setSubmitted(true)
       setQuestionText('')
-      setTimeout(() => setSubmitted(false), 3000)
+
+      // 调用 AI 生成
+      setGenerating(true)
+      setGenerateStatus('正在分析题目...')
+      const result = await generateDemo(saved.id)
+
+      if (result.success) {
+        setGenerateStatus('生成完成！')
+        // 刷新最新题目和 demos
+        const list = await getMyQuestions()
+        if (list.length > 0) {
+          setLatestQuestion(list[0])
+          const demos = await getQuestionDemos(list[0].id)
+          setLatestDemos(demos)
+        }
+      } else {
+        setGenerateStatus(result.error || '生成失败')
+      }
     } catch {
-      alert('提交失败，请重试')
+      alert('操作失败，请重试')
     } finally {
       setSubmitting(false)
+      setGenerating(false)
+      setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 4000)
     }
   }
 
@@ -94,26 +119,27 @@ export default function HomePage() {
 
           <div className="flex items-center justify-end">
             {submitted ? (
-              <span className="inline-flex items-center gap-1 px-4 h-9 text-sm font-medium text-green-700 bg-green-50 rounded-full">
-                <Check className="w-4 h-4" />
-                已保存
+              <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full
+                bg-green-50 text-green-700">
+                <Check className="w-3.5 h-3.5" />
+                {generateStatus || '已保存'}
               </span>
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={!questionText.trim() || submitting}
+                disabled={!questionText.trim() || submitting || generating}
                 className="inline-flex items-center gap-1.5 px-5 h-9 text-sm font-medium text-white rounded-full
                   bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
                   shadow-[0_1px_8px_rgba(121,40,202,0.2)]
                   hover:shadow-[0_2px_16px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98]
                   disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
               >
-                {submitting ? (
+                {submitting || generating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                {submitting ? '保存中...' : '立即生成'}
+                {submitting ? '保存中...' : generating ? '生成中...' : '立即生成'}
               </button>
             )}
           </div>

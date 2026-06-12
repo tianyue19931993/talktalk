@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2 } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { generateDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -41,6 +42,24 @@ export default function MyQuestionsPage() {
     )
     setDemosMap(map)
     setLoading(false)
+  }
+
+  const [regenerating, setRegenerating] = useState<Record<string, boolean>>({})
+
+  const handleRegenerate = async (questionId: string) => {
+    setRegenerating((prev) => ({ ...prev, [questionId]: true }))
+    try {
+      const result = await generateDemo(questionId, { regenerate: true })
+      if (result.success) {
+        await loadAll()
+      } else {
+        alert(result.error || '生成失败')
+      }
+    } catch {
+      alert('生成失败')
+    } finally {
+      setRegenerating((prev) => ({ ...prev, [questionId]: false }))
+    }
   }
 
   const downloadHtml = (url: string, label: string) => {
@@ -113,38 +132,52 @@ export default function MyQuestionsPage() {
                   </span>
                 </div>
 
-                {/* demos */}
-                {demos.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--color-hairline)]">
-                    {demos.map((demo) => (
-                      <div key={demo.id} className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => navigate(`/my/demo/${demo.id}`)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                            text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                            rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                            transition-all duration-200 cursor-pointer"
-                        >
-                          <Play className="w-3 h-3" />
-                          观看 {demo.title || '演示'}
-                        </button>
-                        <button
-                          onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                          className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                          title="下载 HTML"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                {/* demos + 重新生成 */}
+                <div className="flex items-start justify-between gap-2 pt-2 border-t border-[var(--color-hairline)]">
+                  <div className="flex flex-wrap gap-2 flex-1">
+                    {demos.length > 0 ? (
+                      demos.map((demo) => (
+                        <div key={demo.id} className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => navigate(`/my/demo/${demo.id}`)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                              text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                              rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                              transition-all duration-200 cursor-pointer"
+                          >
+                            <Play className="w-3 h-3" />
+                            观看 {demo.title || '演示'}
+                          </button>
+                          <button
+                            onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                            className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
+                            title="下载 HTML"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
+                    )}
                   </div>
-                ) : (
-                  <div className="pt-2 border-t border-[var(--color-hairline)]">
-                    <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
-                  </div>
-                )}
-              </div>
-            )
+                  <button
+                    onClick={() => handleRegenerate(q.id)}
+                    disabled={regenerating[q.id]}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium shrink-0
+                      text-[var(--color-link)] bg-[var(--color-link-bg-soft)] rounded-full
+                      hover:bg-blue-100 disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    {regenerating[q.id] ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Play className="w-3 h-3" />
+                    )}
+                    {regenerating[q.id] ? '生成中...' : '重新生成'}
+                  </button>
+                </div>
+            </div>
+          )
           })
         )}
       </div>

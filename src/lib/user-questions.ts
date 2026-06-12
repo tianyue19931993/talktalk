@@ -11,6 +11,7 @@ function rowToUserQuestion(row: any): UserQuestion {
     id: row.id,
     userId: row.user_id,
     questionText: row.question_text,
+    questionType: row.question_type || '',
     questionTypeId: row.question_type_id || null,
     analysisJson: row.analysis_json || {},
     status: row.status,

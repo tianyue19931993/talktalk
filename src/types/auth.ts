@@ -71,6 +71,7 @@ export interface UserQuestion {
   id: string
   userId: string
   questionText: string
+  questionType: string
   questionTypeId: number | null
   analysisJson: any
   status: 'pending' | 'completed' | 'uploaded'

@@ -9,6 +9,8 @@ interface GenerateResult {
   demoId?: string
   htmlUrl?: string
   error?: string
+  timedOut?: boolean
+  questionId?: string
 }
 
 /** 触发生成（首次或重新生成） */
@@ -17,6 +19,10 @@ export async function generateDemo(
   options?: { regenerate?: boolean }
 ): Promise<GenerateResult> {
   try {
+    const controller = new AbortController()
+    // 55 秒超时（Vercel Serverless 免费套餐最大 60s）
+    const timeoutId = setTimeout(() => controller.abort(), 55000)
+
     const token = getAccessToken()
     const res = await fetch('/api/generate/demo', {
       method: 'POST',
@@ -28,12 +34,22 @@ export async function generateDemo(
         questionId,
         regenerate: options?.regenerate ?? false,
       }),
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     const data = await res.json()
     return data
   } catch (e: any) {
-    return { success: false, error: e.message || '网络错误' }
+    if (e.name === 'AbortError') {
+      return {
+        success: false,
+        error: 'timeout',
+        timedOut: true,
+        questionId,
+      }
+    }
+    return { success: false, error: e.message || '网络错误', questionId }
   }
 }
 

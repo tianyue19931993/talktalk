@@ -26,11 +26,26 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' })
 
+  const { questionId, regenerate } = req.body
+  if (!questionId) {
+    return res.status(400).json({ success: false, error: 'questionId is required' })
+  }
+
+  // 辅助：更新 user_questions（不 return representation，不抛错）
+  async function fetchUserQuestionPatch(id, body) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+    } catch { /* best effort */ }
+  }
+
   try {
-    const { questionId, regenerate } = req.body
-    if (!questionId) {
-      return res.status(400).json({ success: false, error: 'questionId is required' })
-    }
 
     // 验证 Supabase 配置
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -80,11 +95,30 @@ export default async function handler(req, res) {
         temperature: 0.3,
         maxTokens: 50,
       })
-      if (!identifyResult.success) throw new Error(`AI 题型识别失败: ${identifyResult.error}`)
+      if (!identifyResult.success) {
+        // AI 调用失败 → 保存题目为 pending，让用户去互动列表重试
+        await fetchUserQuestionPatch(questionId, { status: 'pending' })
+        return res.status(200).json({
+          success: false,
+          error: '题目已保存，AI 识别暂时不可用，请到「我的互动列表」中重新生成',
+          questionId,
+        })
+      }
 
       questionTypeName = identifyResult.content.trim()
       const matchedType = allTypes.find((t) => t.name === questionTypeName)
-      questionTypeId = matchedType?.id || null
+
+      if (!matchedType) {
+        // 没有匹配到题型 → 保存题目为 pending，返回友好提示
+        await fetchUserQuestionPatch(questionId, { status: 'pending' })
+        return res.status(200).json({
+          success: false,
+          error: '没有匹配到合适的题型，请联系客服',
+          questionId,
+        })
+      }
+
+      questionTypeId = matchedType.id
 
       // 结构化分析（使用 matchedType 的 analysis_prompt）
       if (matchedType?.analysis_prompt) {
@@ -138,7 +172,15 @@ export default async function handler(req, res) {
       temperature: 0.6,
       maxTokens: 4096,
     })
-    if (!htmlGenResult.success) throw new Error(`HTML 生成失败: ${htmlGenResult.error}`)
+    if (!htmlGenResult.success) {
+      // HTML 生成失败 → 保存题目状态，让用户去互动列表重试
+      await fetchUserQuestionPatch(questionId, { status: 'pending' })
+      return res.status(200).json({
+        success: false,
+        error: '题目已保存，AI 生成暂时不可用，请到「我的互动列表」中重新生成',
+        questionId,
+      })
+    }
 
     const htmlContent = htmlGenResult.content
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
@@ -169,6 +211,14 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     console.error('[generate/demo] error:', e.message)
-    return res.status(500).json({ success: false, error: e.message || 'Internal error' })
+    // 兜底：尝试保存题目为 pending，允许用户重试
+    if (questionId) {
+      await fetchUserQuestionPatch(questionId, { status: 'pending' }).catch(() => {})
+    }
+    return res.status(200).json({
+      success: false,
+      error: '题目已保存，生成过程出错了，请到「我的互动列表」中重新生成',
+      questionId,
+    })
   }
 }

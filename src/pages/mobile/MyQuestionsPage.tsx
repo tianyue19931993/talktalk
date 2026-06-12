@@ -52,11 +52,15 @@ export default function MyQuestionsPage() {
       const result = await generateDemo(questionId, { regenerate: true })
       if (result.success) {
         await loadAll()
+      } else if (result.timedOut) {
+        alert('生成超时，请稍后重试')
+      } else if (result.error?.includes('没有匹配到合适的题型')) {
+        alert('没有匹配到合适的题型，请联系客服')
       } else {
-        alert(result.error || '生成失败')
+        alert(result.error || '生成失败，请重试')
       }
     } catch {
-      alert('生成失败')
+      alert('生成失败，请重试')
     } finally {
       setRegenerating((prev) => ({ ...prev, [questionId]: false }))
     }

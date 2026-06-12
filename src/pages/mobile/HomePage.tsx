@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play } from 'lucide-react'
+import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo } from '../../lib/generate'
@@ -38,22 +38,24 @@ export default function HomePage() {
       return
     }
 
+    // 阶段：saving → analyzing → generating → done | error
     setSubmitting(true)
     setGenerateStatus('正在保存题目...')
     try {
       const saved = await createUserQuestion(questionText.trim())
-      if (!saved) { alert('保存失败'); return }
+      if (!saved) { alert('保存失败，请重试'); return }
 
       setSubmitted(true)
       setQuestionText('')
 
       // 调用 AI 生成
       setGenerating(true)
-      setGenerateStatus('正在分析题目...')
+      setGenerateStatus('正在分析题型...')
       const result = await generateDemo(saved.id)
 
       if (result.success) {
-        setGenerateStatus('生成完成！')
+        // 生成中...
+        setGenerateStatus('正在生成互动演示...')
         // 刷新最新题目和 demos
         const list = await getMyQuestions()
         if (list.length > 0) {
@@ -61,7 +63,14 @@ export default function HomePage() {
           const demos = await getQuestionDemos(list[0].id)
           setLatestDemos(demos)
         }
+        setGenerateStatus('生成完成！')
+      } else if (result.timedOut) {
+        // 超时 — 题目已保存，提示用户去互动列表重试
+        setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
+      } else if (result.error?.includes('没有匹配到合适的题型')) {
+        setGenerateStatus('❌ 没有匹配到合适的题型，请联系客服')
       } else {
+        // 一般错误
         setGenerateStatus(result.error || '生成失败')
       }
     } catch {
@@ -69,7 +78,8 @@ export default function HomePage() {
     } finally {
       setSubmitting(false)
       setGenerating(false)
-      setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 4000)
+      // 3.5 秒后自动关闭状态提示
+      setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
     }
   }
 
@@ -119,11 +129,12 @@ export default function HomePage() {
 
           <div className="flex items-center justify-end">
             {submitted ? (
-              <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full
-                bg-green-50 text-green-700">
-                <Check className="w-3.5 h-3.5" />
-                {generateStatus || '已保存'}
-              </span>
+              <StatusBadge
+                message={generateStatus || '已保存'}
+                isError={generateStatus?.includes('❌') || generateStatus?.includes('超时') || generateStatus?.includes('失败')}
+                isTimeout={generateStatus?.includes('超时') || false}
+                onGoToList={() => navigate('/my/questions')}
+              />
             ) : (
               <button
                 onClick={handleSubmit}
@@ -193,5 +204,89 @@ export default function HomePage() {
         我的互动演示
       </button>
     </div>
+  )
+}
+
+// ─── 生成状态徽章组件 ───────────────────────
+
+function StatusBadge({
+  message,
+  isError,
+  isTimeout,
+  onGoToList,
+}: {
+  message: string
+  isError?: boolean
+  isTimeout?: boolean
+  onGoToList?: () => void
+}) {
+  const isGenerating = message.includes('分析') || message.includes('生成')
+  const isDone = message.includes('完成')
+
+  // 完成状态
+  if (isDone) {
+    return (
+      <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full bg-green-50 text-green-700">
+        <Check className="w-3.5 h-3.5" />
+        {message}
+      </span>
+    )
+  }
+
+  // 生成中状态
+  if (isGenerating) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        {message}
+      </span>
+    )
+  }
+
+  // 超时/错误状态
+  if (isTimeout) {
+    return (
+      <div className="flex flex-col items-end gap-1.5">
+        <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700">
+          <Clock className="w-3.5 h-3.5" />
+          {message}
+        </span>
+        {onGoToList && (
+          <button
+            onClick={onGoToList}
+            className="text-xs text-[var(--color-link)] underline hover:no-underline cursor-pointer"
+          >
+            去我的互动列表重新生成 →
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-end gap-1.5">
+        <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full bg-red-50 text-red-600">
+          <AlertCircle className="w-3.5 h-3.5" />
+          {message}
+        </span>
+        {onGoToList && (
+          <button
+            onClick={onGoToList}
+            className="text-xs text-[var(--color-link)] underline hover:no-underline cursor-pointer"
+          >
+            去我的互动列表重新生成 →
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // 默认（已保存等）
+  return (
+    <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full bg-green-50 text-green-700">
+      <Check className="w-3.5 h-3.5" />
+      {message}
+    </span>
   )
 }

@@ -92,7 +92,7 @@ export default function MyPage() {
               </div>
             )}
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
-              续费
+              查看会员套餐
             </Button>
           </div>
         )}
@@ -111,7 +111,7 @@ export default function MyPage() {
               </div>
             )}
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
-              续费
+              查看会员套餐
             </Button>
           </div>
         )}
@@ -130,7 +130,7 @@ export default function MyPage() {
               </div>
             )}
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
-              续费
+              查看会员套餐
             </Button>
           </div>
         )}

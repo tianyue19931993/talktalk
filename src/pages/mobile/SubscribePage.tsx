@@ -181,8 +181,14 @@ export default function SubscribePage() {
       if (!res.ok) throw new Error(data.error || data.detail || '下单失败')
 
       setPayParams(data)
-      // Native 模式：显示二维码
-      setPayState('waiting')
+      if (data.payment?.codeUrl) {
+        // 有有效的付款码 → 显示二维码
+        setPayState('waiting')
+      } else {
+        // 无付款码（如有未完成的订单）→ 跳转到我的页面查看
+        setPayError(data.payment?.message || '下单异常，请到我的页面检查订单状态')
+        setPayState('error')
+      }
     } catch (e: any) {
       setPayError(e.message)
       setPayState('error')
@@ -247,17 +253,17 @@ export default function SubscribePage() {
             二维码有效期 {countdown}s
           </p>
           <p className="text-xs text-[var(--color-mute)] mb-4">
-            用另一台手机微信扫码，或截图保存后打开微信扫一扫
+            用手机微信扫码，或截图保存后打开微信扫一扫
           </p>
 
-          <div className="flex flex-col items-center gap-3 mb-6">
-            <div className="flex items-center gap-3">
-              <Button variant="primary" size="sm" onClick={startPolling}>
+          <div className="flex flex-col items-center gap-4 mb-6">
+            <div className="flex items-center gap-4">
+              <Button variant="primary" size="lg" onClick={() => { startPolling(); navigate('/my') }}>
                 已完成支付
               </Button>
               <Button
                 variant="secondary"
-                size="sm"
+                size="lg"
                 onClick={() => {
                   setPayState('idle')
                   setPayParams(null)

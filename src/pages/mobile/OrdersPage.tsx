@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Receipt, XCircle } from 'lucide-react'
-import { getOrders, authedRequest } from '../../lib/supabase-auth'
+import { getOrders } from '../../lib/supabase-auth'
 import { useAuth } from '../../stores/authStore'
 import { refreshStore } from '../../stores/appStore'
 import type { Order } from '../../types/auth'
@@ -31,18 +31,35 @@ export default function OrdersPage() {
     if (!confirm('确定取消此订单？')) return
     setCancellingId(orderId)
     try {
-      await authedRequest(`/orders?id=eq.${orderId}`, {
-        method: 'PATCH',
-        body: { status: 'cancelled' },
+      const token = getAccessToken()
+      const res = await fetch('/api/pay/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ orderId }),
       })
-      // 取消后刷新订阅数据
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || '取消失败')
+      // 取消后刷新数据
       refreshStore()
       await loadOrders()
-    } catch {
-      alert('取消失败，请重试')
+    } catch (e: any) {
+      alert(e.message || '取消失败，请重试')
     } finally {
       setCancellingId(null)
     }
+  }
+
+  function getAccessToken() {
+    try {
+      const raw = localStorage.getItem('talktalk_auth')
+      if (!raw) return null
+      const session = JSON.parse(raw)
+      if (session.expiresAt && Date.now() > session.expiresAt * 1000) return null
+      return session.accessToken || null
+    } catch { return null }
   }
 
   useEffect(() => {

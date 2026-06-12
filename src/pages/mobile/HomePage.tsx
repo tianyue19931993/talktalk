@@ -240,12 +240,21 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* 无演示 */}
-          {!pendingQuestionId && latestDemos.length === 0 && (
-            <div className="pt-2 border-t border-[var(--color-hairline)]">
-              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-yellow-600 bg-yellow-50">暂未生成</span>
-            </div>
-          )}
+          {/* 无演示 — 状态与互动列表保持一致 */}
+          {!pendingQuestionId && latestDemos.length === 0 && (() => {
+            const now = Date.now()
+            const created = new Date(latestQuestion.createdAt).getTime()
+            const isRecent = (now - created) < 5 * 60 * 1000
+            return (
+              <div className="pt-2 border-t border-[var(--color-hairline)]">
+                <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
+                  isRecent ? 'text-yellow-600 bg-yellow-50' : 'text-yellow-600 bg-yellow-50'
+                }`}>
+                  {isRecent ? '生成中' : '待生成'}
+                </span>
+              </div>
+            )
+          })()}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search, RefreshCw } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
@@ -111,7 +111,21 @@ export default function MyQuestionsPage() {
           <ArrowLeft className="w-4 h-4" />
           返回
         </button>
-        <h1 className="text-lg font-semibold text-[var(--color-ink)]">我的互动列表</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-[var(--color-ink)]">我的互动列表</h1>
+          <button
+            onClick={() => { setLoading(true); loadAll() }}
+            disabled={loading}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+              text-[var(--color-body)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)]
+              rounded-full hover:text-[var(--color-ink)] hover:border-[var(--color-mute)]
+              disabled:opacity-40 transition-all cursor-pointer"
+            title="刷新"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            刷新
+          </button>
+        </div>
         <p className="text-xs text-[var(--color-mute)] mt-1 mb-3">共 {filteredQuestions.length} 条</p>
         {/* 搜索框 */}
         <div className="relative">

@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Load
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
+import { canCreateDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -15,7 +16,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = 
 
 export default function MyQuestionsPage() {
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, subscription } = useAuth()
   const [questions, setQuestions] = useState<UserQuestion[]>([])
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
@@ -58,6 +59,11 @@ export default function MyQuestionsPage() {
   const [regenerating, setRegenerating] = useState<Record<string, boolean>>({})
 
   const handleRegenerate = async (questionId: string) => {
+    // 权限检查：只有 AI 会员才能重新生成
+    if (!subscription || !canCreateDemo(subscription)) {
+      alert('当前套餐不支持创建互动演示，请升级会员')
+      return
+    }
     setRegenerating((prev) => ({ ...prev, [questionId]: true }))
     try {
       const result = await generateDemo(questionId, { regenerate: true })

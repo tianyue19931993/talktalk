@@ -49,7 +49,8 @@ export default function HomePage() {
     }
 
     // 权限检查：只有 AI 会员才能创建互动演示
-    if (!canCreateDemo(subscription)) {
+    if (!subscription || !canCreateDemo(subscription)) {
+      alert('当前套餐不支持创建互动演示，请升级会员')
       navigate('/subscribe')
       return
     }

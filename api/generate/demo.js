@@ -163,7 +163,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // 保存到 user_questions
+      // 保存题型分析结果（不设 status='completed'，等 HTML 生成成功后再设）
       await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${questionId}`, {
         method: 'PATCH',
         headers,
@@ -171,7 +171,6 @@ export default async function handler(req, res) {
           question_type_id: questionTypeId,
           question_type: questionTypeName,
           analysis_json: analysisJson,
-          status: 'completed',
         }),
       })
     }
@@ -227,6 +226,9 @@ export default async function handler(req, res) {
     if (!demoRes.ok) throw new Error('保存演示失败')
     const demos = await demoRes.json()
     const demo = demos?.[0] || {}
+
+    // 全部流程成功 → 标记为 completed
+    await fetchUserQuestionPatch(questionId, { status: 'completed' })
 
     // ============================================================
     // 返回结果

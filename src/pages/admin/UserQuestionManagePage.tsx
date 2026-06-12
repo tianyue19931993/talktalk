@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Search, Eye, Trash2, Plus } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
@@ -136,29 +136,44 @@ export default function UserQuestionManagePage() {
                 const isExpanded = editingId === String(q.id)
                 const demos = demosMap[q.id] || []
                 return (
-                  <tr key={q.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-[var(--color-ink)] line-clamp-2 max-w-md">{q.questionText}</p>
-                      <p className="text-xs text-[var(--color-mute)] font-mono mt-0.5">{q.id.slice(0, 8)}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
-                      {demos.length} 个
-                    </td>
-                    <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
-                      {new Date(q.createdAt).toLocaleDateString('zh-CN')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => toggleExpand(q.id)}
-                        className="p-1.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] hover:bg-[var(--color-link-bg-soft)] transition-colors cursor-pointer text-xs"
-                      >
-                        {isExpanded ? '收起' : '详情'}
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={q.id}>
+                    <tr className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-[var(--color-ink)] line-clamp-2 max-w-md">{q.questionText}</p>
+                        <p className="text-xs text-[var(--color-mute)] font-mono mt-0.5">{q.id.slice(0, 8)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
+                        {demos.length} 个
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-mute)]">
+                        {new Date(q.createdAt).toLocaleDateString('zh-CN')}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => toggleExpand(q.id)}
+                          className="p-1.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] hover:bg-[var(--color-link-bg-soft)] transition-colors cursor-pointer text-xs"
+                        >
+                          {isExpanded ? '收起' : '详情'}
+                        </button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-4 bg-[var(--color-canvas-soft)] border-b border-[var(--color-hairline)]">
+                          <InlineDemoManager
+                            question={q}
+                            demos={demos}
+                            onUpload={() => handleUploadHtml(q.id)}
+                            onPreview={(url) => handlePreviewHtml(url)}
+                            onRemove={(demoId) => handleRemoveDemo(demoId)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )
               })
             )}
@@ -166,62 +181,53 @@ export default function UserQuestionManagePage() {
         </table>
       </div>
 
-      {editingId && (() => {
-        const q = questions.find((x) => String(x.id) === editingId)
-        if (!q) return null
-        const demos = demosMap[q.id] || []
-        return (
-          <div className="mt-4 bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-[var(--color-ink)]">演示管理</h3>
-              <button
-                onClick={() => handleUploadHtml(q.id)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
-                  bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                上传 HTML
-              </button>
-            </div>
 
-            <p className="text-sm text-[var(--color-body)] mb-4 line-clamp-2">{q.questionText}</p>
-
-            {demos.length === 0 ? (
-              <p className="text-xs text-[var(--color-mute)] py-4 text-center">暂无演示，点击上方按钮上传</p>
-            ) : (
-              <div className="space-y-2">
-                {demos.map((demo) => (
-                  <div key={demo.id} className="flex items-center justify-between p-3 bg-[var(--color-canvas-soft)] rounded-[var(--radius-md)]">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm text-[var(--color-ink)] truncate">
-                        {demo.title || '演示'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => handlePreviewHtml(demo.htmlUrl)}
-                        className="p-1.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] hover:bg-[var(--color-link-bg-soft)] transition-colors cursor-pointer"
-                        title="预览"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleRemoveDemo(demo.id)}
-                        className="p-1.5 rounded text-[var(--color-body)] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="删除"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })()}
 
       <Pagination current={safePage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
+    </div>
+  )
+}
+
+// ─── 行内演示管理组件 ───────────────────────
+
+function InlineDemoManager({ question, demos, onUpload, onPreview, onRemove }: {
+  question: any
+  demos: any[]
+  onUpload: () => void
+  onPreview: (url: string) => void
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-semibold text-[var(--color-ink)]">演示管理</h4>
+        <button
+          onClick={onUpload}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white rounded-full
+            bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] cursor-pointer"
+        >
+          <Plus className="w-3 h-3" />
+          上传 HTML
+        </button>
+      </div>
+
+      {demos.length === 0 ? (
+        <p className="text-xs text-[var(--color-mute)] py-2">暂无演示，点击上方按钮上传</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {demos.map((demo) => (
+            <div key={demo.id} className="flex items-center gap-1 px-2.5 py-1.5 bg-white rounded-[var(--radius-md)] border border-[var(--color-hairline)]">
+              <span className="text-xs text-[var(--color-ink)]">{demo.title || '演示'}</span>
+              <button onClick={() => onPreview(demo.htmlUrl)} className="p-0.5 rounded text-[var(--color-body)] hover:text-[var(--color-link)] cursor-pointer" title="预览">
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => onRemove(demo.id)} className="p-0.5 rounded text-[var(--color-body)] hover:text-red-600 cursor-pointer" title="删除">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

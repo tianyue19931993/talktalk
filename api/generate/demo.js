@@ -12,7 +12,7 @@
  *   或 { success: false, error: string }
  */
 
-import { callAI } from '../lib/ai'
+import { callAI } from '../lib/ai.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY

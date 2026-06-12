@@ -32,6 +32,28 @@ export default async function handler(req, res) {
   }
 
   // 辅助：更新 user_questions（不 return representation，不抛错）
+  /** 清理 AI 生成的 HTML：去掉多余说明文字，只保留 HTML 结构 */
+  function cleanHtmlContent(raw) {
+    if (!raw) return raw
+    // 找到第一个 <html、<!DOCTYPE 或 <!doctype 开始的位置
+    const htmlStart = raw.search(/<(?:(!DOCTYPE\s+html|html|!doctype\s+html)[^>]*>)/i)
+    if (htmlStart > 0) {
+      raw = raw.slice(htmlStart)
+    } else {
+      // 没有 <html 标签，找第一个 < 开头的 HTML 标签
+      const firstTag = raw.indexOf('<')
+      if (firstTag > 0) {
+        raw = raw.slice(firstTag)
+      }
+    }
+    // 去掉 </html> 之后的多余内容
+    const htmlEnd = raw.search(/<\/html>\s*/i)
+    if (htmlEnd >= 0) {
+      raw = raw.slice(0, htmlEnd + '</html>'.length)
+    }
+    return raw.trim()
+  }
+
   async function fetchUserQuestionPatch(id, body) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${id}`, {
@@ -186,7 +208,8 @@ export default async function handler(req, res) {
       })
     }
 
-    const htmlContent = htmlGenResult.content
+    // 清理 HTML：去掉 AI 生成的多余说明文字，只保留 HTML 结构
+    const htmlContent = cleanHtmlContent(htmlGenResult.content)
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
 
     // ============================================================

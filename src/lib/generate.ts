@@ -20,8 +20,8 @@ export async function generateDemo(
 ): Promise<GenerateResult> {
   try {
     const controller = new AbortController()
-    // 前端超时 30s（Vercel Hobby 免费计划函数只有 10s 执行时间！）
-    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    // 前端超时 60s
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
 
     const token = getAccessToken()
     const res = await fetch('/api/generate/demo', {
@@ -38,7 +38,7 @@ export async function generateDemo(
     })
     clearTimeout(timeoutId)
 
-    // 先读文本，再尝试解析 JSON（防止服务器返回 HTML 错误页）
+    // 先读文本，再尝试解析 JSON
     const text = await res.text()
     if (!text) {
       return { success: false, error: '服务器返回空响应，请稍后重试', questionId }
@@ -47,13 +47,12 @@ export async function generateDemo(
       const data = JSON.parse(text)
       return data
     } catch {
-      // 解析 JSON 失败 → 服务器返回了非 JSON 内容（如 Vercel 错误页）
       const preview = text.slice(0, 120)
       console.error('[generateDemo] 非 JSON 响应:', preview)
       return {
         success: false,
         error: '生成超时或服务器异常，题目已保存，请到「我的互动列表」中重新生成',
-        timedOut: text.includes('timeout') || text.includes('TIMEOUT') || text.includes('504'),
+        timedOut: true,
         questionId,
       }
     }
@@ -68,6 +67,39 @@ export async function generateDemo(
     }
     return { success: false, error: e.message || '网络错误', questionId }
   }
+}
+
+/**
+ * 轮询检测题目是否已生成（超时后的兜底机制）
+ * 每 3s 查一次，最多查 30 次（90s）
+ */
+export async function pollQuestionDemos(
+  questionId: string,
+  onUpdate: (demos: any[]) => void,
+  onDone: () => void,
+  onTimeout: () => void
+): Promise<void> {
+  let attempts = 0
+  const maxAttempts = 30
+
+  const { getQuestionDemos } = await import('./user-questions')
+
+  const poll = async () => {
+    attempts++
+    const demos = await getQuestionDemos(questionId)
+    if (demos.length > 0) {
+      onUpdate(demos)
+      onDone()
+      return
+    }
+    if (attempts >= maxAttempts) {
+      onTimeout()
+      return
+    }
+    setTimeout(poll, 3000)
+  }
+
+  poll()
 }
 
 function getAccessToken(): string | null {

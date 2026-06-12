@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
@@ -19,6 +19,17 @@ export default function MyQuestionsPage() {
   const [questions, setQuestions] = useState<UserQuestion[]>([])
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  const filteredQuestions = useMemo(() => {
+    if (!search.trim()) return questions
+    const q = search.toLowerCase()
+    return questions.filter(
+      (item) =>
+        item.questionText.toLowerCase().includes(q) ||
+        (item.questionType && item.questionType.toLowerCase().includes(q))
+    )
+  }, [questions, search])
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -95,7 +106,20 @@ export default function MyQuestionsPage() {
           返回
         </button>
         <h1 className="text-lg font-semibold text-[var(--color-ink)]">我的互动列表</h1>
-        <p className="text-xs text-[var(--color-mute)] mt-1">共 {questions.length} 条</p>
+        <p className="text-xs text-[var(--color-mute)] mt-1 mb-3">共 {filteredQuestions.length} 条</p>
+        {/* 搜索框 */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
+          <input
+            type="text"
+            placeholder="搜索题目内容..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
+              text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+              focus:outline-none focus:border-[var(--color-link)] transition-colors"
+          />
+        </div>
       </div>
 
       {/* List */}
@@ -114,8 +138,12 @@ export default function MyQuestionsPage() {
               去录入题目
             </Button>
           </div>
+        ) : filteredQuestions.length === 0 ? (
+          <div className="text-center py-12 text-sm text-[var(--color-mute)]">
+            没有匹配的题目
+          </div>
         ) : (
-          questions.map((q) => {
+          filteredQuestions.map((q) => {
             const st = STATUS_MAP[q.status] || STATUS_MAP.pending
             const StatusIcon = st.icon
             const demos = demosMap[q.id] || []

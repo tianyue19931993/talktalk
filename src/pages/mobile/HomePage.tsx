@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
-import { generateDemo } from '../../lib/generate'
+import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 export default function HomePage() {
@@ -16,18 +16,27 @@ export default function HomePage() {
   const [generateStatus, setGenerateStatus] = useState('')
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
+  const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pollingRef = useRef(false)
+
+  // 加载最新题目
+  const loadLatest = async (forceReload?: boolean) => {
+    if (forceReload || isLoggedIn) {
+      const list = await getMyQuestions()
+      if (list.length > 0) {
+        setLatestQuestion(list[0])
+        const demos = await getQuestionDemos(list[0].id)
+        setLatestDemos(demos)
+      } else {
+        setLatestQuestion(null)
+        setLatestDemos([])
+      }
+    }
+  }
 
   useEffect(() => {
-    if (isLoggedIn) {
-      getMyQuestions().then(async (list) => {
-        if (list.length > 0) {
-          setLatestQuestion(list[0])
-          const demos = await getQuestionDemos(list[0].id)
-          setLatestDemos(demos)
-        }
-      })
-    }
+    loadLatest()
   }, [isLoggedIn, submitted])
 
   const handleSubmit = async () => {
@@ -38,7 +47,6 @@ export default function HomePage() {
       return
     }
 
-    // 阶段：saving → analyzing → generating → done | error
     setSubmitting(true)
     setGenerateStatus('正在保存题目...')
     try {
@@ -47,33 +55,51 @@ export default function HomePage() {
 
       setSubmitted(true)
       setQuestionText('')
+      // 立即刷新显示最新题目（标记为"生成中"）
+      await loadLatest()
 
       // 调用 AI 生成
       setGenerating(true)
       setGenerateStatus('正在分析题型...')
+      setPendingQuestionId(saved.id)
       const result = await generateDemo(saved.id)
 
       if (result.success) {
-        // 生成中...
         setGenerateStatus('正在生成互动演示...')
-        // 刷新最新题目和 demos
-        const list = await getMyQuestions()
-        if (list.length > 0) {
-          setLatestQuestion(list[0])
-          const demos = await getQuestionDemos(list[0].id)
-          setLatestDemos(demos)
-        }
+        await loadLatest(true)
         setGenerateStatus('生成完成！')
+        setPendingQuestionId(null)
       } else if (result.timedOut) {
-        // 超时 — 题目已保存，提示用户去互动列表重试
-        setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
+        // 超时 — 启动轮询检测是否实际已生成
+        setGenerateStatus('⏱ 生成超时，正在确认结果...')
+        pollingRef.current = true
+        pollQuestionDemos(
+          saved.id,
+          (demos) => {
+            setLatestDemos(demos as QuestionDemo[])
+            setGenerateStatus('生成完成！')
+            setPendingQuestionId(null)
+          },
+          () => {
+            // 轮询到结果
+            pollingRef.current = false
+            loadLatest(true)
+          },
+          () => {
+            // 轮询超时 — 确认失败
+            pollingRef.current = false
+            setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
+            setPendingQuestionId(null)
+          }
+        )
       } else if (result.error?.includes('没有匹配到合适的题型')) {
+        setPendingQuestionId(null)
         setGenerateStatus('❌ 没有匹配到合适的题型，请联系客服')
       } else if (result.error?.includes('AI 识别失败') || result.error?.includes('AI 生成')) {
-        // AI 接口报错 — 显示具体原因
+        setPendingQuestionId(null)
         setGenerateStatus(result.error)
       } else {
-        // 一般错误
+        setPendingQuestionId(null)
         setGenerateStatus(result.error || '生成失败')
       }
     } catch {
@@ -81,8 +107,10 @@ export default function HomePage() {
     } finally {
       setSubmitting(false)
       setGenerating(false)
-      // 3.5 秒后自动关闭状态提示
-      setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
+      // 成功/失败 3.5 秒后关闭状态提示（超时的不自动关闭）
+      if (!generateStatus.includes('确认结果') && !generateStatus.includes('超时')) {
+        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
+      }
     }
   }
 
@@ -134,8 +162,9 @@ export default function HomePage() {
             {submitted ? (
               <StatusBadge
                 message={generateStatus || '已保存'}
-                isError={generateStatus?.includes('❌') || generateStatus?.includes('超时') || generateStatus?.includes('失败')}
+                isError={generateStatus?.includes('❌') || generateStatus?.includes('失败')}
                 isTimeout={generateStatus?.includes('超时') || false}
+                isPolling={generateStatus?.includes('确认结果') || false}
                 onGoToList={() => navigate('/my/questions')}
               />
             ) : (
@@ -160,9 +189,12 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 最近生成的互动 — 未登录时不显示 */}
+      {/* 最近生成的互动 */}
       {isLoggedIn && latestQuestion && (
-        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5">
+        <div
+          className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5 cursor-pointer hover:shadow-[var(--shadow-l3)] transition-all duration-200"
+          onClick={() => navigate('/my/questions')}
+        >
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="w-4 h-4 text-[var(--color-link)]" />
             <span className="text-xs font-medium text-[var(--color-body)]">最近生成的互动</span>
@@ -170,12 +202,24 @@ export default function HomePage() {
           <p className="text-sm text-[var(--color-ink)] leading-relaxed line-clamp-2 whitespace-pre-wrap mb-3">
             {latestQuestion.questionText}
           </p>
-          {latestDemos.length > 0 ? (
+
+          {/* 生成中状态 */}
+          {pendingQuestionId && (
+            <div className="pt-2 border-t border-[var(--color-hairline)]">
+              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-blue-600 bg-blue-50">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                生成中
+              </span>
+            </div>
+          )}
+
+          {/* 已生成（有演示） */}
+          {!pendingQuestionId && latestDemos.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--color-hairline)]">
               {latestDemos.map((demo) => (
                 <button
                   key={demo.id}
-                  onClick={() => navigate(`/my/demo/${demo.id}`)}
+                  onClick={(e) => { e.stopPropagation(); navigate(`/my/demo/${demo.id}`) }}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
                     text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
                     rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
@@ -186,7 +230,10 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
-          ) : (
+          )}
+
+          {/* 无演示 */}
+          {!pendingQuestionId && latestDemos.length === 0 && (
             <div className="pt-2 border-t border-[var(--color-hairline)]">
               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-yellow-600 bg-yellow-50">暂未生成</span>
             </div>
@@ -216,23 +263,36 @@ function StatusBadge({
   message,
   isError,
   isTimeout,
+  isPolling,
   onGoToList,
 }: {
   message: string
   isError?: boolean
   isTimeout?: boolean
+  isPolling?: boolean
   onGoToList?: () => void
 }) {
   const isGenerating = message.includes('分析') || message.includes('生成')
-  const isDone = message.includes('完成')
 
   // 完成状态
-  if (isDone) {
+  if (message.includes('完成')) {
     return (
       <span className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-medium rounded-full bg-green-50 text-green-700">
         <Check className="w-3.5 h-3.5" />
         {message}
       </span>
+    )
+  }
+
+  // 轮询中状态
+  if (isPolling) {
+    return (
+      <div className="flex flex-col items-end gap-1.5">
+        <span className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          {message}
+        </span>
+      </div>
     )
   }
 
@@ -246,7 +306,7 @@ function StatusBadge({
     )
   }
 
-  // 超时/错误状态
+  // 超时状态
   if (isTimeout) {
     return (
       <div className="flex flex-col items-end gap-1.5">

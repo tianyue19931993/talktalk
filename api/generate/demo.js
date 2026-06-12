@@ -88,12 +88,13 @@ export default async function handler(req, res) {
       if (!typesRes.ok) throw new Error('加载题型失败')
       const allTypes = await typesRes.json()
 
-      // AI 识别题型
+      // AI 识别题型（简单任务，5s 超时）
       const typeNames = allTypes.map((t) => t.name).join('、')
       const identifyResult = await callAI({
         prompt: `题目：${question.question_text}\n\n可用题型：${typeNames}\n\n请判断这道题属于以上哪种题型，只返回题型名称，不要多余文字。`,
         temperature: 0.3,
         maxTokens: 50,
+        timeoutSeconds: 5,
       })
       if (!identifyResult.success) {
         // AI 调用失败 → 保存题目为 pending，让用户去互动列表重试
@@ -120,7 +121,7 @@ export default async function handler(req, res) {
 
       questionTypeId = matchedType.id
 
-      // 结构化分析（使用 matchedType 的 analysis_prompt）
+      // 结构化分析（使用 matchedType 的 analysis_prompt，8s 超时）
       if (matchedType?.analysis_prompt) {
         const analysisResult = await callAI({
           systemPrompt: matchedType.analysis_prompt,
@@ -128,6 +129,7 @@ export default async function handler(req, res) {
           responseFormat: 'json_object',
           temperature: 0.5,
           maxTokens: 2048,
+          timeoutSeconds: 8,
         })
         if (!analysisResult.success) throw new Error(`AI 分析失败: ${analysisResult.error}`)
 
@@ -171,6 +173,7 @@ export default async function handler(req, res) {
       prompt: `根据以下题目分析结果，生成互动 HTML 演示：\n\n题目原文：${question.question_text}\n\n分析结果：${JSON.stringify(analysisJson, null, 2)}`,
       temperature: 0.6,
       maxTokens: 4096,
+      timeoutSeconds: 8,
     })
     if (!htmlGenResult.success) {
       // HTML 生成失败 → 保存题目状态，让用户去互动列表重试

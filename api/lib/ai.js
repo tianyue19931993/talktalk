@@ -22,6 +22,8 @@ interface AICallOptions {
   maxTokens?: number
   /** 输出格式：text 或 json_object */
   responseFormat?: 'text' | 'json_object'
+  /** 超时秒数（默认 7） */
+  timeoutSeconds?: number
 }
 
 interface AICallResult {
@@ -50,6 +52,11 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
   }
   messages.push({ role: 'user', content: options.prompt })
 
+  // Vercel Hobby 计划函数最大 10s，每个 AI 调用单独设超时
+  const timeoutMs = (options.timeoutSeconds || 7) * 1000
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
       method: 'POST',
@@ -66,7 +73,9 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
           ? { type: 'json_object' }
           : undefined,
       }),
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     if (!res.ok) {
       const err = await res.text()
@@ -77,6 +86,10 @@ export async function callAI(options: AICallOptions): Promise<AICallResult> {
     const content = data.choices?.[0]?.message?.content || ''
     return { success: true, content }
   } catch (e: any) {
+    clearTimeout(timeoutId)
+    if (e.name === 'AbortError') {
+      return { success: false, content: '', error: 'AI 请求超时' }
+    }
     return { success: false, content: '', error: e.message || 'AI call failed' }
   }
 }

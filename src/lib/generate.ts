@@ -20,8 +20,8 @@ export async function generateDemo(
 ): Promise<GenerateResult> {
   try {
     const controller = new AbortController()
-    // 55 秒超时（Vercel Serverless 免费套餐最大 60s）
-    const timeoutId = setTimeout(() => controller.abort(), 55000)
+    // 前端超时 30s（Vercel Hobby 免费计划函数只有 10s 执行时间！）
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
 
     const token = getAccessToken()
     const res = await fetch('/api/generate/demo', {
@@ -38,8 +38,25 @@ export async function generateDemo(
     })
     clearTimeout(timeoutId)
 
-    const data = await res.json()
-    return data
+    // 先读文本，再尝试解析 JSON（防止服务器返回 HTML 错误页）
+    const text = await res.text()
+    if (!text) {
+      return { success: false, error: '服务器返回空响应，请稍后重试', questionId }
+    }
+    try {
+      const data = JSON.parse(text)
+      return data
+    } catch {
+      // 解析 JSON 失败 → 服务器返回了非 JSON 内容（如 Vercel 错误页）
+      const preview = text.slice(0, 120)
+      console.error('[generateDemo] 非 JSON 响应:', preview)
+      return {
+        success: false,
+        error: '生成超时或服务器异常，题目已保存，请到「我的互动列表」中重新生成',
+        timedOut: text.includes('timeout') || text.includes('TIMEOUT') || text.includes('504'),
+        questionId,
+      }
+    }
   } catch (e: any) {
     if (e.name === 'AbortError') {
       return {

@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: '生成中', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
+  pending: { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
   completed: { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle },
   uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50', icon: CheckCircle },
 }
@@ -151,10 +151,15 @@ export default function MyQuestionsPage() {
         ) : (
           filteredQuestions.map((q) => {
             const demos = demosMap[q.id] || []
-            // 已有演示 → 显示已生成（兼容旧数据状态未更新的情况）
+            const now = Date.now()
+            const created = new Date(q.createdAt).getTime()
+            const isRecent = (now - created) < 5 * 60 * 1000 // 5分钟内算"生成中"
+            // 有演示 → 已生成；无演示+近期 → 生成中；无演示+超时 → 待生成
             const st = demos.length > 0
               ? { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
-              : (STATUS_MAP[q.status] || STATUS_MAP.pending)
+              : isRecent
+                ? { label: '生成中', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+                : { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
             const StatusIcon = st.icon
             return (
               <div

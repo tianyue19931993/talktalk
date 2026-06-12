@@ -97,11 +97,12 @@ export default async function handler(req, res) {
         timeoutSeconds: 5,
       })
       if (!identifyResult.success) {
-        // AI 调用失败 → 保存题目为 pending，让用户去互动列表重试
+        // AI 调用失败 → 保存题目为 pending，带具体错误信息
+        console.error('[generate/demo] AI 识别失败:', identifyResult.error)
         await fetchUserQuestionPatch(questionId, { status: 'pending' })
         return res.status(200).json({
           success: false,
-          error: '题目已保存，AI 识别暂时不可用，请到「我的互动列表」中重新生成',
+          error: `AI 识别失败: ${identifyResult.error}`,
           questionId,
         })
       }

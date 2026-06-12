@@ -69,6 +69,9 @@ export default function HomePage() {
         setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
       } else if (result.error?.includes('没有匹配到合适的题型')) {
         setGenerateStatus('❌ 没有匹配到合适的题型，请联系客服')
+      } else if (result.error?.includes('AI 识别失败') || result.error?.includes('AI 生成')) {
+        // AI 接口报错 — 显示具体原因
+        setGenerateStatus(result.error)
       } else {
         // 一般错误
         setGenerateStatus(result.error || '生成失败')

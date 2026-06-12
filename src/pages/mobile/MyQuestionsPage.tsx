@@ -56,6 +56,8 @@ export default function MyQuestionsPage() {
         alert('生成超时，请稍后重试')
       } else if (result.error?.includes('没有匹配到合适的题型')) {
         alert('没有匹配到合适的题型，请联系客服')
+      } else if (result.error?.includes('AI 识别失败') || result.error?.includes('AI 生成')) {
+        alert(result.error)
       } else {
         alert(result.error || '生成失败，请重试')
       }

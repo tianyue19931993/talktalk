@@ -23,7 +23,7 @@ function QuestionCard({ question }: { question: Question }) {
       {question.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {question.tags.map((tag) => (
-            <Badge key={tag} className="!bg-[var(--color-link-bg-soft)] !text-[var(--color-link)]">{tag}</Badge>
+            <Badge key={tag} className="!bg-yellow-50 !text-yellow-600">{tag}</Badge>
           ))}
         </div>
       )}

@@ -174,7 +174,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="pt-2 border-t border-[var(--color-hairline)]">
-              <span className="text-[10px] text-[var(--color-mute)]">暂未生成</span>
+              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-yellow-600 bg-yellow-50">暂未生成</span>
             </div>
           )}
         </div>

@@ -57,7 +57,7 @@ export default function LessonDetailPage() {
         {question.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {question.tags.map((tag) => (
-              <Badge key={tag}>{tag}</Badge>
+              <Badge key={tag} className="!bg-yellow-50 !text-yellow-600">{tag}</Badge>
             ))}
           </div>
         )}

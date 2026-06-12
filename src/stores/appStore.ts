@@ -43,7 +43,6 @@ function rowToType(row: any): QuestionType {
   return {
     id: String(row.id), name: row.name,
     description: row.description || '',
-    typePrompt: row.type_prompt || '',
     analysisPrompt: row.analysis_prompt || '',
     htmlPrompt: row.html_prompt || '',
     createdAt: row.created_at?.slice(0, 10) || '',
@@ -155,11 +154,10 @@ export function deleteQuestion(id: string) {
   })
 }
 
-export async function addType(data: { name: string; description?: string; typePrompt?: string; analysisPrompt?: string; htmlPrompt?: string }): Promise<QuestionType> {
+export async function addType(data: { name: string; description?: string; analysisPrompt?: string; htmlPrompt?: string }): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', {
     name: data.name,
     description: data.description || '',
-    type_prompt: data.typePrompt || '',
     analysis_prompt: data.analysisPrompt || '',
     html_prompt: data.htmlPrompt || '',
   })
@@ -168,12 +166,11 @@ export async function addType(data: { name: string; description?: string; typePr
   return t
 }
 
-export async function updateType(id: string, data: { name?: string; description?: string; typePrompt?: string; analysisPrompt?: string; htmlPrompt?: string }) {
+export async function updateType(id: string, data: { name?: string; description?: string; analysisPrompt?: string; htmlPrompt?: string }) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
   const p: any = {};
   if (data.name !== undefined) p.name = data.name
   if (data.description !== undefined) p.description = data.description
-  if (data.typePrompt !== undefined) p.type_prompt = data.typePrompt
   if (data.analysisPrompt !== undefined) p.analysis_prompt = data.analysisPrompt
   if (data.htmlPrompt !== undefined) p.html_prompt = data.htmlPrompt
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }

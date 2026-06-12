@@ -3,7 +3,6 @@ export interface QuestionType {
   id: string
   name: string
   description?: string
-  typePrompt?: string
   analysisPrompt?: string
   htmlPrompt?: string
   createdAt: string

@@ -11,14 +11,12 @@ export default function TypeManagePage() {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
-  const [newPrompt, setNewPrompt] = useState('')
   const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
   const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
-  const [editPrompt, setEditPrompt] = useState('')
   const [editAnalysisPrompt, setEditAnalysisPrompt] = useState('')
   const [editHtmlPrompt, setEditHtmlPrompt] = useState('')
 
@@ -39,13 +37,11 @@ export default function TypeManagePage() {
     addType({
       name: newName.trim(),
       description: newDesc.trim(),
-      typePrompt: newPrompt.trim(),
       analysisPrompt: newAnalysisPrompt.trim(),
       htmlPrompt: newHtmlPrompt.trim(),
     })
     setNewName('')
     setNewDesc('')
-    setNewPrompt('')
     setNewAnalysisPrompt('')
     setNewHtmlPrompt('')
     setShowNewForm(false)
@@ -55,7 +51,6 @@ export default function TypeManagePage() {
     setEditingId(t.id)
     setEditName(t.name)
     setEditDesc(t.description || '')
-    setEditPrompt(t.typePrompt || '')
     setEditAnalysisPrompt(t.analysisPrompt || '')
     setEditHtmlPrompt(t.htmlPrompt || '')
   }
@@ -65,7 +60,6 @@ export default function TypeManagePage() {
     updateType(editingId, {
       name: editName.trim(),
       description: editDesc.trim(),
-      typePrompt: editPrompt.trim(),
       analysisPrompt: editAnalysisPrompt.trim(),
       htmlPrompt: editHtmlPrompt.trim(),
     })
@@ -140,7 +134,7 @@ export default function TypeManagePage() {
             />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewPrompt(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -185,12 +179,6 @@ export default function TypeManagePage() {
                           placeholder="描述（可选）"
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
                         />
-                        <input
-                          value={editPrompt}
-                          onChange={(e) => setEditPrompt(e.target.value)}
-                          placeholder="提示词模板（可选）"
-                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
-                        />
                         <textarea
                           value={editAnalysisPrompt}
                           onChange={(e) => setEditAnalysisPrompt(e.target.value)}
@@ -211,9 +199,6 @@ export default function TypeManagePage() {
                         <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
                         {t.description && (
                           <p className="text-xs text-[var(--color-mute)] mt-0.5">{t.description}</p>
-                        )}
-                        {t.typePrompt && (
-                          <p className="text-[10px] text-[var(--color-mute)] mt-0.5 italic line-clamp-1">{t.typePrompt}</p>
                         )}
                       </div>
                     )}

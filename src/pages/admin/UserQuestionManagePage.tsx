@@ -77,8 +77,9 @@ export default function UserQuestionManagePage() {
     }
   }
 
-  const toggleExpand = (id: string) => {
-    setEditingId(editingId === id ? null : id)
+  const toggleExpand = (id: string | number) => {
+    const sid = String(id)
+    setEditingId(editingId === sid ? null : sid)
   }
 
   const filtered = useMemo(() => {
@@ -132,7 +133,7 @@ export default function UserQuestionManagePage() {
             ) : (
               paginated.map((q) => {
                 const st = STATUS_MAP[q.status] || STATUS_MAP.pending
-                const isExpanded = editingId === q.id
+                const isExpanded = editingId === String(q.id)
                 const demos = demosMap[q.id] || []
                 return (
                   <tr key={q.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
@@ -166,7 +167,7 @@ export default function UserQuestionManagePage() {
       </div>
 
       {editingId && (() => {
-        const q = questions.find((x) => x.id === editingId)
+        const q = questions.find((x) => String(x.id) === editingId)
         if (!q) return null
         const demos = demosMap[q.id] || []
         return (

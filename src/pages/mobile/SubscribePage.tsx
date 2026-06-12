@@ -405,12 +405,12 @@ export default function SubscribePage() {
               <div className="space-y-2 mb-6">
                 <div className="flex items-center gap-2 text-sm text-[var(--color-body)]">
                   <Check className="w-4 h-4 text-green-500 shrink-0" />
-                  <span>查看全部互动演示</span>
+                  <span>查看题库全部互动演示</span>
                 </div>
                 {plan.permissions.includes('create_demo') && (
                   <div className="flex items-center gap-2 text-sm text-[var(--color-body)]">
                     <Check className="w-4 h-4 text-green-500 shrink-0" />
-                      <span>创建互动演示（即将开放）</span>
+                      <span>创建互动演示</span>
                     </div>
                   )}
                 </div>

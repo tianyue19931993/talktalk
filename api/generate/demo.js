@@ -192,7 +192,7 @@ export default async function handler(req, res) {
     }
 
     const htmlGenResult = await callAI({
-      systemPrompt: htmlPrompt || '你是一名小学数学老师，请生成一个漂亮的互动教学 HTML 演示页面。',
+      systemPrompt: htmlPrompt || '你是一名小学数学老师，请生成一个漂亮的互动教学 HTML 演示页面。\n\n【重要规则】\n1. 只输出纯 HTML 代码，不要任何说明文字、介绍或注释\n2. 不要在页面内显示“这是为您准备的...”之类的提示语\n3. 不要在页面内显示“以下是...”或“希望这个...”之类的文字\n4. 直接展示题目、解题步骤和互动元素即可\n5. 使用中文展示内容，但不要出现 AI 生成的元描述',
       prompt: `根据以下题目分析结果，生成互动 HTML 演示：\n\n题目原文：${question.question_text}\n\n分析结果：${JSON.stringify(analysisJson, null, 2)}`,
       temperature: 0.6,
       maxTokens: 4096,

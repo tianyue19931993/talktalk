@@ -2,13 +2,14 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
+import { canCreateDemo } from '../../lib/supabase-auth'
 import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, subscription } = useAuth()
   const [questionText, setQuestionText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -44,6 +45,12 @@ export default function HomePage() {
 
     if (!isLoggedIn) {
       navigate('/login?redirect=/')
+      return
+    }
+
+    // 权限检查：只有 AI 会员才能创建互动演示
+    if (!canCreateDemo(subscription)) {
+      navigate('/subscribe')
       return
     }
 

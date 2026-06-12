@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Receipt } from 'lucide-react'
-import { getOrders } from '../../lib/supabase-auth'
+import { ArrowLeft, Receipt, XCircle } from 'lucide-react'
+import { getOrders, authedRequest } from '../../lib/supabase-auth'
 import { useAuth } from '../../stores/authStore'
+import { refreshStore } from '../../stores/appStore'
 import type { Order } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -18,15 +19,38 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
+  const loadOrders = async () => {
+    const r = await getOrders()
+    if (r.data) setOrders(r.data)
+    setLoading(false)
+  }
+
+  const handleCancel = async (orderId: string) => {
+    if (!confirm('确定取消此订单？')) return
+    setCancellingId(orderId)
+    try {
+      await authedRequest(`/orders?id=eq.${orderId}`, {
+        method: 'PATCH',
+        body: { status: 'cancelled' },
+      })
+      // 取消后刷新订阅数据
+      refreshStore()
+      await loadOrders()
+    } catch {
+      alert('取消失败，请重试')
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
   useEffect(() => {
     if (!isLoggedIn) {
       navigate('/login')
       return
     }
-    getOrders().then((r) => {
-      if (r.data) setOrders(r.data)
-      setLoading(false)
-    })
+    loadOrders()
   }, [isLoggedIn, navigate])
 
   return (
@@ -66,9 +90,23 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-[var(--color-ink)] font-medium">¥{order.amount}</span>
-                  <span className="text-xs text-[var(--color-mute)]">
-                    {new Date(order.createdAt).toLocaleDateString('zh-CN')}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--color-mute)]">
+                      {new Date(order.createdAt).toLocaleDateString('zh-CN')}
+                    </span>
+                    {order.status === 'pending' && (
+                      <button
+                        onClick={() => handleCancel(order.id)}
+                        disabled={cancellingId === order.id}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium
+                          text-red-600 bg-red-50 rounded-full
+                          hover:bg-red-100 disabled:opacity-40 transition-colors cursor-pointer"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        {cancellingId === order.id ? '取消中...' : '取消订单'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )

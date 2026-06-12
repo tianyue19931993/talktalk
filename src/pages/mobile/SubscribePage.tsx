@@ -312,7 +312,7 @@ export default function SubscribePage() {
             }}>
               重新选择
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => navigate('/my')}>
+            <Button variant="secondary" size="sm" onClick={() => navigate('/orders')}>
               查看订单
             </Button>
           </div>

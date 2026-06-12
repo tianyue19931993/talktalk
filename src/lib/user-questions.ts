@@ -11,7 +11,8 @@ function rowToUserQuestion(row: any): UserQuestion {
     id: row.id,
     userId: row.user_id,
     questionText: row.question_text,
-    questionType: row.question_type || '',
+    questionTypeId: row.question_type_id || null,
+    analysisJson: row.analysis_json || {},
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -30,12 +31,11 @@ export async function getMyQuestions(): Promise<UserQuestion[]> {
 }
 
 /** 新增用户题目 */
-export async function createUserQuestion(questionText: string, questionType?: string): Promise<UserQuestion | null> {
+export async function createUserQuestion(questionText: string): Promise<UserQuestion | null> {
   const session = loadSession()
   if (!session) return null
 
   const body: any = { question_text: questionText, user_id: session.user.id }
-  if (questionType) body.question_type = questionType
 
   const { data } = await authedRequest<any[]>('/user_questions', {
     method: 'POST',

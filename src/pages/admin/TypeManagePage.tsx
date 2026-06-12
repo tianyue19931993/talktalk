@@ -12,11 +12,15 @@ export default function TypeManagePage() {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newPrompt, setNewPrompt] = useState('')
+  const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
+  const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editPrompt, setEditPrompt] = useState('')
+  const [editAnalysisPrompt, setEditAnalysisPrompt] = useState('')
+  const [editHtmlPrompt, setEditHtmlPrompt] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null)
 
@@ -32,10 +36,18 @@ export default function TypeManagePage() {
 
   const handleAdd = () => {
     if (!newName.trim()) return
-    addType({ name: newName.trim(), description: newDesc.trim(), typePrompt: newPrompt.trim() })
+    addType({
+      name: newName.trim(),
+      description: newDesc.trim(),
+      typePrompt: newPrompt.trim(),
+      analysisPrompt: newAnalysisPrompt.trim(),
+      htmlPrompt: newHtmlPrompt.trim(),
+    })
     setNewName('')
     setNewDesc('')
     setNewPrompt('')
+    setNewAnalysisPrompt('')
+    setNewHtmlPrompt('')
     setShowNewForm(false)
   }
 
@@ -44,11 +56,19 @@ export default function TypeManagePage() {
     setEditName(t.name)
     setEditDesc(t.description || '')
     setEditPrompt(t.typePrompt || '')
+    setEditAnalysisPrompt(t.analysisPrompt || '')
+    setEditHtmlPrompt(t.htmlPrompt || '')
   }
 
   const handleUpdate = () => {
     if (!editingId || !editName.trim()) return
-    updateType(editingId, { name: editName.trim(), description: editDesc.trim(), typePrompt: editPrompt.trim() })
+    updateType(editingId, {
+      name: editName.trim(),
+      description: editDesc.trim(),
+      typePrompt: editPrompt.trim(),
+      analysisPrompt: editAnalysisPrompt.trim(),
+      htmlPrompt: editHtmlPrompt.trim(),
+    })
     setEditingId(null)
   }
 
@@ -86,7 +106,7 @@ export default function TypeManagePage() {
       {/* Inline new type form */}
       {showNewForm && (
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <Input
               placeholder="题型名称"
               value={newName}
@@ -98,14 +118,29 @@ export default function TypeManagePage() {
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
             />
-            <Input
-              placeholder="提示词模板（可选）"
-              value={newPrompt}
-              onChange={(e) => setNewPrompt(e.target.value)}
+          </div>
+          <div className="flex flex-col gap-2 mb-3">
+            <textarea
+              placeholder="题目分析 prompt（可选）"
+              value={newAnalysisPrompt}
+              onChange={(e) => setNewAnalysisPrompt(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
+                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
+            />
+            <textarea
+              placeholder="HTML 生成 prompt（可选）"
+              value={newHtmlPrompt}
+              onChange={(e) => setNewHtmlPrompt(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
+                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
             />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewPrompt('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewPrompt(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -155,6 +190,20 @@ export default function TypeManagePage() {
                           onChange={(e) => setEditPrompt(e.target.value)}
                           placeholder="提示词模板（可选）"
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
+                        />
+                        <textarea
+                          value={editAnalysisPrompt}
+                          onChange={(e) => setEditAnalysisPrompt(e.target.value)}
+                          placeholder="题目分析 prompt（可选）"
+                          rows={2}
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
+                        />
+                        <textarea
+                          value={editHtmlPrompt}
+                          onChange={(e) => setEditHtmlPrompt(e.target.value)}
+                          placeholder="HTML 生成 prompt（可选）"
+                          rows={2}
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
                         />
                       </div>
                     ) : (

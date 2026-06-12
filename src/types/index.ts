@@ -4,6 +4,8 @@ export interface QuestionType {
   name: string
   description?: string
   typePrompt?: string
+  analysisPrompt?: string
+  htmlPrompt?: string
   createdAt: string
   updatedAt: string
 }

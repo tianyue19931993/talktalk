@@ -195,7 +195,7 @@ function LinkItem({
 function AboutSection() {
   return (
     <section>
-      <h2 className="text-base font-semibold text-[var(--color-ink)] mb-3">关于 TalkTalk</h2>
+      <h2 className="text-base font-semibold text-[var(--color-ink)] mb-3">关于成长表达实验室 M</h2>
       <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5">
         <p className="text-sm text-[var(--color-body)] leading-relaxed">
           客服: tyAnan1993

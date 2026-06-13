@@ -72,7 +72,7 @@ export default function LoginPage() {
       {/* Brand */}
       <div className="mb-8">
         <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] bg-clip-text text-transparent">
-          TalkTalk
+          成长表达实验室 M
         </span>
         <h1 className="text-xl font-semibold text-[var(--color-ink)] mt-3">
           {mode === 'login' ? '登录账号' : '注册账号'}

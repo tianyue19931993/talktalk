@@ -338,7 +338,7 @@ export default function SubscribePage() {
         </button>
 
         <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] bg-clip-text text-transparent">
-          TalkTalk
+          成长表达实验室 M
         </span>
         <h1 className="text-xl font-semibold text-[var(--color-ink)] mt-3">选择会员套餐</h1>
         <p className="text-sm text-[var(--color-mute)] mt-1">解锁全部互动演示学习资源</p>

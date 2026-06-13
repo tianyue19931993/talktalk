@@ -58,7 +58,7 @@ export default function AdminLayout() {
             ) : (
               <>
                 <Link to="/" className="flex items-center gap-2">
-                  <span className="text-lg font-semibold tracking-tight">TalkTalk</span>
+                  <span className="text-lg font-semibold tracking-tight">成长表达实验室 M</span>
                 </Link>
                 <span className="text-xs text-[var(--color-mute)] bg-[var(--color-canvas-soft)] px-2 py-0.5 rounded-full">管理后台</span>
               </>

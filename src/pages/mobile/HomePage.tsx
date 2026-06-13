@@ -127,7 +127,7 @@ export default function HomePage() {
       {/* Logo */}
       <div className="mb-6">
         <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] bg-clip-text text-transparent">
-          TalkTalk
+          成长表达实验室 M
         </span>
       </div>
 
@@ -150,7 +150,7 @@ export default function HomePage() {
         </div>
 
         <p className="text-xs text-[var(--color-mute)] mb-3">
-          录入题目文字，TalkTalk 将为您生成互动演示动画
+          录入题目文字，成长表达实验室 M 将为您生成互动演示动画
         </p>
 
         <div className="flex flex-col gap-2">

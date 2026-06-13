@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, Search, Eye, Trash2, Plus } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { Pagination } from '../../components/ui/Pagination'
-import { getAllUserQuestions, getQuestionDemos, adminUploadUserQuestionHtml, deleteQuestionDemo } from '../../lib/user-questions'
+import { getAllUserQuestions, getQuestionDemosBatch, adminUploadUserQuestionHtml, deleteQuestionDemo } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const PAGE_SIZE = 20
@@ -34,13 +34,9 @@ export default function UserQuestionManagePage() {
     const list = await getAllUserQuestions()
     setQuestions(list)
 
-    // 并行加载所有题目的 demos
-    const map: Record<string, QuestionDemo[]> = {}
-    await Promise.all(
-      list.map(async (q) => {
-        map[q.id] = await getQuestionDemos(q.id)
-      })
-    )
+    // 批量加载所有题目的 demos（一次 SQL 查询代替 N 次）
+    const ids = list.map((q) => q.id)
+    const map = ids.length > 0 ? await getQuestionDemosBatch(ids) : {}
     setDemosMap(map)
     setLoading(false)
   }
@@ -132,7 +128,10 @@ export default function UserQuestionManagePage() {
               <tr><td colSpan={5} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无用户题目数据</td></tr>
             ) : (
               paginated.map((q) => {
-                const st = STATUS_MAP[q.status] || STATUS_MAP.pending
+                // 状态以是否有真实演示为准（不依赖可能未及时更新的 DB status）
+                const hasDemo = (demosMap[q.id] || []).length > 0
+                const effectiveStatus = hasDemo ? 'completed' : q.status
+                const st = STATUS_MAP[effectiveStatus] || STATUS_MAP.pending
                 const isExpanded = editingId === String(q.id)
                 const demos = demosMap[q.id] || []
                 return (

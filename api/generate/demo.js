@@ -31,35 +31,32 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'questionId is required' })
   }
 
-  // 辅助：更新 user_questions（不 return representation，不抛错）
-  /** 清理 AI 生成的 HTML：去掉多余说明文字，只保留 HTML 结构 */
+  // ─── 辅助函数 ──────────────────────────────────────────
+
+  /** 清理 AI 输出的纯 HTML：去掉开头结尾的非 HTML 文字 */
   function cleanHtmlContent(raw) {
-    if (!raw) return raw
-    // 找到第一个 <html、<!DOCTYPE 或 <!doctype 开始的位置
-    const htmlStart = raw.search(/<(?:(!DOCTYPE\s+html|html|!doctype\s+html)[^>]*>)/i)
-    if (htmlStart > 0) {
-      raw = raw.slice(htmlStart)
-    } else {
-      // 没有 <html 标签，找第一个 < 开头的 HTML 标签
+    if (!raw) return ''
+    const startIdx = raw.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
+    if (startIdx === -1) {
       const firstTag = raw.indexOf('<')
-      if (firstTag > 0) {
-        raw = raw.slice(firstTag)
-      }
+      if (firstTag === -1) return raw
+      return raw.slice(firstTag).trim()
     }
-    // 去掉 </html> 之后的多余内容
-    const htmlEnd = raw.search(/<\/html>\s*/i)
-    if (htmlEnd >= 0) {
-      raw = raw.slice(0, htmlEnd + '</html>'.length)
+    let out = raw.slice(startIdx).trim()
+    const endIdx = out.search(/<\/html>\s*/i)
+    if (endIdx !== -1) {
+      out = out.slice(0, endIdx + '</html>'.length)
     }
-    return raw.trim()
+    return out.trim()
   }
 
-  async function fetchUserQuestionPatch(id, body) {
+  /** 静默更新 user_questions 字段（best effort，不抛错） */
+  async function patchQuestion(id, body) {
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${id}`, {
         method: 'PATCH',
         headers: {
-          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -67,42 +64,43 @@ export default async function handler(req, res) {
     } catch { /* best effort */ }
   }
 
-  try {
+  // ─── 主流程 ──────────────────────────────────────────
 
-    // 验证 Supabase 配置
+  try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return res.status(500).json({ success: false, error: 'Supabase not configured' })
     }
 
     const headers = {
-      'apikey': SUPABASE_SERVICE_ROLE_KEY,
-      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Prefer': 'return=representation',
+      Prefer: 'return=representation',
     }
 
-    // ============================================================
+    // ════════════════════════════════════════════════════════
     // Step 1: 加载用户题目
-    // ============================================================
-    const questionRes = await fetch(
+    // ════════════════════════════════════════════════════════
+    const qRes = await fetch(
       `${SUPABASE_URL}/rest/v1/user_questions?id=eq.${questionId}`,
       { headers: { ...headers, Prefer: undefined } }
     )
-    if (!questionRes.ok) throw new Error(`加载题目失败: ${questionRes.status}`)
-    const questions = await questionRes.json()
-    const question = questions?.[0]
+    if (!qRes.ok) throw new Error(`加载题目失败: ${qRes.status}`)
+    const qRows = await qRes.json()
+    const question = qRows?.[0]
     if (!question) throw new Error('题目不存在')
 
     let questionTypeId = question.question_type_id
     let questionTypeName = question.question_type || ''
     let analysisJson = question.analysis_json || {}
+    let htmlPrompt = ''  // 将在下方填充
 
-    // ============================================================
-    // Step 2-3: 首次生成 → AI 识别题型 + 获取 prompt
-    // ============================================================
+    // ════════════════════════════════════════════════════════
+    // Step 2-3: 首次生成 → AI 识别题型 + 结构化分析
+    // ════════════════════════════════════════════════════════
     if (!regenerate || !questionTypeId) {
-      // 加载所有可用题型
+      // 加载题型字典（一次获取所有字段：id, name, analysis_prompt, html_prompt）
       const typesRes = await fetch(
         `${SUPABASE_URL}/rest/v1/question_types?order=id.asc`,
         { headers: { ...headers, Prefer: undefined } }
@@ -110,7 +108,7 @@ export default async function handler(req, res) {
       if (!typesRes.ok) throw new Error('加载题型失败')
       const allTypes = await typesRes.json()
 
-      // AI 识别题型（简单任务，5s 超时）
+      // ── Step 2: AI 识别题型 ──
       const typeNames = allTypes.map((t) => t.name).join('、')
       const identifyResult = await callAI({
         prompt: `题目：${question.question_text}\n\n可用题型：${typeNames}\n\n请判断这道题属于以上哪种题型，只返回题型名称，不要多余文字。`,
@@ -119,9 +117,8 @@ export default async function handler(req, res) {
         timeoutSeconds: 5,
       })
       if (!identifyResult.success) {
-        // AI 调用失败 → 保存题目为 pending，带具体错误信息
         console.error('[generate/demo] AI 识别失败:', identifyResult.error)
-        await fetchUserQuestionPatch(questionId, { status: 'pending' })
+        await patchQuestion(questionId, { status: 'pending' })
         return res.status(200).json({
           success: false,
           error: `AI 识别失败: ${identifyResult.error}`,
@@ -133,8 +130,7 @@ export default async function handler(req, res) {
       const matchedType = allTypes.find((t) => t.name === questionTypeName)
 
       if (!matchedType) {
-        // 没有匹配到题型 → 保存题目为 pending，返回友好提示
-        await fetchUserQuestionPatch(questionId, { status: 'pending' })
+        await patchQuestion(questionId, { status: 'pending' })
         return res.status(200).json({
           success: false,
           error: '没有匹配到合适的题型，请联系客服',
@@ -143,8 +139,9 @@ export default async function handler(req, res) {
       }
 
       questionTypeId = matchedType.id
+      htmlPrompt = matchedType.html_prompt || ''  // 已有 html_prompt，无需再查
 
-      // 结构化分析（使用 matchedType 的 analysis_prompt，8s 超时）
+      // ── Step 3: 结构化分析（使用 analysis_prompt）──
       if (matchedType?.analysis_prompt) {
         const analysisResult = await callAI({
           systemPrompt: matchedType.analysis_prompt,
@@ -163,7 +160,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // 保存题型分析结果（不设 status='completed'，等 HTML 生成成功后再设）
+      // 保存题型 + 分析结果（不设 completed，等 HTML 生成后才设）
       await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${questionId}`, {
         method: 'PATCH',
         headers,
@@ -175,11 +172,12 @@ export default async function handler(req, res) {
       })
     }
 
-    // ============================================================
-    // Step 4: 获取 html_prompt + 生成 HTML
-    // ============================================================
-    let htmlPrompt = ''
-    if (questionTypeId) {
+    // ════════════════════════════════════════════════════════
+    // Step 4: 用 analysis_json 驱动 HTML 生成
+    // ════════════════════════════════════════════════════════
+    // 首次生成：htmlPrompt 已在 Step 2-3 从 matchedType 取得
+    // 重新生成：需从 question_types 表查询 html_prompt
+    if (!htmlPrompt && questionTypeId) {
       const promptRes = await fetch(
         `${SUPABASE_URL}/rest/v1/question_types?id=eq.${questionTypeId}`,
         { headers: { ...headers, Prefer: undefined } }
@@ -190,30 +188,120 @@ export default async function handler(req, res) {
       }
     }
 
+    // 把 analysis_json 转为结构化的数据指引
+    const hasSteps = !!(analysisJson.thinking_steps && analysisJson.thinking_steps.length > 0)
+    const knowledgeStr = analysisJson.knowledge
+      ? (Array.isArray(analysisJson.knowledge) ? analysisJson.knowledge.join('、') : String(analysisJson.knowledge))
+      : ''
+    const stepsStr = hasSteps
+      ? analysisJson.thinking_steps.map((s, i) => {
+          const inputInfo = s.input_type === 'choice'
+            ? `【选择题】选项：${(s.options || []).join(' / ')}`
+            : `【填空题】输入数字答案`
+          return `步骤 ${i + 1}：「${s.title || ''}」
+  - 引导提问：${s.teacher_question || ''}
+  - 交互方式：${inputInfo}
+  - 正确答：${s.correct_answer != null ? s.correct_answer : ''}
+  - 提示信息：${s.hint || ''}
+  - 阶段结论：${s.conclusion || ''}`
+        }).join('\n\n')
+      : '（无步骤数据）'
+
+    const answerStr = analysisJson.answer
+      ? JSON.stringify(analysisJson.answer, null, 2)
+      : '（无）'
+
+    const systemPrompt = (htmlPrompt || '').trim()
+      ? htmlPrompt
+      : `你是一名小学数学互动 HTML 生成专家。
+
+你必须严格按照以下规则输出：
+1. 只输出纯 HTML 代码，不包含任何 markdown 标记、说明文字、代码块
+2. HTML 必须完整、可独立运行（含所有 CSS + JavaScript）
+3. 所有文字内容使用中文
+4. 不要出现"这是为您准备的"等 AI 元描述文字`
+
+    const userPrompt = `请根据以下数据结构生成一个互动的 HTML 教学页面。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📌 题目原文
+${question.question_text}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 知识点：${knowledgeStr || '（无）'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 步骤式交互数据（analysis_json.thinking_steps）
+
+系统将按照以下步骤驱动交互流程，每步对应一个关卡卡片：
+
+${stepsStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 最终答案：${answerStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【重要 — 数据结构与 UI 的精确映射规则】
+
+你必须严格按以下规则将 thinking_steps 的每个字段映射到 UI：
+
+1. teacher_question → 显示在当前步骤卡片顶部的「引导提问」区域，作为学生当前要回答的问题
+
+2. input_type：
+   - "choice" → 渲染为多个选项按钮，点击其中一项即为作答
+   - "number" → 渲染为一个数字输入框 + 提交按钮
+
+3. options[] → 当 input_type="choice" 时，每个选项渲染为一个可点击的按钮
+
+4. correct_answer → 用于验证用户输入。输入后立即校验：
+   - 答对 → 绿色 ✓ 反馈 + 显示本步 conclusion → 自动过渡到下一步
+   - 答错 → 红色 ✗ 反馈 + 显示 hint → 用户可重新作答
+
+5. hint → 答错时显示的提示文字，引导学生思考
+
+6. conclusion → 答对后显示的阶段性结论，代表本步骤完成
+
+7. 步骤切换：所有步骤按 thinking_steps 数组的顺序串行，每完成一步进入下一步
+
+8. 全部完成后：显示 "🎉 所有步骤完成！" + 最终答案 answer
+
+【UI 要求】
+- 卡片式布局，每步一个卡片
+- 当前步骤卡片高亮显示，已完成步骤显示 ✓
+- 卡片颜色、圆角使用你见到的现代 UI 风格
+- 适配移动端和 PC（响应式）`
+
     const htmlGenResult = await callAI({
-      systemPrompt: htmlPrompt || '你是一名小学数学老师，请生成一个漂亮的互动教学 HTML 演示页面。\n\n【重要规则】\n1. 只输出纯 HTML 代码，不要任何说明文字、介绍或注释\n2. 不要在页面内显示“这是为您准备的...”之类的提示语\n3. 不要在页面内显示“以下是...”或“希望这个...”之类的文字\n4. 直接展示题目、解题步骤和互动元素即可\n5. 使用中文展示内容，但不要出现 AI 生成的元描述',
-      prompt: `根据以下题目分析结果，生成互动 HTML 演示：\n\n题目原文：${question.question_text}\n\n分析结果：${JSON.stringify(analysisJson, null, 2)}`,
-      temperature: 0.6,
-      maxTokens: 4096,
-      timeoutSeconds: 8,
+      systemPrompt,
+      prompt: userPrompt,
+      temperature: 0.5,
+      maxTokens: 8192,
+      timeoutSeconds: 25,
     })
+
     if (!htmlGenResult.success) {
-      // HTML 生成失败 → 保存题目状态，让用户去互动列表重试
-      await fetchUserQuestionPatch(questionId, { status: 'pending' })
+      await patchQuestion(questionId, { status: 'pending' })
       return res.status(200).json({
         success: false,
-        error: '题目已保存，AI 生成暂时不可用，请到「我的互动列表」中重新生成',
+        error: 'HTML 生成超时或失败，题目已保存，请到「我的互动列表」中重新生成',
         questionId,
       })
     }
 
-    // 清理 HTML：去掉 AI 生成的多余说明文字，只保留 HTML 结构
+    // 清理 HTML
     const htmlContent = cleanHtmlContent(htmlGenResult.content)
+    // 基本校验：至少包含 <html 或 <!DOCTYPE
+    if (!htmlContent || (!htmlContent.includes('<html') && !htmlContent.includes('<!DOCTYPE'))) {
+      await patchQuestion(questionId, { status: 'pending' })
+      return res.status(200).json({
+        success: false,
+        error: '生成的 HTML 格式不完整，请到「我的互动列表」中重新生成',
+        questionId,
+      })
+    }
+
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
 
-    // ============================================================
-    // Step 5: 存入 question_demos
-    // ============================================================
+    // ════════════════════════════════════════════════════════
+    // Step 5: 存入 question_demos + 标记 completed
+    // ════════════════════════════════════════════════════════
     const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
       method: 'POST',
       headers,
@@ -228,11 +316,8 @@ export default async function handler(req, res) {
     const demo = demos?.[0] || {}
 
     // 全部流程成功 → 标记为 completed
-    await fetchUserQuestionPatch(questionId, { status: 'completed' })
+    await patchQuestion(questionId, { status: 'completed' })
 
-    // ============================================================
-    // 返回结果
-    // ============================================================
     return res.status(200).json({
       success: true,
       demoId: demo.id,
@@ -240,9 +325,8 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     console.error('[generate/demo] error:', e.message)
-    // 兜底：尝试保存题目为 pending，允许用户重试
     if (questionId) {
-      await fetchUserQuestionPatch(questionId, { status: 'pending' }).catch(() => {})
+      await patchQuestion(questionId, { status: 'pending' }).catch(() => {})
     }
     return res.status(200).json({
       success: false,

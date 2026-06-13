@@ -79,6 +79,23 @@ export async function getQuestionDemos(questionId: string): Promise<QuestionDemo
   return (data || []).map(rowToDemo)
 }
 
+/** 批量获取多个题目的演示记录（keyed by question_id） */
+export async function getQuestionDemosBatch(questionIds: string[]): Promise<Record<string, QuestionDemo[]>> {
+  if (questionIds.length === 0) return {}
+  // Supabase REST: in 查询
+  const ids = questionIds.map(id => id).join(',')
+  const { data } = await authedRequest<any[]>(
+    `/question_demos?question_id=in.(${ids})&order=created_at.desc`
+  )
+  const map: Record<string, QuestionDemo[]> = {}
+  for (const id of questionIds) map[id] = []
+  for (const row of (data || [])) {
+    const qid = row.question_id
+    if (map[qid]) map[qid].push(rowToDemo(row))
+  }
+  return map
+}
+
 /** 为题目创建一条新的演示记录 */
 export async function createQuestionDemo(questionId: string, htmlUrl: string, title?: string): Promise<QuestionDemo | null> {
   const { data } = await authedRequest<any[]>('/question_demos', {

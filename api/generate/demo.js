@@ -133,9 +133,8 @@ export default async function handler(req, res) {
         } catch { /* best effort */ }
 
         if (fallbackPrompt) {
-          // 用兜底 prompt 当作 analysis_prompt 来执行
-          htmlTemplate = fallbackPrompt
-          questionTypeName = 'temp'
+          // 用兜底 prompt 当作 analysis_prompt 来执行（不设 htmlTemplate，走内置通用模板）
+          questionTypeName = '暂未分类'
           const analysisResult = await callAI({
             systemPrompt: fallbackPrompt,
             prompt: `请分析以下数学题：\n\n${question.question_text}`,

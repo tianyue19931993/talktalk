@@ -133,34 +133,49 @@ export default async function handler(req, res) {
         } catch { /* best effort */ }
 
         if (fallbackPrompt) {
-          // 用兜底 prompt 当作 analysis_prompt 来执行（不设 htmlTemplate，走内置通用模板）
+          // temp 是一个综合 prompt → AI 直接生成完整 HTML
           questionTypeName = '暂未分类'
-          const analysisResult = await callAI({
+          const htmlResult = await callAI({
             systemPrompt: fallbackPrompt,
-            prompt: `请分析以下数学题：\n\n${question.question_text}`,
-            responseFormat: 'json_object',
-            temperature: 0.5,
-            maxTokens: 2048,
-            timeoutSeconds: 8,
+            prompt: `题目原文：\n\n${question.question_text}`,
+            temperature: 0.6,
+            maxTokens: 8192,
+            timeoutSeconds: 25,
           })
-          if (analysisResult.success) {
-            try {
-              analysisJson = JSON.parse(analysisResult.content)
-            } catch {
-              analysisJson = { raw: analysisResult.content }
-            }
+          if (!htmlResult.success || !htmlResult.content) {
+            await patchQuestion(questionId, { status: 'pending' })
+            return res.status(200).json({
+              success: false,
+              error: 'AI 生成暂时不可用，请到「我的互动列表」中重新生成',
+              questionId,
+            })
           }
-          // 不设 question_type_id，用 temp 标记
+          // 清理 HTML：只保留 DOCTYPE~html 之间的内容
+          const startIdx = htmlResult.content.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
+          var fallbackHtml = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
+          var htmlEnd = fallbackHtml.search(/<\/html>\s*/i)
+          if (htmlEnd !== -1) fallbackHtml = fallbackHtml.slice(0, htmlEnd + '<\/html>'.length)
+          // 标记为 uploaded（不经过 analysis_json 流程）
           await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${questionId}`, {
             method: 'PATCH',
             headers,
-            body: JSON.stringify({
-              question_type: '暂未分类',
-              analysis_json: analysisJson,
-            }),
+            body: JSON.stringify({ question_type: '暂未分类', status: 'uploaded' }),
           })
-          // 跳过后面的 matchedType 逻辑，直接到 Step 4
-          questionTypeId = null
+          // 直接将 HTML 存入 question_demos
+          var dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(fallbackHtml)
+          var demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ question_id: questionId, html_url: dataUrl, title: '演示' }),
+          })
+          if (!demoRes.ok) throw new Error('保存演示失败')
+          var demos = await demoRes.json()
+          var demo = demos?.[0] || {}
+          return res.status(200).json({
+            success: true,
+            demoId: demo.id,
+            htmlUrl: dataUrl,
+          })
         } else {
           await patchQuestion(questionId, { status: 'pending' })
           return res.status(200).json({

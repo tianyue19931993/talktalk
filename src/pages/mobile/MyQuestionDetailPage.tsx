@@ -129,14 +129,16 @@ export default function MyQuestionDetailPage() {
                       <Lock className="w-3.5 h-3.5" />会员可看
                     </button>
                   )}
-                  <button
-                    onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                    className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
-                      bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
-                      hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />下载
-                  </button>
+                  {hasDemoAccess && (
+                    <button
+                      onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                      className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
+                        bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
+                        hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />下载
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

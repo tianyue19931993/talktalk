@@ -219,13 +219,15 @@ export default function MyQuestionsPage() {
                               会员可看
                             </button>
                           )}
-                          <button
-                            onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                            className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                            title="下载 HTML"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
+                          {canViewDemo(subscription) && (
+                            <button
+                              onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                              className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
+                              title="下载 HTML"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       ))
                     ) : (

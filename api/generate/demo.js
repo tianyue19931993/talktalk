@@ -100,9 +100,9 @@ export default async function handler(req, res) {
       // ── Step 2: AI 识别题型 ──
       const typeNames = allTypes.map((t) => t.name).join('、')
       const identifyResult = await callAI({
-        prompt: `题目：${question.question_text}\n\n可用题型：${typeNames}\n\n如果这道题属于以上某一种题型，只返回该题型名称，不要多余文字。\n如果不属于以上任何题型，请只返回「不匹配」三个字。`,
-        temperature: 0.3,
-        maxTokens: 50,
+        prompt: `判断下面这道题是否属于以下题型之一。\n\n可用题型：${typeNames}\n\n题目：${question.question_text}\n\n规则（严格遵循）：\n1. 如果这道题是数学题且属于以上某一种题型 → 只返回该题型名称\n2. 如果这道题不是数学题，或不属于以上任何题型 → 只返回「不匹配」\n\n只返回一个词，不要任何其他文字。`,
+        temperature: 0,
+        maxTokens: 20,
         timeoutSeconds: 5,
       })
       if (!identifyResult.success) {

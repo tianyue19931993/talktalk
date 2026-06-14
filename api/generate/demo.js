@@ -231,14 +231,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // 没有模板 → 报错
+    // 没有题型模板 → 使用内置通用模板（暂未分类题型走这里）
     if (!htmlTemplate || !htmlTemplate.trim()) {
-      await patchQuestion(questionId, { status: 'pending' })
-      return res.status(200).json({
-        success: false,
-        error: '该题型暂无可用的 HTML 模板，请联系管理员上传',
-        questionId,
-      })
+      var q = question.question_text.replace(/'/g, "\\'")
+      var d = JSON.stringify(analysisJson, null, 2).replace(/'/g, "\\'")
+      htmlTemplate = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>互动学习</title><style>:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px}.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}h2{font-size:13px;color:var(--mute);margin-bottom:12px}</style></head><body><div class="container"><div class="card"><h2>📝 题目</h2><p class="q-text">' + q + '</p></div><div class="card" id="steps-container"><h2>🔍 思维引导</h2><p style="font-size:13px;color:var(--mute)">加载中...</p></div></div><script>try{var data=' + d + ';var c=document.getElementById("steps-container");if(!data||!data.thinking_steps||!data.thinking_steps.length){c.innerHTML="<h2>🔍 思维引导</h2><p style=\'font-size:13px;color:var(--mute)\'>暂无分析数据</p>";}else{var h="<h2>🔍 思维引导</h2>";data.thinking_steps.forEach(function(s,i){h+="<div class=\'step\'><div class=\'step-num\'>步骤"+(i+1)+"</div><div class=\'step-q\'>"+(s.teacher_question||s.title||"")+"</div><div class=\'step-ans\'>✅ 答案："+(s.correct_answer!=null?s.correct_answer:"")+"</div>";if(s.hint)h+="<div class=\'step-hint\'>💡 提示："+s.hint+"</div>";if(s.conclusion)h+="<div class=\'step-concl\'>📌 "+s.conclusion+"</div>";h+="</div>";});if(data.answer)h+="<div class=\'answer-box\'>🎉 最终答案："+JSON.stringify(data.answer)+"</div>";c.innerHTML=h;}}catch(e){document.getElementById("steps-container").innerHTML="<h2>🔍 思维引导</h2><p style=\'font-size:13px;color:var(--mute)\'>未能加载分析数据</p>";}<\/script></body></html>'
     }
 
     // 执行模板替换（用函数避免 String.replace 对 $ 的特殊解释）

@@ -303,11 +303,88 @@ export default async function handler(req, res) {
       }
     }
 
-    // 没有题型模板 → 使用内置通用模板
+    // 没有题型模板 → 使用内置通用模板（自适应多种 JSON 结构）
     if (!htmlTemplate || !htmlTemplate.trim()) {
-      const q = question.question_text.replace(/'/g, "\\'")
-      const d = JSON.stringify(analysisJson, null, 2).replace(/'/g, "\\'")
-      htmlTemplate = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>互动学习</title><style>:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px}.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}h2{font-size:13px;color:var(--mute);margin-bottom:12px}</style></head><body><div class="container"><div class="card"><h2>📝 题目</h2><p class="q-text">' + q + '</p></div><div class="card" id="steps-container"><h2>🔍 思维引导</h2><p style="font-size:13px;color:var(--mute)">加载中...</p></div></div><script>try{var data=' + d + ';var c=document.getElementById("steps-container");if(!data||!data.thinking_steps||!data.thinking_steps.length){c.innerHTML="<h2>🔍 思维引导</h2><p style=\'font-size:13px;color:var(--mute)\'>暂无分析数据</p>";}else{var h="<h2>🔍 思维引导</h2>";data.thinking_steps.forEach(function(s,i){h+="<div class=\'step\'><div class=\'step-num\'>步骤"+(i+1)+"</div><div class=\'step-q\'>"+(s.teacher_question||s.title||"")+"</div><div class=\'step-ans\'>✅ 答案："+(s.correct_answer!=null?s.correct_answer:"")+"</div>";if(s.hint)h+="<div class=\'step-hint\'>💡 提示："+s.hint+"</div>";if(s.conclusion)h+="<div class=\'step-concl\'>📌 "+s.conclusion+"</div>";h+="</div>";});if(data.answer)h+="<div class=\'answer-box\'>🎉 最终答案："+JSON.stringify(data.answer)+"</div>";c.innerHTML=h;}}catch(e){document.getElementById("steps-container").innerHTML="<h2>🔍 思维引导</h2><p style=\'font-size:13px;color:var(--mute)\'>未能加载分析数据</p>";}<\/script></body></html>'
+      const d = JSON.stringify(analysisJson, null, 2)
+      htmlTemplate = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>互动学习</title>
+<style>
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
+.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px;margin-bottom:16px}
+.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}
+h2{font-size:13px;color:var(--mute);margin-bottom:12px}
+.section-label{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-box{padding:16px;background:var(--bg);border-radius:16px;text-align:center}
+.stat-value{font-size:20px;font-weight:700;color:var(--purple);margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--mute)}
+.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}
+.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}
+.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}
+.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}
+.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}
+.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}
+.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}
+.obj-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--bg);border-radius:24px;font-size:13px;margin:0 4px 8px 0}
+.ctrl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:500;border:1px solid #ddd;background:var(--card);color:var(--ink);margin:0 4px 8px 0}
+.disc-card{padding:12px 16px;background:#f0fdf4;border-radius:12px;color:#16a34a;font-size:13px;margin-bottom:8px;border-left:4px solid #16a34a}
+.obs-card{padding:12px 16px;background:var(--bg);border-radius:12px;font-size:12px;color:var(--body);margin-bottom:8px;border-left:4px solid var(--blue)}
+.raw-json{font-size:11px;font-family:monospace;background:var(--bg);padding:16px;border-radius:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:var(--body);line-height:1.5}
+.equation{text-align:center;padding:16px;background:linear-gradient(135deg,rgba(121,40,202,.06),rgba(0,112,243,.06));border-radius:16px;font-size:16px;font-weight:600;color:var(--purple);margin:8px 0}
+</style>
+</head>
+<body>
+<div class="container" id="app-root">
+<div class="card"><h2>📝 题目</h2><p class="q-text">\${question_text}</p></div>
+<div id="dynamic-content"><p style="font-size:13px;color:var(--mute);text-align:center;padding:20px">加载中...</p></div>
+</div>
+<script>
+var data = ${d};
+(function(){try{var el=document.getElementById('dynamic-content');if(!el)return;if(!data){el.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">暂无分析数据</p></div>';return;}
+
+// ---------- 场景式（scene + objects + controls）----------
+if(data.scene&&data.objects){var s=data.scene,o=data.objects,c=data.controls,k=data.known_data,di=data.discoveries,ob=data.observations,h=data.hidden_data;var h2='<div class="card">';
+h2+='<div class="section-label">🧪 实验场景</div>';
+h2+='<p style="font-size:14px;color:var(--body);line-height:1.6;margin-bottom:16px">'+esc(s.description)+'</p>';
+if(o&&o.length){h2+='<div style="margin-bottom:12px">';o.forEach(function(x){h2+='<span class="obj-tag">'+esc(x.icon||'')+' '+esc(x.name||'')+'</span>'});h2+='</div>'}
+if(c&&c.length){h2+='<div class="section-label" style="margin-top:12px">🎮 操作</div><div>';c.forEach(function(x){h2+='<span class="ctrl-btn">'+esc(x.action)+'</span>'});h2+='</div>'}
+h2+='</div>';
+
+// 已知数据
+if(k&&k.length){h2+='<div class="card"><div class="section-label">📊 已知数据</div><div class="grid-2">';k.forEach(function(x){h2+='<div class="stat-box"><div class="stat-value">'+esc(x.total_value)+'<span style="font-size:13px;font-weight:400;color:var(--mute);margin-left:4px">'+esc(x.unit||'')+'</span></div><div class="stat-label">'+esc(x.label||'')+'</div></div>'});h2+='</div></div>'}
+
+// 思考发现
+if(di&&di.length){h2+='<div class="card"><div class="section-label">💡 思考发现</div>';di.forEach(function(x){h2+='<div class="disc-card">✨ '+esc(x.rule||'')+'</div>'});h2+='</div>'}
+
+// 观察
+if(ob&&ob.length){h2+='<div class="card"><div class="section-label">🔍 观察</div>';ob.forEach(function(x){h2+='<div class="obs-card">👁️ '+esc(x.phenomenon||'')+'</div>'});h2+='</div>'}
+
+// 隐藏答案区域
+if(h&&h.length){h2+='<div class="card" id="answer-section"><div class="section-label">🎯 隐藏发现</div>';h.forEach(function(x){h2+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-label" style="font-size:13px">'+esc(x.label||'')+'</div><div class="stat-value" style="color:var(--mute);font-size:16px">点击按钮显示答案</div></div>'});h2+='<div style="text-align:center;margin-top:12px"><button onclick="document.querySelectorAll(\'#answer-section .stat-value\').forEach(function(e,i){e.textContent=answers[i]||\'?\';e.style.color=\'var(--purple)\'})" style="padding:8px 20px;border:none;border-radius:24px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:13px;font-weight:500;cursor:pointer">🎯 显示答案</button></div></div>'}
+
+el.innerHTML=h2;return}
+
+// ---------- thinking_steps 格式（兼容旧版）----------
+if(data.thinking_steps&&data.thinking_steps.length){var h3='<div class="card" id="steps-container"><div class="section-label">🔍 思维引导</div>';data.thinking_steps.forEach(function(s,i){h3+='<div class="step"><div class="step-num">步骤 '+(i+1)+'</div><div class="step-q">'+esc(s.teacher_question||s.title||'')+'</div><div class="step-ans">✅ 答案：'+(s.correct_answer!=null?s.correct_answer:'')+'</div>';if(s.hint)h3+='<div class="step-hint">💡 提示：'+esc(s.hint)+'</div>';if(s.conclusion)h3+='<div class="step-concl">📌 '+esc(s.conclusion)+'</div>';h3+='</div>'});if(data.answer)h3+='<div class="answer-box">🎉 最终答案：'+JSON.stringify(data.answer)+'</div>';h3+='</div>';el.innerHTML=h3;return}
+
+// ---------- 通用数据视图（known_data 等）----------
+if(data.known_data){var h4='<div class="card"><div class="section-label">📊 分析数据</div>';if(Array.isArray(data.known_data)){data.known_data.forEach(function(x){h4+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-value">'+esc(x.total_value||x.value||'')+'</div><div class="stat-label">'+esc(x.label||'')+'</div></div>'})}else{h4+='<pre class="raw-json">'+esc(JSON.stringify(data.known_data,null,2))+'</pre>'}h4+='</div>';el.innerHTML=h4;return}
+
+// ---------- 兜底：格式化 JSON ----------
+el.innerHTML='<div class="card"><div class="section-label">📊 分析结果</div><pre class="raw-json">'+esc(JSON.stringify(data,null,2))+'</pre></div>';}catch(e){var errEl=document.getElementById('dynamic-content');if(errEl)errEl.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">无法加载分析内容</p></div>'}})()
+function esc(s){if(typeof s!=='string')return String(s||'');return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+var answers=[];
+try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.label||'?'});if(r.discoveries&&answers.length===0)answers=r.discoveries.map(function(x,i){return r.known_data&&r.known_data.length>i?'\u89e3\u51b3\u65b9\u6848 '+(i+1):''})}catch(e){}
+<\/script>
+</body>
+</html>`
     }
 
     // 执行模板替换

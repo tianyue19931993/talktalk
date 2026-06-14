@@ -100,7 +100,7 @@ export default async function handler(req, res) {
       // ── Step 2: AI 识别题型 ──
       const typeNames = allTypes.map((t) => t.name).join('、')
       const identifyResult = await callAI({
-        prompt: `题目：${question.question_text}\n\n可用题型：${typeNames}\n\n请判断这道题属于以上哪种题型，只返回题型名称，不要多余文字。`,
+        prompt: `题目：${question.question_text}\n\n可用题型：${typeNames}\n\n如果这道题属于以上某一种题型，只返回该题型名称，不要多余文字。\n如果不属于以上任何题型，请只返回「不匹配」三个字。`,
         temperature: 0.3,
         maxTokens: 50,
         timeoutSeconds: 5,
@@ -241,11 +241,11 @@ export default async function handler(req, res) {
       })
     }
 
-    // 执行模板替换
+    // 执行模板替换（用函数避免 String.replace 对 $ 的特殊解释）
     const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
     let htmlContent = htmlTemplate
-      .replace(/\$\{analysis_json\}/g, analysisJsonStr)
-      .replace(/\$\{question_text\}/g, question.question_text)
+      .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
+      .replace(/\$\{question_text\}/g, () => question.question_text)
 
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
 

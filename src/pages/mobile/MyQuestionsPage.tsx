@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search, RefreshCw } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search, RefreshCw, Lock } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
-import { canCreateDemo } from '../../lib/supabase-auth'
+import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -71,10 +71,6 @@ export default function MyQuestionsPage() {
         await loadAll()
       } else if (result.timedOut) {
         alert('生成超时，请稍后重试')
-      } else if (result.error?.includes('没有匹配到合适的题型')) {
-        alert('没有匹配到合适的题型，请联系客服')
-      } else if (result.error?.includes('AI 识别失败') || result.error?.includes('AI 生成')) {
-        alert(result.error)
       } else {
         alert(result.error || '生成失败，请重试')
       }
@@ -200,16 +196,29 @@ export default function MyQuestionsPage() {
                     {demos.length > 0 ? (
                       demos.map((demo) => (
                         <div key={demo.id} className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => navigate(`/my/demo/${demo.id}`)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                              text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                              rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                              transition-all duration-200 cursor-pointer"
-                          >
-                            <Play className="w-3 h-3" />
-                            观看 {demo.title || '演示'}
-                          </button>
+                          {canViewDemo(subscription) ? (
+                            <button
+                              onClick={() => navigate(`/my/demo/${demo.id}`)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                                text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                                rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                                transition-all duration-200 cursor-pointer"
+                            >
+                              <Play className="w-3 h-3" />
+                              观看 {demo.title || '演示'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate('/subscribe')}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                                text-[var(--color-mute)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)]
+                                rounded-full hover:text-[var(--color-link)] hover:border-[var(--color-link)]
+                                transition-all duration-200 cursor-pointer"
+                            >
+                              <Lock className="w-3 h-3" />
+                              会员可看
+                            </button>
+                          )}
                           <button
                             onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
                             className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"

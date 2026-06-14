@@ -130,12 +130,60 @@ export default async function handler(req, res) {
       const matchedType = allTypes.find((t) => t.name === questionTypeName)
 
       if (!matchedType) {
-        await patchQuestion(questionId, { status: 'pending' })
-        return res.status(200).json({
-          success: false,
-          error: '没有匹配到合适的题型，请联系客服',
-          questionId,
-        })
+        // 没有匹配到题型 → 查询 configs 表 key='temp' 的值作为兜底
+        let fallbackPrompt = ''
+        try {
+          const cfgRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/configs?key=eq.temp`,
+            { headers: { ...headers, Prefer: undefined } }
+          )
+          if (cfgRes.ok) {
+            const cfgs = await cfgRes.json()
+            fallbackPrompt = cfgs?.[0]?.value || ''
+          }
+        } catch { /* best effort */ }
+
+        if (fallbackPrompt) {
+          // 用兜底 prompt 当作 analysis_prompt 来执行
+          htmlPrompt = fallbackPrompt
+          questionTypeName = 'temp'
+          const analysisResult = await callAI({
+            systemPrompt: fallbackPrompt,
+            prompt: `请分析以下数学题：\n\n${question.question_text}`,
+            responseFormat: 'json_object',
+            temperature: 0.5,
+            maxTokens: 2048,
+            timeoutSeconds: 8,
+          })
+          if (analysisResult.success) {
+            try {
+              analysisJson = JSON.parse(analysisResult.content)
+            } catch {
+              analysisJson = { raw: analysisResult.content }
+            }
+          }
+          // 不设 question_type_id，用 temp 标记
+          await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${questionId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({
+              question_type: '暂未分类',
+              analysis_json: analysisJson,
+            }),
+          })
+        } else {
+          // 没有兜底配置 → 保存为 pending
+          await patchQuestion(questionId, { status: 'pending' })
+          return res.status(200).json({
+            success: false,
+            error: '没有匹配到合适的题型，请尝试调整题目描述后重试',
+            questionId,
+          })
+        }
+
+        // 跳过 analysis_prompt 阶段，直接用 htmlPrompt 继续到 Step 4
+        // 设置标记让后续逻辑知道没有 questionTypeId
+        questionTypeId = null
       }
 
       questionTypeId = matchedType.id

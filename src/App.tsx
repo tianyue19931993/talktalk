@@ -21,6 +21,7 @@ import PlanManagePage from './pages/admin/PlanManagePage'
 import SubscriptionManagePage from './pages/admin/SubscriptionManagePage'
 import OrderManagePage from './pages/admin/OrderManagePage'
 import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
+import ConfigsManagePage from './pages/admin/ConfigsManagePage'
 
 export default function App() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="subscriptions" element={<SubscriptionManagePage />} />
         <Route path="orders" element={<OrderManagePage />} />
         <Route path="user-questions" element={<UserQuestionManagePage />} />
+        <Route path="configs" element={<ConfigsManagePage />} />
       </Route>
 
       {/* Fallback */}

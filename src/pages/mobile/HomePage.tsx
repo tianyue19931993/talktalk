@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
-import { canCreateDemo } from '../../lib/supabase-auth'
+import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
 import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -100,15 +100,9 @@ export default function HomePage() {
             setPendingQuestionId(null)
           }
         )
-      } else if (result.error?.includes('没有匹配到合适的题型')) {
-        setPendingQuestionId(null)
-        setGenerateStatus('❌ 没有匹配到合适的题型，请联系客服')
-      } else if (result.error?.includes('AI 识别失败') || result.error?.includes('AI 生成')) {
-        setPendingQuestionId(null)
-        setGenerateStatus(result.error)
       } else {
         setPendingQuestionId(null)
-        setGenerateStatus(result.error || '生成失败')
+        setGenerateStatus(result.error || '生成失败，请重试')
       }
     } catch {
       alert('操作失败，请重试')
@@ -197,8 +191,8 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 最近生成的互动 */}
-      {isLoggedIn && latestQuestion && (
+      {/* 最近生成的互动 — 需要有效订阅才能查看 */}
+      {isLoggedIn && latestQuestion && canViewDemo(subscription) && (
         <div
           className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5 cursor-pointer hover:shadow-[var(--shadow-l3)] transition-all duration-200"
           onClick={() => navigate('/my/questions')}

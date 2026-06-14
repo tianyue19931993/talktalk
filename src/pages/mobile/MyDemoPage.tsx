@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Lock, Crown } from 'lucide-react'
+import { useAuth } from '../../stores/authStore'
+import { canViewDemo } from '../../lib/supabase-auth'
+import { Button } from '../../components/ui/Button'
 
 export default function MyDemoPage() {
   const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
+  const { subscription, isLoggedIn, isLoading } = useAuth()
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
 
+  // 权限检查：需要有效订阅
+  const hasAccess = isLoggedIn && canViewDemo(subscription)
+
   useEffect(() => {
-    if (!demoId) return
+    if (!demoId || !hasAccess || isLoading) return
     loadDemo()
-  }, [demoId])
+  }, [demoId, hasAccess, isLoading])
 
   async function loadDemo() {
     if (!demoId) return
@@ -35,6 +42,36 @@ export default function MyDemoPage() {
     } else {
       window.location.href = demo.html_url
     }
+  }
+
+  // 权限不足 → 锁定页面
+  if (!isLoading && !hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
+        <button
+          onClick={() => navigate(-1)}
+          className="self-start mb-4 inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          返回
+        </button>
+        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-8 border border-[var(--color-hairline)] text-center max-w-sm">
+          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center">
+            <Lock className="w-7 h-7 text-[var(--color-mute)]" />
+          </div>
+          <p className="text-base font-semibold text-[var(--color-ink)] mb-1">互动演示已锁定</p>
+          <p className="text-sm text-[var(--color-mute)] mb-5">开通会员后即可查看全部互动演示</p>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate(isLoggedIn ? '/subscribe' : '/login')}
+          >
+            <Crown className="w-4 h-4" />
+            {isLoggedIn ? '开通会员' : '登录开通'}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (notFound) {

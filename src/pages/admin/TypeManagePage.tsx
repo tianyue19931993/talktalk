@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getTypes, addType, updateType, deleteType, subscribe } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Plus, Pencil, Trash2, Check, X, BookType, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, BookType, FileText, Upload } from 'lucide-react'
 import type { QuestionType } from '../../types'
 
 export default function TypeManagePage() {
@@ -13,6 +13,23 @@ export default function TypeManagePage() {
   const [newDesc, setNewDesc] = useState('')
   const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
   const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
+
+  // 上传 HTML 模板文件
+  const uploadHtmlTemplate = (onContent: (content: string) => void) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.html,.htm'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        onContent(reader.result as string)
+      }
+      reader.readAsText(file)
+    }
+    input.click()
+  }
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -123,11 +140,22 @@ export default function TypeManagePage() {
                 text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
                 focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
             />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-[var(--color-body)]">HTML 模板</label>
+              <button
+                type="button"
+                onClick={() => uploadHtmlTemplate(setNewHtmlPrompt)}
+                className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline cursor-pointer"
+              >
+                <Upload className="w-3 h-3" />
+                上传 HTML 模板文件
+              </button>
+            </div>
             <textarea
-              placeholder="HTML 生成 prompt（可选）"
+              placeholder="HTML 模板，含 ${analysis_json} 占位符"
               value={newHtmlPrompt}
               onChange={(e) => setNewHtmlPrompt(e.target.value)}
-              rows={3}
+              rows={5}
               className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
                 text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
                 focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
@@ -186,11 +214,22 @@ export default function TypeManagePage() {
                           rows={2}
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
                         />
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-[var(--color-mute)]">HTML 模板</span>
+                          <button
+                            type="button"
+                            onClick={() => uploadHtmlTemplate(setEditHtmlPrompt)}
+                            className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline cursor-pointer"
+                          >
+                            <Upload className="w-3 h-3" />
+                            上传文件
+                          </button>
+                        </div>
                         <textarea
                           value={editHtmlPrompt}
                           onChange={(e) => setEditHtmlPrompt(e.target.value)}
-                          placeholder="HTML 生成 prompt（可选）"
-                          rows={2}
+                          placeholder="HTML 模板，含 ${analysis_json} 占位符"
+                          rows={4}
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
                         />
                       </div>

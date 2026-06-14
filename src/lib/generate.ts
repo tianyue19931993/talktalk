@@ -2,6 +2,9 @@
  * 前端生成 API 调用工具
  * 
  * 调用 POST /api/generate/demo 触发完整 AI 生成链路。
+ * 支持两种模式：
+ *   新提交: generateDemo(questionText, { type: 'submit' })
+ *   重新生成: generateDemo(questionId, { type: 'regenerate' })
  */
 
 interface GenerateResult {
@@ -11,12 +14,20 @@ interface GenerateResult {
   error?: string
   timedOut?: boolean
   questionId?: string
+  /** 是否为"非数学题"错误（前端显示不同文案） */
+  notMath?: boolean
+}
+
+interface GenerateOptions {
+  type?: 'submit' | 'regenerate'
+  /** @deprecated 向后兼容，请用 type */
+  regenerate?: boolean
 }
 
 /** 触发生成（首次或重新生成） */
 export async function generateDemo(
-  questionId: string,
-  options?: { regenerate?: boolean }
+  input: string,
+  options?: GenerateOptions
 ): Promise<GenerateResult> {
   try {
     const controller = new AbortController()
@@ -24,16 +35,29 @@ export async function generateDemo(
     const timeoutId = setTimeout(() => controller.abort(), 60000)
 
     const token = getAccessToken()
+
+    // 构造请求体
+    const body: Record<string, any> = {}
+
+    if (options?.type === 'submit') {
+      // 新提交：传递 questionText，不传 questionId
+      body.questionText = input
+    } else if (options?.regenerate || options?.type === 'regenerate') {
+      // 重新生成：传递 questionId + regenerate
+      body.questionId = input
+      body.regenerate = true
+    } else {
+      // 向后兼容：视为 questionId
+      body.questionId = input
+    }
+
     const res = await fetch('/api/generate/demo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        questionId,
-        regenerate: options?.regenerate ?? false,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
@@ -41,10 +65,10 @@ export async function generateDemo(
     // 先读文本，再尝试解析 JSON
     const text = await res.text()
     if (!text) {
-      return { success: false, error: '服务器返回空响应，请稍后重试', questionId }
+      return { success: false, error: '服务器返回空响应，请稍后重试' }
     }
     try {
-      const data = JSON.parse(text)
+      const data: GenerateResult = JSON.parse(text)
       return data
     } catch {
       const preview = text.slice(0, 120)
@@ -53,7 +77,6 @@ export async function generateDemo(
         success: false,
         error: '生成超时或服务器异常，题目已保存，请到「我的互动列表」中重新生成',
         timedOut: true,
-        questionId,
       }
     }
   } catch (e: any) {
@@ -62,10 +85,9 @@ export async function generateDemo(
         success: false,
         error: 'timeout',
         timedOut: true,
-        questionId,
       }
     }
-    return { success: false, error: e.message || '网络错误', questionId }
+    return { success: false, error: e.message || '网络错误' }
   }
 }
 

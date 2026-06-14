@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
-import { createUserQuestion, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -13,7 +13,6 @@ export default function HomePage() {
   const [questionText, setQuestionText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [generating, setGenerating] = useState(false)
   const [generateStatus, setGenerateStatus] = useState('')
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
@@ -56,63 +55,67 @@ export default function HomePage() {
     }
 
     setSubmitting(true)
-    setGenerateStatus('正在保存题目...')
-    try {
-      const saved = await createUserQuestion(questionText.trim())
-      if (!saved) { alert('保存失败，请重试'); return }
+    setGenerateStatus('正在验证题目...')
+    setSubmitted(true)
 
-      setSubmitted(true)
+    try {
+      const result = await generateDemo(questionText.trim(), { type: 'submit' })
+
+      if (result.notMath) {
+        // 不是数学题 → 不落库，不清空输入框，显示提示
+        setGenerateStatus('❌ 请输入正确的数学题')
+        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 4000)
+        return
+      }
+
+      // 数学题：API 已落库，清空输入框、刷新列表
       setQuestionText('')
-      // 立即刷新显示最新题目（标记为"生成中"）
       await loadLatest()
 
-      // 调用 AI 生成
-      setGenerating(true)
-      setGenerateStatus('正在分析题型...')
-      setPendingQuestionId(saved.id)
-      const result = await generateDemo(saved.id)
-
       if (result.success) {
-        setGenerateStatus('正在生成互动演示...')
-        await loadLatest(true)
         setGenerateStatus('生成完成！')
         setPendingQuestionId(null)
+        await loadLatest(true)
+        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
       } else if (result.timedOut) {
         // 超时 — 启动轮询检测是否实际已生成
         setGenerateStatus('⏱ 生成超时，正在确认结果...')
         pollingRef.current = true
-        pollQuestionDemos(
-          saved.id,
-          (demos) => {
-            setLatestDemos(demos as QuestionDemo[])
-            setGenerateStatus('生成完成！')
-            setPendingQuestionId(null)
-          },
-          () => {
-            // 轮询到结果
-            pollingRef.current = false
-            loadLatest(true)
-          },
-          () => {
-            // 轮询超时 — 确认失败
-            pollingRef.current = false
-            setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
-            setPendingQuestionId(null)
-          }
-        )
+        if (result.questionId) {
+          pollQuestionDemos(
+            result.questionId,
+            (demos) => {
+              setLatestDemos(demos as QuestionDemo[])
+              setGenerateStatus('生成完成！')
+              setPendingQuestionId(null)
+            },
+            () => {
+              pollingRef.current = false
+              loadLatest(true)
+            },
+            () => {
+              pollingRef.current = false
+              setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
+              setPendingQuestionId(null)
+            }
+          )
+        } else {
+          pollingRef.current = false
+          setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
+          setPendingQuestionId(null)
+          setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 5000)
+        }
       } else {
-        setPendingQuestionId(null)
+        // 其他错误（API 已落库题目，只是生成失败了）
         setGenerateStatus(result.error || '生成失败，请重试')
+        setPendingQuestionId(null)
+        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 5000)
       }
     } catch {
-      alert('操作失败，请重试')
+      setGenerateStatus('操作失败，请重试')
+      setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 4000)
     } finally {
       setSubmitting(false)
-      setGenerating(false)
-      // 成功/失败 3.5 秒后关闭状态提示（超时的不自动关闭）
-      if (!generateStatus.includes('确认结果') && !generateStatus.includes('超时')) {
-        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
-      }
     }
   }
 
@@ -172,19 +175,19 @@ export default function HomePage() {
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={!questionText.trim() || submitting || generating}
+                disabled={!questionText.trim() || submitting}
                 className="inline-flex items-center gap-1.5 px-5 h-9 text-sm font-medium text-white rounded-full
                   bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
                   shadow-[0_1px_8px_rgba(121,40,202,0.2)]
                   hover:shadow-[0_2px_16px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98]
                   disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
               >
-                {submitting || generating ? (
+                {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                {submitting ? '保存中...' : generating ? '生成中...' : '立即生成'}
+                {submitting ? '验证中...' : '立即生成'}
               </button>
             )}
           </div>

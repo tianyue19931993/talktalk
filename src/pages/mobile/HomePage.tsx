@@ -165,7 +165,7 @@ export default function HomePage() {
               transition-all resize-y"
           />
 
-          <div className="flex items-center justify-end">
+          <div className="flex flex-col items-end gap-1">
             {submitted ? (
               <StatusBadge
                 message={generateStatus || '已保存'}
@@ -174,6 +174,9 @@ export default function HomePage() {
                 isPolling={generateStatus?.includes('确认结果') || false}
                 onGoToList={notMathError ? undefined : () => navigate('/my/questions')}
               />
+              {generateStatus === '正在验证题目...' && (
+                <span className="text-[10px] text-[var(--color-mute)] text-right">请耐心等待 1～3 分钟</span>
+              )}
             ) : (
               <button
                 onClick={handleSubmit}

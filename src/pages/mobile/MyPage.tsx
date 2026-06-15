@@ -1,15 +1,66 @@
 import { useNavigate } from 'react-router-dom'
 import {
   User, Crown, Clock, CreditCard,
-  LogIn, LogOut, Sparkles, ChevronRight, Shield
+  LogIn, LogOut, Sparkles, ChevronRight, Shield, KeyRound
 } from 'lucide-react'
 import { useAuth, resetAuth } from '../../stores/authStore'
-import { signOut } from '../../lib/supabase-auth'
+import { signOut, loadSession } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
+import { useState } from 'react'
 
 export default function MyPage() {
   const navigate = useNavigate()
   const { user, subscription, isLoggedIn, isAdmin } = useAuth()
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+
+  const handleChangePassword = async () => {
+    setPasswordError('')
+    setPasswordSuccess('')
+    if (!newPassword) { setPasswordError('请输入新密码'); return }
+    if (newPassword.length < 6) { setPasswordError('密码至少 6 位'); return }
+    if (newPassword !== confirmPassword) { setPasswordError('两次输入的密码不一致'); return }
+
+    const session = loadSession()
+    if (!session) { setPasswordError('未登录'); return }
+
+    setPasswordLoading(true)
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          'apikey': SUPABASE_KEY!,
+          'Authorization': `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: newPassword }),
+      })
+
+      const text = await res.text()
+      if (!res.ok) {
+        const msg = text ? JSON.parse(text)?.msg || text : `HTTP ${res.status}`
+        setPasswordError(msg || '修改失败')
+        setPasswordLoading(false)
+        return
+      }
+
+      setPasswordSuccess('密码修改成功')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordLoading(false)
+      setTimeout(() => { setShowPasswordForm(false); setPasswordSuccess('') }, 2000)
+    } catch (e: any) {
+      setPasswordError(e.message || '修改失败')
+      setPasswordLoading(false)
+    }
+  }
 
   const handleLogout = async () => {
     await signOut()
@@ -142,6 +193,7 @@ export default function MyPage() {
           <LinkItem icon={Crown} label="开通会员" onClick={() => navigate('/subscribe')} />
         )}
         <LinkItem icon={CreditCard} label="订单记录" onClick={() => navigate('/orders')} />
+        <LinkItem icon={KeyRound} label="修改密码" onClick={() => setShowPasswordForm(true)} />
         {isAi && (
           <LinkItem icon={Sparkles} label="AI 功能" onClick={() => {}} />
         )}
@@ -158,6 +210,53 @@ export default function MyPage() {
 
       {/* About */}
       <AboutSection />
+
+      {/* 修改密码弹窗 */}
+      {showPasswordForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l3)] p-6 w-full max-w-sm">
+            <h3 className="text-base font-semibold text-[var(--color-ink)] mb-1">修改密码</h3>
+            <p className="text-xs text-[var(--color-mute)] mb-4">输入新密码后保存，下次登录请使用新密码</p>
+
+            {passwordSuccess && (
+              <div className="bg-green-50 text-green-700 text-sm px-3 py-2 rounded-[var(--radius-md)] mb-3">{passwordSuccess}</div>
+            )}
+            {passwordError && (
+              <div className="bg-[var(--color-error-soft)] text-[var(--color-error)] text-sm px-3 py-2 rounded-[var(--radius-md)] mb-3">{passwordError}</div>
+            )}
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                placeholder="新密码（至少 6 位）"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full h-11 px-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                  text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+                  focus:outline-none focus:border-[var(--color-link)] transition-all"
+              />
+              <input
+                type="password"
+                placeholder="确认新密码"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full h-11 px-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                  text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+                  focus:outline-none focus:border-[var(--color-link)] transition-all"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <Button variant="secondary" size="sm" onClick={() => { setShowPasswordForm(false); setPasswordError(''); setPasswordSuccess(''); setNewPassword(''); setConfirmPassword('') }}>
+                取消
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleChangePassword} loading={passwordLoading}>
+                保存
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

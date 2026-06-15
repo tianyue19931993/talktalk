@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { getTypes, addType, updateType, deleteType, subscribe } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Plus, Pencil, Trash2, Check, X, BookType, FileText, Upload } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, BookType, FileText } from 'lucide-react'
 import type { QuestionType } from '../../types'
+import { EXPERIMENT_COMPONENTS } from '../../types'
 
 export default function TypeManagePage() {
   const [, setTick] = useState(0)
@@ -13,29 +14,14 @@ export default function TypeManagePage() {
   const [newDesc, setNewDesc] = useState('')
   const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
   const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
-
-  // 上传 HTML 模板文件
-  const uploadHtmlTemplate = (onContent: (content: string) => void) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.html,.htm'
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = () => {
-        onContent(reader.result as string)
-      }
-      reader.readAsText(file)
-    }
-    input.click()
-  }
+  const [newComponentType, setNewComponentType] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editAnalysisPrompt, setEditAnalysisPrompt] = useState('')
   const [editHtmlPrompt, setEditHtmlPrompt] = useState('')
+  const [editComponentType, setEditComponentType] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null)
 
@@ -49,18 +35,26 @@ export default function TypeManagePage() {
 
   const types = getTypes()
 
+  /** 判断 htmlPrompt 是否被某个实验组件占用 */
+  function getComponentValue(htmlPrompt: string | undefined): string {
+    if (!htmlPrompt) return ''
+    const match = EXPERIMENT_COMPONENTS.find((c) => c.value && c.value === htmlPrompt.trim())
+    return match ? match.value : ''
+  }
+
   const handleAdd = () => {
     if (!newName.trim()) return
     addType({
       name: newName.trim(),
       description: newDesc.trim(),
       analysisPrompt: newAnalysisPrompt.trim(),
-      htmlPrompt: newHtmlPrompt.trim(),
+      htmlPrompt: newComponentType || newHtmlPrompt.trim(),
     })
     setNewName('')
     setNewDesc('')
     setNewAnalysisPrompt('')
     setNewHtmlPrompt('')
+    setNewComponentType('')
     setShowNewForm(false)
   }
 
@@ -70,6 +64,7 @@ export default function TypeManagePage() {
     setEditDesc(t.description || '')
     setEditAnalysisPrompt(t.analysisPrompt || '')
     setEditHtmlPrompt(t.htmlPrompt || '')
+    setEditComponentType(getComponentValue(t.htmlPrompt))
   }
 
   const handleUpdate = () => {
@@ -78,13 +73,15 @@ export default function TypeManagePage() {
       name: editName.trim(),
       description: editDesc.trim(),
       analysisPrompt: editAnalysisPrompt.trim(),
-      htmlPrompt: editHtmlPrompt.trim(),
+      htmlPrompt: editComponentType || editHtmlPrompt.trim(),
     })
     setEditingId(null)
+    setEditComponentType('')
   }
 
   const cancelEdit = () => {
     setEditingId(null)
+    setEditComponentType('')
   }
 
   const handleDelete = () => {
@@ -140,29 +137,22 @@ export default function TypeManagePage() {
                 text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
                 focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
             />
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-[var(--color-body)]">HTML 模板</label>
-              <button
-                type="button"
-                onClick={() => uploadHtmlTemplate(setNewHtmlPrompt)}
-                className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline cursor-pointer"
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[var(--color-body)]">实验组件</label>
+              <select
+                value={newComponentType}
+                onChange={(e) => setNewComponentType(e.target.value)}
+                className="h-9 px-3 text-xs bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                  text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-link)] transition-colors"
               >
-                <Upload className="w-3 h-3" />
-                上传 HTML 模板文件
-              </button>
+                {EXPERIMENT_COMPONENTS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </div>
-            <textarea
-              placeholder="HTML 模板，含 ${analysis_json} 占位符"
-              value={newHtmlPrompt}
-              onChange={(e) => setNewHtmlPrompt(e.target.value)}
-              rows={5}
-              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
-                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
-                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
-            />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewComponentType('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -178,110 +168,131 @@ export default function TypeManagePage() {
           <thead>
             <tr className="border-b border-[var(--color-hairline)]">
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题型名称</th>
+              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">实验组件</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
             {types.length === 0 ? (
               <tr>
-                <td colSpan={2} className="text-center py-12 text-sm text-[var(--color-mute)]">
+                <td colSpan={3} className="text-center py-12 text-sm text-[var(--color-mute)]">
                   暂无题型数据
                 </td>
               </tr>
             ) : (
-              types.map((t) => (
-                <tr key={t.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
+              types.map((t) => {
+                const compValue = getComponentValue(t.htmlPrompt)
+                const compLabel = EXPERIMENT_COMPONENTS.find((c) => c.value === compValue)?.label || '—'
 
-                  <td className="px-4 py-3">
-                    {editingId === t.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full px-2 py-1 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
-                          autoFocus
-                        />
-                        <input
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          placeholder="描述（可选）"
-                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
-                        />
-                        <textarea
-                          value={editAnalysisPrompt}
-                          onChange={(e) => setEditAnalysisPrompt(e.target.value)}
-                          placeholder="题目分析 prompt（可选）"
-                          rows={2}
-                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-[var(--color-mute)]">HTML 模板</span>
-                          <button
-                            type="button"
-                            onClick={() => uploadHtmlTemplate(setEditHtmlPrompt)}
-                            className="inline-flex items-center gap-1 text-xs text-[var(--color-link)] hover:underline cursor-pointer"
+                return (
+                  <tr key={t.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
+                    <td className="px-4 py-3">
+                      {editingId === t.id ? (
+                        <div className="space-y-2">
+                          <input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full px-2 py-1 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
+                            autoFocus
+                          />
+                          <input
+                            value={editDesc}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            placeholder="描述（可选）"
+                            className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
+                          />
+                          <textarea
+                            value={editAnalysisPrompt}
+                            onChange={(e) => setEditAnalysisPrompt(e.target.value)}
+                            placeholder="题目分析 prompt（可选）"
+                            rows={2}
+                            className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
+                          {t.description && (
+                            <p className="text-xs text-[var(--color-mute)] mt-0.5">{t.description}</p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      {editingId === t.id ? (
+                        <div className="space-y-1.5">
+                          <select
+                            value={editComponentType}
+                            onChange={(e) => setEditComponentType(e.target.value)}
+                            className="w-full h-8 px-2 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]
+                              text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-link)] transition-colors"
                           >
-                            <Upload className="w-3 h-3" />
-                            上传文件
+                            {EXPERIMENT_COMPONENTS.map((c) => (
+                              <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-[var(--color-mute)]">
+                          {compValue ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+                              {compValue === 'comparison' && '🔍'}
+                              {compValue === 'fraction' && '🧮'}
+                              {compValue === 'area' && '📐'}
+                              {compLabel.replace(/（.*）/g, '')}
+                            </span>
+                          ) : (
+                            t.htmlPrompt?.trim() && !compValue ? (
+                              <span className="text-[10px] text-gray-400">自定义 HTML</span>
+                            ) : (
+                              <span className="text-[10px] text-gray-300">—</span>
+                            )
+                          )}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      {editingId === t.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={handleUpdate}
+                            className="p-1.5 rounded-[var(--radius-sm)] text-green-600 hover:bg-green-50 transition-colors cursor-pointer"
+                            title="保存"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
+                            title="取消"
+                          >
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
-                        <textarea
-                          value={editHtmlPrompt}
-                          onChange={(e) => setEditHtmlPrompt(e.target.value)}
-                          placeholder="HTML 模板，含 ${analysis_json} 占位符"
-                          rows={4}
-                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
-                        {t.description && (
-                          <p className="text-xs text-[var(--color-mute)] mt-0.5">{t.description}</p>
-                        )}
-                      </div>
-                    )}
-                  </td>
-
-                  <td className="px-4 py-3 text-right">
-                    {editingId === t.id ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={handleUpdate}
-                          className="p-1.5 rounded-[var(--radius-sm)] text-green-600 hover:bg-green-50 transition-colors cursor-pointer"
-                          title="保存"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                          title="取消"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => startEdit(t)}
-                          className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                          title="编辑"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(t)}
-                          className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="删除"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+                      ) : (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => startEdit(t)}
+                            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
+                            title="编辑"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(t)}
+                            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--color-body)] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="删除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

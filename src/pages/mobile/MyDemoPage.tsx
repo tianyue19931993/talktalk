@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Crown } from 'lucide-react'
+
+const ALLOWED_DOMAIN = typeof window !== 'undefined' ? window.location.origin : ''
 import { useAuth } from '../../stores/authStore'
 import { canViewDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
@@ -27,8 +29,13 @@ export default function MyDemoPage() {
     const { authedRequest } = await import('../../lib/supabase-auth')
     const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
     const demo = data?.[0]
-    if (!demo?.html_url) {
-      setNotFound(true)
+    if (!demo?.html_url || demo.html_url === '__experiment__') {
+      // 无 HTML 或标记为实验组件 → 跳转到 ExperimentPage
+      if (demoId === demo?.id) {
+        navigate(`/experiment/${demoId}`, { replace: true })
+      } else {
+        setNotFound(true)
+      }
       return
     }
 

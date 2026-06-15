@@ -59,6 +59,15 @@ export interface QuestionForm {
 export const SUBJECTS = ['数学'] as const
 export type Subject = (typeof SUBJECTS)[number]
 
+/** 组件实验类型 */
+export const EXPERIMENT_COMPONENTS = [
+  { value: '', label: '无（使用 HTML 模板）' },
+  { value: 'comparison', label: 'ComparisonExperiment（比较关系）' },
+  { value: 'fraction', label: 'FractionExperiment（分数模型）' },
+  { value: 'area', label: 'AreaExperiment（面积模型）' },
+] as const
+export type ExperimentComponent = (typeof EXPERIMENT_COMPONENTS)[number]['value']
+
 /** 年级 */
 export const GRADES = [
   '一年级', '二年级', '三年级', '四年级', '五年级', '六年级',

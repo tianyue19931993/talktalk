@@ -12,6 +12,7 @@ import OrdersPage from './pages/mobile/OrdersPage'
 import MyQuestionsPage from './pages/mobile/MyQuestionsPage'
 import MyQuestionDetailPage from './pages/mobile/MyQuestionDetailPage'
 import MyDemoPage from './pages/mobile/MyDemoPage'
+import ExperimentPage from './pages/ExperimentPage'
 import LessonManagePage from './pages/admin/LessonManagePage'
 import LessonEditPage from './pages/admin/LessonEditPage'
 import TypeManagePage from './pages/admin/TypeManagePage'
@@ -41,6 +42,9 @@ export default function App() {
       <Route path="/my/questions" element={<MyQuestionsPage />} />
       <Route path="/my/question/:id" element={<MyQuestionDetailPage />} />
       <Route path="/my/demo/:demoId" element={<MyDemoPage />} />
+
+      {/* Experiment — 全屏实验组件 */}
+      <Route path="/experiment/:demoId" element={<ExperimentPage />} />
 
       {/* Demo - full screen, no layout */}
       <Route path="/demo/:lessonId/:demoId" element={<DemoPage />} />

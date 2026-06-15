@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
-import { getQuestions } from '../../stores/appStore'
+import { getQuestions, getTypes } from '../../stores/appStore'
 import { GRADES, Question } from '../../types'
 
 function QuestionCard({ question }: { question: Question }) {
@@ -38,8 +38,10 @@ function QuestionCard({ question }: { question: Question }) {
 
 export default function LessonListPage() {
   const allQuestions = getQuestions().filter((q) => q.status === 'published')
+  const allTypes = getTypes()
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
 
   const filtered = useMemo(() => {
     let result = allQuestions
@@ -55,13 +57,18 @@ export default function LessonListPage() {
       )
     }
 
+    // Type filter
+    if (typeFilter) {
+      result = result.filter((q) => q.typeId === typeFilter)
+    }
+
     // Grade filter
     if (gradeFilter) {
       result = result.filter((q) => q.grade === gradeFilter)
     }
 
     return result
-  }, [allQuestions, search, gradeFilter])
+  }, [allQuestions, search, typeFilter, gradeFilter])
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4">
@@ -79,6 +86,23 @@ export default function LessonListPage() {
             <X className="w-4 h-4" />
           </button>
         )}
+      </div>
+
+      {/* Type & grade filters */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--color-mute)] shrink-0">题型</span>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="flex-1 h-9 px-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-ink)]"
+        >
+          <option value="">全部</option>
+          {allTypes.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Grade filter */}

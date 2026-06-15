@@ -87,9 +87,9 @@ export default function ComponentPreviewPage() {
       {/* Component preview area */}
       <div className="bg-[var(--color-canvas-soft)] rounded-[var(--radius-xl)] border border-[var(--color-hairline)] overflow-hidden">
         {/* Mobile mockup */}
-        <div className="max-w-[400px] mx-auto bg-white shadow-sm">
+        <div className="max-w-[400px] mx-auto bg-[var(--color-canvas)] shadow-[var(--shadow-l3)]">
           {/* Status bar mock */}
-          <div className="h-8 bg-gray-50 border-b border-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+          <div className="h-8 bg-[var(--color-canvas-soft)] border-b border-[var(--color-hairline)] flex items-center justify-center text-[10px] text-[var(--color-mute)]">
             手机预览 · 375 × 812
           </div>
 

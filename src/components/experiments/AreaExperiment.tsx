@@ -25,51 +25,52 @@ export default function AreaExperiment({ data }: { data: AreaData }) {
     return result
   }, [clampedWidth, clampedHeight])
 
-  const cellSize = clampedWidth > 12 || clampedHeight > 12 ? 'w-6 h-6 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-10 sm:h-10'
+  const cellSize = clampedWidth > 12 || clampedHeight > 12
+    ? 'w-6 h-6 sm:w-7 sm:h-7'
+    : 'w-7 h-7 sm:w-9 sm:h-9'
 
   return (
     <div className="flex flex-col gap-5 max-w-xl mx-auto p-4">
       {/* Question */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <p className="text-sm text-gray-700 leading-relaxed">{data.question}</p>
+      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-5 shadow-[var(--shadow-l2)] border border-[var(--color-hairline)]">
+        <p className="text-sm text-[var(--color-body)] leading-relaxed">{data.question}</p>
       </div>
 
       {/* Grid visualization */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+      <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-6 shadow-[var(--shadow-l2)] border border-[var(--color-hairline)]">
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-gray-400 font-medium">方格图</span>
-          <span className="text-xs text-gray-300">·</span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-[var(--color-mute)] font-medium">方格图</span>
+          <span className="text-xs text-[var(--color-hairline-strong)]">·</span>
+          <span className="text-xs text-[var(--color-mute)]">
             {clampedWidth} × {clampedHeight} 网格
           </span>
         </div>
 
-        {/* Width label */}
-        <div className="flex items-end gap-1 ml-1 mb-1">
-          <span className="text-[10px] text-gray-400 w-4 shrink-0">宽</span>
-          <div className="flex gap-1" style={{ marginLeft: '2px' }}>
-            {Array.from({ length: clampedWidth }).map((_, i) => (
-              <div key={i} className={`${cellSize} flex items-center justify-center`}>
-                <span className="text-[9px] text-gray-400">{i + 1}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Grid rows */}
-        <div className="space-y-1">
+        <div className="space-y-1 overflow-x-auto pb-2">
+          {/* Top width label */}
+          <div className="flex items-center gap-1 mb-1 ml-11">
+            <div className="flex gap-1">
+              {Array.from({ length: clampedWidth }).map((_, i) => (
+                <div key={i} className={`${cellSize} flex items-center justify-center`}>
+                  <span className="text-[9px] text-[var(--color-mute)]">{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {rows.map((row, ri) => (
             <div key={ri} className="flex items-center gap-1">
               {/* Row number label */}
-              <span className="text-[10px] text-gray-400 w-4 shrink-0 text-right">
-                {ri === Math.floor(clampedHeight / 2) ? '高' : ''}
+              <span className="text-[9px] text-[var(--color-mute)] w-10 shrink-0 text-right pr-1">
+                {ri + 1}
               </span>
               {/* Cells */}
               <div className="flex gap-1">
                 {row.map((cellNum) => (
                   <div
                     key={cellNum}
-                    className={`${cellSize} bg-purple-100 border border-purple-200 rounded flex items-center justify-center text-[9px] sm:text-[10px] font-medium text-purple-600`}
+                    className={`${cellSize} bg-[var(--color-link-bg-soft)] border border-[var(--color-link)]/20 rounded flex items-center justify-center text-[9px] sm:text-[10px] font-medium text-[var(--color-link)]`}
                   >
                     {cellNum}
                   </div>
@@ -78,42 +79,26 @@ export default function AreaExperiment({ data }: { data: AreaData }) {
             </div>
           ))}
         </div>
-
-        {/* Height label */}
-        {clampedHeight > 1 && (
-          <div className="flex items-center gap-1 mt-2 ml-1">
-            <span className="text-[10px] text-gray-400 w-4 shrink-0">高</span>
-            <div className="flex items-center gap-1">
-              <div className="flex flex-col gap-[2px]" style={{ height: `${Math.min(clampedHeight * 12, 80)}px` }}>
-                {Array.from({ length: clampedHeight }).map((_, i) => (
-                  <div key={i} className="flex items-center">
-                    <span className="text-[9px] text-gray-400 mr-1">{i + 1}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Dimension display */}
-      <div className="bg-gray-50 rounded-2xl p-5">
-        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-3">📐 尺寸信息</p>
+      <div className="bg-[var(--color-canvas-soft)] rounded-[var(--radius-2xl)] p-5">
+        <p className="text-[10px] uppercase tracking-wider text-[var(--color-mute)] font-semibold mb-3">📐 尺寸信息</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm border border-gray-100">
-            <div className="font-bold text-purple-700 text-xl">{clampedWidth}</div>
-            <div className="text-[11px] text-gray-500 mt-1">宽</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">width</div>
+          <div className="bg-[var(--color-canvas)] rounded-xl p-4 text-center shadow-[var(--shadow-l1)] border border-[var(--color-hairline)]">
+            <div className="font-bold text-[var(--color-gradient-start)] text-xl">{clampedWidth}</div>
+            <div className="text-[11px] text-[var(--color-body)] mt-1">宽</div>
+            <div className="text-[10px] text-[var(--color-mute)] mt-0.5">width</div>
           </div>
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm border border-gray-100">
-            <div className="font-bold text-purple-700 text-xl">{clampedHeight}</div>
-            <div className="text-[11px] text-gray-500 mt-1">高</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">height</div>
+          <div className="bg-[var(--color-canvas)] rounded-xl p-4 text-center shadow-[var(--shadow-l1)] border border-[var(--color-hairline)]">
+            <div className="font-bold text-[var(--color-gradient-start)] text-xl">{clampedHeight}</div>
+            <div className="text-[11px] text-[var(--color-body)] mt-1">高</div>
+            <div className="text-[10px] text-[var(--color-mute)] mt-0.5">height</div>
           </div>
         </div>
         <div className="mt-3 text-center">
-          <span className="text-xs text-gray-500">
-            网格总数：<strong className="text-purple-700">{clampedWidth} × {clampedHeight} = {clampedWidth * clampedHeight}</strong> 个方格
+          <span className="text-xs text-[var(--color-body)]">
+            网格总数：<strong className="text-[var(--color-gradient-start)]">{clampedWidth} × {clampedHeight} = {clampedWidth * clampedHeight}</strong> 个方格
           </span>
         </div>
       </div>

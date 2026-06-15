@@ -104,17 +104,17 @@ export default function ExperimentPage() {
   // 权限不足
   if (!isLoading && !hasAccess) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <button onClick={() => navigate(-1)} className="self-start mb-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:opacity-80 cursor-pointer">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
+        <button onClick={() => navigate(-1)} className="self-start mb-4 inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer">
           <ArrowLeft className="w-4 h-4" />
           返回
         </button>
-        <div className="bg-white rounded-2xl p-8 border border-gray-100 text-center max-w-sm shadow-sm">
-          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gray-50 flex items-center justify-center">
-            <Lock className="w-7 h-7 text-gray-400" />
+        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-8 border border-[var(--color-hairline)] text-center max-w-sm shadow-[var(--shadow-l2)]">
+          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center">
+            <Lock className="w-7 h-7 text-[var(--color-mute)]" />
           </div>
-          <p className="text-base font-semibold text-gray-900 mb-1">互动实验已锁定</p>
-          <p className="text-sm text-gray-500 mb-5">开通会员后即可查看全部互动实验</p>
+          <p className="text-base font-semibold text-[var(--color-ink)] mb-1">互动实验已锁定</p>
+          <p className="text-sm text-[var(--color-mute)] mb-5">开通会员后即可查看全部互动实验</p>
           <Button variant="primary" size="sm" onClick={() => navigate(isLoggedIn ? '/subscribe' : '/login')}>
             <Crown className="w-4 h-4" />
             {isLoggedIn ? '开通会员' : '登录开通'}
@@ -126,18 +126,18 @@ export default function ExperimentPage() {
 
   if (loadState === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <p className="text-sm text-gray-400">加载中...</p>
+      <div className="flex items-center justify-center min-h-screen bg-[var(--color-canvas-soft)]">
+        <p className="text-sm text-[var(--color-mute)]">加载中...</p>
       </div>
     )
   }
 
   if (loadState === 'notfound' || !analysisJson) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="flex flex-col items-center gap-2 text-gray-400">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
+        <div className="flex flex-col items-center gap-2 text-[var(--color-mute)]">
           <p className="text-base font-medium">实验未找到</p>
-          <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline cursor-pointer">返回</button>
+          <button onClick={() => navigate(-1)} className="text-sm text-[var(--color-link)] hover:underline cursor-pointer">返回</button>
         </div>
       </div>
     )
@@ -153,7 +153,7 @@ export default function ExperimentPage() {
         return <AreaExperiment data={analysisJson as never} />
       default:
         return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-gray-400">
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-[var(--color-mute)]">
             <p className="text-sm">无法自动识别实验类型</p>
             <p className="text-xs mt-1">
               {analysisJson?.type
@@ -161,8 +161,8 @@ export default function ExperimentPage() {
                 : 'analysis_json 缺少 type 字段且无法通过结构推断'}
             </p>
             <details className="mt-4 max-w-md text-left">
-              <summary className="text-xs text-blue-500 cursor-pointer">查看原始数据</summary>
-              <pre className="mt-2 text-[10px] bg-gray-100 p-3 rounded-xl overflow-auto max-h-60">
+              <summary className="text-xs text-[var(--color-link)] cursor-pointer">查看原始数据</summary>
+              <pre className="mt-2 text-[10px] bg-[var(--color-canvas-soft)] p-3 rounded-xl overflow-auto max-h-60 text-[var(--color-body)]">
                 {JSON.stringify(analysisJson, null, 2)}
               </pre>
             </details>
@@ -177,15 +177,15 @@ export default function ExperimentPage() {
     : ''
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <div className="min-h-screen bg-[var(--color-canvas-soft)]">
+      <div className="sticky top-0 z-10 bg-[var(--color-canvas)]/80 backdrop-blur-md border-b border-[var(--color-hairline)]">
         <div className="max-w-xl mx-auto flex items-center h-12 px-4">
-          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition-colors cursor-pointer">
+          <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm text-[var(--color-body)] hover:text-[var(--color-ink)] transition-colors cursor-pointer">
             <ArrowLeft className="w-4 h-4" />
             返回
           </button>
           {typeLabel && (
-            <span className="ml-auto text-[10px] text-gray-400 uppercase tracking-wider font-medium">{typeLabel}</span>
+            <span className="ml-auto text-[10px] text-[var(--color-mute)] uppercase tracking-wider font-medium">{typeLabel}</span>
           )}
         </div>
       </div>

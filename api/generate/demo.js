@@ -387,11 +387,42 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 </html>`
     }
 
-    // ── 执行模板替换 ──
+    // ── 执行模板替换 / AI 生成 ──
     const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
-    const htmlContent = htmlTemplate
-      .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
-      .replace(/\$\{question_text\}/g, () => question.question_text)
+    let htmlContent
+
+    // 判断 htmlTemplate 中是否含有 ${analysis_json} 或 ${question_text} 占位符
+    const hasPlaceholders = htmlTemplate.includes('\${analysis_json}') || htmlTemplate.includes('\${question_text}')
+
+    if (!hasPlaceholders && htmlTemplate.trim()) {
+      // 没有占位符 → html_prompt 是 AI 提示词 → 调 AI 生成 HTML
+      const htmlResult = await callAI({
+        systemPrompt: htmlTemplate,
+        prompt: `以下是题目的结构化分析数据，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
+        temperature: 0.6,
+        maxTokens: 8192,
+        timeoutSeconds: 25,
+      })
+      if (!htmlResult.success || !htmlResult.content) {
+        await patchQuestionFull(actualQuestionId, { status: 'pending' })
+        return res.status(200).json({
+          success: false,
+          error: 'AI 生成 HTML 失败，请重试',
+          questionId: actualQuestionId,
+        })
+      }
+
+      // 清理 HTML：只保留 DOCTYPE~html 之间的内容
+      const startIdx = htmlResult.content.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
+      const rawHtml = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
+      const htmlEnd = rawHtml.search(/<\/html>\s*/i)
+      htmlContent = htmlEnd !== -1 ? rawHtml.slice(0, htmlEnd + '<\/html>'.length) : rawHtml
+    } else {
+      // 含占位符 → 字符串替换（兼容旧版或内置模板）
+      htmlContent = htmlTemplate
+        .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
+        .replace(/\$\{question_text\}/g, () => question.question_text)
+    }
 
     const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
 

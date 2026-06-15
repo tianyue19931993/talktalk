@@ -17,6 +17,7 @@ export default function HomePage() {
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
   const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null)
+  const [notMathError, setNotMathError] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const pollingRef = useRef(false)
 
@@ -64,7 +65,8 @@ export default function HomePage() {
       if (result.notMath) {
         // 不是数学题 → 不落库，不清空输入框，显示提示
         setGenerateStatus('❌ 请输入正确的数学题')
-        setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 4000)
+        setNotMathError(true)
+        setTimeout(() => { setSubmitted(false); setGenerateStatus(''); setNotMathError(false) }, 4000)
         return
       }
 
@@ -170,7 +172,7 @@ export default function HomePage() {
                 isError={generateStatus?.includes('❌') || generateStatus?.includes('失败')}
                 isTimeout={generateStatus?.includes('超时') || false}
                 isPolling={generateStatus?.includes('确认结果') || false}
-                onGoToList={() => navigate('/my/questions')}
+                onGoToList={notMathError ? undefined : () => navigate('/my/questions')}
               />
             ) : (
               <button

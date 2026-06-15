@@ -15,9 +15,6 @@
 
 import { callAI } from '../lib/ai.js'
 
-// 可用的实验组件类型（与前端 EXPERIMENT_COMPONENTS 一致）
-const COMPONENT_TYPES = ['comparison', 'fraction', 'area']
-
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -390,37 +387,7 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 </html>`
     }
 
-    // ── 判断是否为实验组件类型（非 HTML 模板） ──
-    const trimmedTemplate = (htmlTemplate || '').trim().toLowerCase()
-    const isComponentType = COMPONENT_TYPES.includes(trimmedTemplate)
-
-    if (isComponentType) {
-      // 组件类型 → 不生成 HTML，存 __experiment__ 标记，由前端 ExperimentPage 渲染
-      const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          question_id: actualQuestionId,
-          html_url: '__experiment__',
-          title: `演示 ${Date.now().toString().slice(-4)}`,
-        }),
-      })
-      if (!demoRes.ok) throw new Error('保存演示失败')
-      const demos = await demoRes.json()
-      const demo = demos?.[0] || {}
-
-      // 标记为 completed
-      await patchQuestionFull(actualQuestionId, { status: 'completed' })
-
-      return res.status(200).json({
-        success: true,
-        demoId: demo.id,
-        htmlUrl: '__experiment__',
-        questionId: actualQuestionId,
-      })
-    }
-
-    // ── HTML 模板类型 → 执行模板替换 ──
+    // ── 执行模板替换 ──
     const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
     const htmlContent = htmlTemplate
       .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)

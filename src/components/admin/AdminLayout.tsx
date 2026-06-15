@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, NavLink, useLocation, Link, useNavigate } from 'react-router-dom'
-import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings, Eye } from 'lucide-react'
+import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 
 interface SidebarItem {
@@ -20,7 +20,7 @@ const sidebarItems: SidebarItem[] = [
   { path: '/admin/orders', label: '订单管理', icon: Receipt },
   { path: '/admin/plans', label: '套餐管理', icon: Crown },
   { path: '/admin/configs', label: '系统配置', icon: Settings },
-  { path: '/admin/component-preview', label: '组件预览', icon: Eye },
+  // { path: '/admin/component-preview', label: '组件预览', icon: Eye },
 ]
 
 // 移动端只显示前 5 个核心菜单，其余折叠到

@@ -12,7 +12,7 @@ import OrdersPage from './pages/mobile/OrdersPage'
 import MyQuestionsPage from './pages/mobile/MyQuestionsPage'
 import MyQuestionDetailPage from './pages/mobile/MyQuestionDetailPage'
 import MyDemoPage from './pages/mobile/MyDemoPage'
-import ExperimentPage from './pages/ExperimentPage'
+// import ExperimentPage from './pages/ExperimentPage'
 import LessonManagePage from './pages/admin/LessonManagePage'
 import LessonEditPage from './pages/admin/LessonEditPage'
 import TypeManagePage from './pages/admin/TypeManagePage'
@@ -23,7 +23,7 @@ import SubscriptionManagePage from './pages/admin/SubscriptionManagePage'
 import OrderManagePage from './pages/admin/OrderManagePage'
 import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
 import ConfigsManagePage from './pages/admin/ConfigsManagePage'
-import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
+// import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
 
 export default function App() {
   return (
@@ -44,8 +44,8 @@ export default function App() {
       <Route path="/my/question/:id" element={<MyQuestionDetailPage />} />
       <Route path="/my/demo/:demoId" element={<MyDemoPage />} />
 
-      {/* Experiment — 全屏实验组件 */}
-      <Route path="/experiment/:demoId" element={<ExperimentPage />} />
+      {/* 组件实验 — 暂不使用 */}
+      {/* <Route path="/experiment/:demoId" element={<ExperimentPage />} /> */}
 
       {/* Demo - full screen, no layout */}
       <Route path="/demo/:lessonId/:demoId" element={<DemoPage />} />
@@ -64,7 +64,7 @@ export default function App() {
         <Route path="orders" element={<OrderManagePage />} />
         <Route path="user-questions" element={<UserQuestionManagePage />} />
         <Route path="configs" element={<ConfigsManagePage />} />
-        <Route path="component-preview" element={<ComponentPreviewPage />} />
+        {/* <Route path="component-preview" element={<ComponentPreviewPage />} /> */}
       </Route>
 
       {/* Fallback */}

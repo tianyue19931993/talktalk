@@ -38,12 +38,7 @@ export default function MyQuestionDetailPage() {
     setLoading(false)
   }
 
-  const downloadHtml = (url: string, label: string, demoId?: string) => {
-    // 实验组件 → 跳转到 ExperimentPage 下载
-    if (url === '__experiment__' && demoId) {
-      navigate(`/experiment/${demoId}`)
-      return
-    }
+  const downloadHtml = (url: string, label: string) => {
     const link = document.createElement('a')
     if (url.startsWith('data:text/html')) {
       const content = decodeURIComponent(url.split(',')[1] || '')
@@ -136,7 +131,7 @@ export default function MyQuestionDetailPage() {
                   )}
                   {hasDemoAccess && (
                     <button
-                      onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo', demo.id)}
+                      onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
                       className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
                         bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
                         hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"

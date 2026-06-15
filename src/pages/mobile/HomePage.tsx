@@ -167,6 +167,7 @@ export default function HomePage() {
 
           <div className="flex flex-col items-end gap-1">
             {submitted ? (
+              <>
               <StatusBadge
                 message={generateStatus || '已保存'}
                 isError={generateStatus?.includes('❌') || generateStatus?.includes('失败')}
@@ -177,6 +178,7 @@ export default function HomePage() {
               {generateStatus === '正在验证题目...' && (
                 <span className="text-[10px] text-[var(--color-mute)] text-right">请耐心等待 1～3 分钟</span>
               )}
+              </>
             ) : (
               <button
                 onClick={handleSubmit}

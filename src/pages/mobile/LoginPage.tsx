@@ -1,22 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { signIn, signUp } from '../../lib/supabase-auth'
 import { refreshUserData } from '../../stores/authStore'
 
-type Mode = 'login' | 'register' | 'forgot' | 'reset'
-
-/** 从 URL hash 中解析恢复参数 */
-function parseRecoveryHash(): { accessToken?: string; type?: string } | null {
-  const hash = window.location.hash
-  if (!hash || hash.length < 2) return null
-  const params = new URLSearchParams(hash.slice(1))
-  return {
-    accessToken: params.get('access_token') || undefined,
-    type: params.get('type') || undefined,
-  }
-}
+type Mode = 'login' | 'register' | 'forgot'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -31,55 +20,26 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // 检测密码重置链接（type=recovery）
-  useEffect(() => {
-    const recovery = parseRecoveryHash()
-    if (recovery?.type === 'recovery' && recovery.accessToken) {
-      setMode('reset')
-      // 清除 hash 避免刷新后重复触发
-      window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    }
-  }, [])
-
   const handleSubmit = async () => {
     setError('')
 
-    // ── 重置密码 ──
-    if (mode === 'reset') {
+    // ── 忘记密码（直接重置，无需邮件） ──
+    if (mode === 'forgot') {
+      if (!email.trim()) { setError('请输入邮箱'); return }
       if (!password) { setError('请输入新密码'); return }
       if (password.length < 6) { setError('密码至少 6 位'); return }
       if (password !== confirmPassword) { setError('两次输入的密码不一致'); return }
 
-      const recovery = parseRecoveryHash()
-      // 重新从原始 URL 获取（hash 可能已被清除，从 history 拿）
-      const accessToken = recovery?.accessToken || new URLSearchParams(
-        window.location.hash.slice(1)
-      ).get('access_token')
-
-      if (!accessToken) {
-        setError('重置链接已过期，请重新发送重置邮件')
-        return
-      }
-
       setLoading(true)
       try {
-        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-          method: 'PUT',
-          headers: {
-            'apikey': SUPABASE_KEY!,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ password }),
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password }),
         })
-
-        const text = await res.text()
-        if (!res.ok) {
-          const msg = text ? JSON.parse(text)?.msg || text : `HTTP ${res.status}`
-          setError(msg || '重置失败，链接可能已过期')
+        const data = await res.json()
+        if (!data.success) {
+          setError(data.error || '重置失败')
           setLoading(false)
           return
         }
@@ -98,47 +58,6 @@ export default function LoginPage() {
     }
 
     if (!email.trim()) { setError('请输入邮箱'); return }
-
-    // ── 忘记密码（发送重置邮件） ──
-    if (mode === 'forgot') {
-      setLoading(true)
-      try {
-        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-        const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-        const siteUrl = window.location.origin
-
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY!,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: email.trim(),
-            redirect_to: `${siteUrl}/login`,
-          }),
-        })
-
-        const text = await res.text()
-        if (!res.ok) {
-          const msg = text ? JSON.parse(text)?.msg || text : `HTTP ${res.status}`
-          setError(msg)
-          setLoading(false)
-          return
-        }
-
-        setSuccess('重置链接已发送到您的邮箱，请查收后设置新密码')
-        setMode('login')
-        setPassword('')
-        setLoading(false)
-        return
-      } catch (e: any) {
-        setError(e.message || '发送失败')
-        setLoading(false)
-        return
-      }
-    }
-
     if (!password) { setError('请输入密码'); return }
     if (password.length < 6) { setError('密码至少 6 位'); return }
 
@@ -154,7 +73,7 @@ export default function LoginPage() {
         if (error) { setError(error); setLoading(false); return }
 
         // signUp 已自动保存 session（邮箱验证关闭时直接返回）
-        // 如果没有 session（邮箱验证开启时），尝试登录
+        // 如果没有 session，尝试登录
         if (!data?.accessToken) {
           const { error: loginError } = await signIn(email, password)
           if (loginError) {
@@ -177,17 +96,14 @@ export default function LoginPage() {
 
   const pageTitle = mode === 'login' ? '登录账号'
     : mode === 'register' ? '注册账号'
-    : mode === 'forgot' ? '重置密码'
-    : '设置新密码'
+    : '重置密码'
 
   const pageDesc = mode === 'login' ? '登录后解锁更多功能'
     : mode === 'register' ? '注册后开启数学思维之旅'
-    : mode === 'forgot' ? '输入邮箱，我们将发送重置链接'
-    : '请输入您的新密码'
+    : '输入邮箱和新密码，直接重置'
 
   const btnText = mode === 'login' ? '登录'
     : mode === 'register' ? '注册'
-    : mode === 'forgot' ? '发送重置链接'
     : '确认重置'
 
   return (
@@ -226,25 +142,24 @@ export default function LoginPage() {
 
       {/* Form */}
       <div className="space-y-4">
-        {mode !== 'reset' ? (
-          <>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-[var(--color-body)]">邮箱</label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
-              <input
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-11 pl-10 pr-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
-                  text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
-                  focus:outline-none focus:border-[var(--color-link)] focus:ring-2 focus:ring-[var(--color-link-bg-soft)]
-                  transition-all"
-              />
-            </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-[var(--color-body)]">邮箱</label>
+          <div className="relative">
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+                focus:outline-none focus:border-[var(--color-link)] focus:ring-2 focus:ring-[var(--color-link-bg-soft)]
+                transition-all"
+            />
           </div>
-          {mode !== 'forgot' && (
+        </div>
+
+        {mode !== 'forgot' ? (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[var(--color-body)]">密码</label>
             <div className="relative">
@@ -268,14 +183,12 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-          )}
-          </>
         ) : (
           <>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-[var(--color-body)]">新密码</label>
             <div className="relative">
-              <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="至少 6 位"
@@ -320,7 +233,7 @@ export default function LoginPage() {
         {mode === 'login' && (
           <div className="text-center mt-3">
             <button
-              onClick={() => { setMode('forgot'); setError(''); setPassword('') }}
+              onClick={() => { setMode('forgot'); setError(''); setPassword(''); setConfirmPassword('') }}
               className="text-xs text-[var(--color-link)] hover:underline cursor-pointer"
             >
               忘记密码？
@@ -330,37 +243,28 @@ export default function LoginPage() {
       </div>
 
       {/* Toggle mode */}
-      {mode === 'reset' ? (
-        <div className="mt-6 text-center">
+      <div className="mt-6 text-center">
+        {mode === 'forgot' ? (
           <button
-            onClick={() => { setMode('login'); setError(''); setPassword('') }}
+            onClick={() => { setMode('login'); setError(''); setPassword(''); setConfirmPassword('') }}
             className="text-sm text-[var(--color-link)] hover:underline cursor-pointer"
           >
             返回登录
           </button>
-        </div>
-      ) : mode !== 'forgot' ? (
-        <div className="mt-6 text-center">
-          <span className="text-sm text-[var(--color-body)]">
-            {mode === 'login' ? '没有账号？' : '已有账号？'}
-          </span>
-          <button
-            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
-            className="text-sm text-[var(--color-link)] hover:underline ml-1 cursor-pointer"
-          >
-            {mode === 'login' ? '去注册' : '去登录'}
-          </button>
-        </div>
-      ) : (
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => { setMode('login'); setError(''); setPassword('') }}
-            className="text-sm text-[var(--color-link)] hover:underline cursor-pointer"
-          >
-            返回登录
-          </button>
-        </div>
-      )}
+        ) : (
+          <>
+            <span className="text-sm text-[var(--color-body)]">
+              {mode === 'login' ? '没有账号？' : '已有账号？'}
+            </span>
+            <button
+              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setPassword('') }}
+              className="text-sm text-[var(--color-link)] hover:underline ml-1 cursor-pointer"
+            >
+              {mode === 'login' ? '去注册' : '去登录'}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

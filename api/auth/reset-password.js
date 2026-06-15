@@ -38,17 +38,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. 通过邮箱查找用户
+    // 1. 查找用户 — 先尝试带 filter 查询
     const searchRes = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users?filter=email&value=eq.${encodeURIComponent(email)}`,
+      `${SUPABASE_URL}/auth/v1/admin/users?filter=email&value=${encodeURIComponent(email)}`,
       { headers }
     )
-    if (!searchRes.ok) {
-      const text = await searchRes.text()
-      return res.status(200).json({ success: false, error: `查找用户失败: ${searchRes.status}` })
+    let users = []
+    if (searchRes.ok) {
+      const searchData = await searchRes.json()
+      users = searchData?.users || []
     }
-    const searchData = await searchRes.json()
-    const users = searchData?.users || []
+
+    // 如果 filter 查询没结果，全量拉取手动匹配
+    if (users.length === 0) {
+      const allRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, { headers })
+      if (allRes.ok) {
+        const allData = await allRes.json()
+        users = (allData?.users || []).filter((u) => u.email === email.toLowerCase())
+      }
+    }
+
     const user = users[0]
     if (!user) {
       return res.status(200).json({ success: false, error: '该邮箱未注册' })

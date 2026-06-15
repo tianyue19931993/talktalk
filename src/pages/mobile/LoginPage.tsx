@@ -153,16 +153,15 @@ export default function LoginPage() {
         const { data, error } = await signUp(email, password)
         if (error) { setError(error); setLoading(false); return }
 
-        // 判断注册后是否直接返回了 session（邮箱验证关闭时）
-        if (data?.access_token) {
-          // 直接拿到 session，无需额外登录
-          const { saveSession } = await import('../../lib/supabase-auth')
-          saveSession({
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-            expiresAt: data.expires_at,
-            user: { id: data.user?.id || '', email: email.trim() },
-          })
+        // signUp 已自动保存 session（邮箱验证关闭时直接返回）
+        // 如果没有 session（邮箱验证开启时），尝试登录
+        if (!data?.accessToken) {
+          const { error: loginError } = await signIn(email, password)
+          if (loginError) {
+            setError('注册成功，请前往邮箱验证后登录')
+            setLoading(false)
+            return
+          }
         }
       }
 

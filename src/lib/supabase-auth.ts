@@ -175,11 +175,30 @@ export async function authedRequest<T>(
 // ============================================================
 
 /** 注册 */
-export async function signUp(email: string, password: string): Promise<AuthResponse<any>> {
-  return authRequest('/signup', {
+export async function signUp(email: string, password: string): Promise<AuthResponse<AuthSession>> {
+  const { data, error } = await authRequest<any>('/signup', {
     method: 'POST',
     body: { email, password },
   })
+
+  if (error || !data) return { data: null, error }
+
+  // 邮箱验证关闭时，signup 直接返回 session
+  if (data.access_token) {
+    const session: AuthSession = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: data.expires_at,
+      user: {
+        id: data.user?.id || data.id,
+        email: data.user?.email || email,
+      },
+    }
+    saveSession(session)
+    return { data: session, error: null }
+  }
+
+  return { data, error: null }
 }
 
 /** 登录 */

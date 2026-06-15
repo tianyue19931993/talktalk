@@ -85,7 +85,7 @@ export default async (req, res) => {
 
     // 调微信支付统一下单（Native 扫码模式）
     const paymentResult = await unifiedOrder({
-      description: `TalkTalk ${plan.name}`,
+      description: `成长表达实验室 M ${plan.name}`,
       outTradeNo: orderNo,
       amount: priceInYuan,
     })

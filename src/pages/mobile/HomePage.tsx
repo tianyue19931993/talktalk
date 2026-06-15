@@ -215,7 +215,7 @@ export default function HomePage() {
             <div className="pt-2 border-t border-[var(--color-hairline)]">
               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-blue-600 bg-blue-50">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                生成中
+                生成中，请耐心等待 1～3 分钟
               </span>
             </div>
           )}
@@ -249,7 +249,7 @@ export default function HomePage() {
                 <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
                   isRecent ? 'text-yellow-600 bg-yellow-50' : 'text-yellow-600 bg-yellow-50'
                 }`}>
-                  {isRecent ? '生成中' : '待生成'}
+                  {isRecent ? '生成中，请耐心等待 1～3 分钟' : '待生成'}
                 </span>
               </div>
             )

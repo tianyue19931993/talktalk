@@ -168,7 +168,7 @@ export default function MyQuestionsPage() {
             const st = demos.length > 0
               ? { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
               : isRecent
-                ? { label: '生成中', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+                ? { label: '生成中，请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
                 : { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
             const StatusIcon = st.icon
             return (

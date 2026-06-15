@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Lock, Crown } from 'lucide-react'
+import { ArrowLeft, Lock, Crown, Download } from 'lucide-react'
 import { useAuth } from '../stores/authStore'
 import { canViewDemo } from '../lib/supabase-auth'
 import { Button } from '../components/ui/Button'
@@ -56,6 +56,36 @@ export default function ExperimentPage() {
 
   const hasAccess = isLoggedIn && canViewDemo(subscription)
   const experimentType = useMemo(() => (analysisJson ? detectType(analysisJson) : null), [analysisJson])
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  /** 下载当前实验为独立 HTML 文件 */
+  const handleDownload = useCallback(() => {
+    const el = contentRef.current
+    if (!el || !analysisJson) return
+
+    const styles = Array.from(document.styleSheets)
+      .map((ss) => {
+        try { return Array.from(ss.cssRules || []).map((r) => r.cssText).join('\n') }
+        catch { return '' }
+      })
+      .filter(Boolean)
+      .join('\n')
+
+    const label = experimentType === 'comparison' ? '比较关系'
+      : experimentType === 'fraction' ? '分数模型'
+      : experimentType === 'area' ? '面积模型'
+      : '互动实验'
+
+    const html = `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">\n<title>${label} - 互动演示</title>\n<style>\n*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}\nbody{background:#FAFAFA;color:#4D4D4D;padding:16px;display:flex;justify-content:center;min-height:100vh}\n.max-w-xl{max-width:600px;width:100%}\n${styles}\n</style>\n</head>\n<body>\n<div class="max-w-xl">${el.innerHTML}</div>\n</body>\n</html>`
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${label}_互动演示.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [analysisJson, experimentType])
 
   useEffect(() => {
     if (!demoId || !hasAccess || isLoading) return
@@ -184,12 +214,23 @@ export default function ExperimentPage() {
             <ArrowLeft className="w-4 h-4" />
             返回
           </button>
-          {typeLabel && (
-            <span className="ml-auto text-[10px] text-[var(--color-mute)] uppercase tracking-wider font-medium">{typeLabel}</span>
-          )}
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-full
+                bg-[var(--color-canvas)] border border-[var(--color-hairline)] text-[var(--color-body)]
+                hover:border-[var(--color-mute)] hover:text-[var(--color-ink)] transition-all cursor-pointer"
+            >
+              <Download className="w-3 h-3" />
+              下载
+            </button>
+            {typeLabel && (
+              <span className="text-[10px] text-[var(--color-mute)] uppercase tracking-wider font-medium">{typeLabel}</span>
+            )}
+          </div>
         </div>
       </div>
-      {renderComponent()}
+      <div ref={contentRef}>{renderComponent()}</div>
     </div>
   )
 }

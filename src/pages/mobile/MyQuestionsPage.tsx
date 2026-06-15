@@ -81,7 +81,12 @@ export default function MyQuestionsPage() {
     }
   }
 
-  const downloadHtml = (url: string, label: string) => {
+  const downloadHtml = (url: string, label: string, demoId?: string) => {
+    // 实验组件 → 跳转到 ExperimentPage 下载
+    if (url === '__experiment__' && demoId) {
+      navigate(`/experiment/${demoId}`)
+      return
+    }
     const link = document.createElement('a')
     if (url.startsWith('data:text/html')) {
       const content = decodeURIComponent(url.split(',')[1] || '')
@@ -221,7 +226,7 @@ export default function MyQuestionsPage() {
                           )}
                           {canViewDemo(subscription) && (
                             <button
-                              onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                              onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo', demo.id)}
                               className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
                               title="下载 HTML"
                             >

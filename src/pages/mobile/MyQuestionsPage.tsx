@@ -99,20 +99,19 @@ export default function MyQuestionsPage() {
 
     setSuggestLoading(true)
     setSuggestError('')
+    // 立即显示提示，关闭弹窗
+    setShowSuggestModal(false)
+    setSuggestText('')
+    showToast('请耐心等待 1～3 分钟，在我的互动演示模块刷新页面后查看结果')
+
+    // 后台继续调用优化 API
     try {
-      const result = await optimizeDemo(latestDemo.id, suggestText.trim())
-      if (result.success) {
-        setShowSuggestModal(false)
-        setSuggestText('')
-        showToast('请耐心等待 1～3 分钟，在我的互动演示模块刷新页面后查看结果')
-        await loadAll()
-      } else {
-        setSuggestError(result.error || '优化失败，请重试')
-      }
+      await optimizeDemo(latestDemo.id, suggestText.trim())
     } catch {
-      setSuggestError('优化失败，请重试')
+      // 静默处理，用户稍后刷新即可看到结果
     } finally {
       setSuggestLoading(false)
+      await loadAll()
     }
   }
 
@@ -175,9 +174,10 @@ export default function MyQuestionsPage() {
 
       {/* Toast */}
       {toastVisible && (
-        <div className="fixed top-4 left-4 right-4 z-50 max-w-lg mx-auto">
-          <div className="bg-blue-600 text-white text-sm px-5 py-3 rounded-2xl shadow-lg">
-            <p>🕐 {toastMessage}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-6 py-4 rounded-2xl shadow-xl max-w-xs text-center">
+            <p className="font-medium mb-1">🕐 优化提交成功</p>
+            <p className="text-xs text-amber-600">{toastMessage}</p>
           </div>
         </div>
       )}

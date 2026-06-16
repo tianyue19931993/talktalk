@@ -63,6 +63,14 @@ export default function MyQuestionsPage() {
   const [suggestText, setSuggestText] = useState('')
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [suggestError, setSuggestError] = useState('')
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastVisible, setToastVisible] = useState(false)
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg)
+    setToastVisible(true)
+    setTimeout(() => setToastVisible(false), 6000)
+  }
 
   const handleRegenerate = async (questionId: string) => {
     if (!subscription || !canCreateDemo(subscription)) {
@@ -95,6 +103,8 @@ export default function MyQuestionsPage() {
       const result = await optimizeDemo(latestDemo.id, suggestText.trim())
       if (result.success) {
         setShowSuggestModal(false)
+        setSuggestText('')
+        showToast('请耐心等待 1～3 分钟，在我的互动演示模块刷新页面后查看结果')
         await loadAll()
       } else {
         setSuggestError(result.error || '优化失败，请重试')
@@ -162,6 +172,15 @@ export default function MyQuestionsPage() {
           />
         </div>
       </div>
+
+      {/* Toast */}
+      {toastVisible && (
+        <div className="fixed top-4 left-4 right-4 z-50 max-w-lg mx-auto">
+          <div className="bg-blue-600 text-white text-sm px-5 py-3 rounded-2xl shadow-lg">
+            <p>🕐 {toastMessage}</p>
+          </div>
+        </div>
+      )}
 
       {/* List */}
       <div className="flex-1 px-5 pt-4 pb-6 space-y-4">

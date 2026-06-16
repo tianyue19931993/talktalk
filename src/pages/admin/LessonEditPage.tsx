@@ -14,7 +14,6 @@ const defaultForm: QuestionForm = {
   typeId: '',
   tags: [],
   question: '',
-  markdown: '',
   htmlDemos: [],
   status: 'draft',
 }
@@ -64,7 +63,6 @@ export default function LessonEditPage() {
           typeId: question.typeId,
           tags: question.tags,
           question: question.question,
-          markdown: question.content.markdown,
           htmlDemos: question.htmlDemos,
           status: question.status,
         })
@@ -253,25 +251,7 @@ export default function LessonEditPage() {
           </div>
         </section>
 
-        {/* Section 3: Markdown explanation */}
-        <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
-          <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">文字讲解</h2>
-          <p className="text-xs text-[var(--color-mute)] mb-2">支持 Markdown 格式</p>
-          <div className="flex flex-col gap-1">
-            <textarea
-              placeholder="输入Markdown格式的讲解内容..."
-              value={form.markdown}
-              onChange={(e) => update('markdown', e.target.value)}
-              rows={12}
-              className="w-full px-4 py-2.5 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
-                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono
-                focus:outline-none focus:border-[var(--color-ink)] focus:ring-1 focus:ring-[var(--color-ink)]
-                transition-colors resize-y"
-            />
-          </div>
-        </section>
-
-        {/* Section 4: HTML Demos */}
+        {/* Section 3: HTML Demos */}
         <section className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-6">
           <h2 className="text-sm font-semibold text-[var(--color-ink)] mb-4">HTML 演示</h2>
           <div className="space-y-3">

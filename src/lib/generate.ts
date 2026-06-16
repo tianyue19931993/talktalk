@@ -31,23 +31,18 @@ export async function generateDemo(
 ): Promise<GenerateResult> {
   try {
     const controller = new AbortController()
-    // 前端超时 60s
     const timeoutId = setTimeout(() => controller.abort(), 60000)
 
     const token = getAccessToken()
 
-    // 构造请求体
     const body: Record<string, any> = {}
 
     if (options?.type === 'submit') {
-      // 新提交：传递 questionText，不传 questionId
       body.questionText = input
     } else if (options?.regenerate || options?.type === 'regenerate') {
-      // 重新生成：传递 questionId + regenerate
       body.questionId = input
       body.regenerate = true
     } else {
-      // 向后兼容：视为 questionId
       body.questionId = input
     }
 
@@ -62,7 +57,6 @@ export async function generateDemo(
     })
     clearTimeout(timeoutId)
 
-    // 先读文本，再尝试解析 JSON
     const text = await res.text()
     if (!text) {
       return { success: false, error: '服务器返回空响应，请稍后重试' }
@@ -81,11 +75,46 @@ export async function generateDemo(
     }
   } catch (e: any) {
     if (e.name === 'AbortError') {
-      return {
-        success: false,
-        error: 'timeout',
-        timedOut: true,
-      }
+      return { success: false, error: 'timeout', timedOut: true }
+    }
+    return { success: false, error: e.message || '网络错误' }
+  }
+}
+
+/**
+ * 根据用户建议优化现有 HTML（不走 analysis / question_types）
+ * 请求: { demoId, suggestions }
+ */
+export async function optimizeDemo(
+  demoId: string,
+  suggestions: string
+): Promise<GenerateResult> {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 90000)
+
+    const token = getAccessToken()
+    const res = await fetch('/api/generate/optimize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ demoId, suggestions }),
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+
+    const text = await res.text()
+    if (!text) return { success: false, error: '服务器返回空响应' }
+    try {
+      return JSON.parse(text)
+    } catch {
+      return { success: false, error: '生成超时', timedOut: true }
+    }
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      return { success: false, error: 'timeout', timedOut: true }
     }
     return { success: false, error: e.message || '网络错误' }
   }

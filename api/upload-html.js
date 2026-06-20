@@ -8,33 +8,51 @@
 
 import crypto from 'crypto'
 
+function urlsafe(s) {
+  const b = typeof s === 'string' ? Buffer.from(s) : s
+  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+}
+
 export default async function handler(req, res) {
+  // 强制禁止缓存（绕过 Cloudflare 缓存）
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  // GET ?action=test → 七牛连接测试
-  if (req.method === 'GET' && req.query.action === 'test') {
+  // GET ?action=test → 七牛连接测试（先验证路由可用）
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`)
+  if (req.method === 'GET' && url.searchParams.get('action') === 'test') {
     const ak = process.env.QINIU_ACCESS_KEY
     const sk = process.env.QINIU_SECRET_KEY
     const domain = process.env.QINIU_DOMAIN
     const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
     const uploadHost = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
 
-    const result = { configured: !!(ak && sk && domain), ak: ak ? `${ak.slice(0,4)}...` : null, domain, bucket, uploadHost }
-    if (!result.configured) {
-      return res.status(200).json({ ...result, error: '缺少七牛环境变量', details: { hasAk: !!ak, hasSk: !!sk, hasDomain: !!domain } })
+    const configured = !!(ak && sk && domain)
+    const result = {
+      ok: true,
+      route: 'api/upload-html?action=test',
+      configured,
+      ak: ak ? `${ak.slice(0, 4)}...` : null,
+      domain,
+      bucket,
+      uploadHost,
+    }
+
+    if (!configured) {
+      return res.status(200).json({ ...result, error: '缺少七牛环境变量' })
     }
 
     try {
-      function urlsafe(s) { const b = typeof s === 'string' ? Buffer.from(s) : s; return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') }
       const testKey = `test/${Date.now()}.txt`
-      const putPolicy = JSON.stringify({ scope: `${bucket}:${testKey}`, deadline: Math.floor(Date.now()/1000)+3600 })
+      const putPolicy = JSON.stringify({ scope: `${bucket}:${testKey}`, deadline: Math.floor(Date.now() / 1000) + 3600 })
       const encodedPolicy = urlsafe(putPolicy)
       const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
-      const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}``
+      const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
+
       const boundary = `----QiniuTest${Date.now()}`
       const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n${token}\r\n`),
@@ -44,9 +62,9 @@ export default async function handler(req, res) {
       ])
       const r = await fetch(uploadHost, { method: 'POST', headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` }, body })
       const text = await r.text()
-      return res.status(200).json({ ...result, uploadStatus: r.status, uploadBody: text.slice(0, 500), testKey })
+      return res.status(200).json({ ...result, uploadStatus: r.status, uploadBody: text.slice(0, 300), testKey })
     } catch (e) {
-      return res.status(200).json({ ...result, error: e.message })
+      return res.status(200).json({ ...result, uploadError: e.message })
     }
   }
 
@@ -67,11 +85,7 @@ export default async function handler(req, res) {
       const folder = type === 'admin' ? 'admin' : 'user'
       const key = `MHTML/${folder}/${refId || 'unknown'}/${Date.now()}.html`
 
-      function urlsafe(s) {
-        const b = typeof s === 'string' ? Buffer.from(s) : s
-        return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
-      }
-      const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now()/1000)+3600 })
+      const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now() / 1000) + 3600 })
       const encodedPolicy = urlsafe(putPolicy)
       const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
       const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`

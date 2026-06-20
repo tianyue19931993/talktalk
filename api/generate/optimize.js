@@ -91,7 +91,7 @@ export default async function handler(req, res) {
         const key = `MHTML/user/${latestDemo.question_id}/${Date.now()}.html`
         function urlsafe(s) {
           const b = typeof s === 'string' ? Buffer.from(s) : s
-          return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+          return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')
         }
         const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now()/1000)+3600 })
         const encodedPolicy = urlsafe(putPolicy)

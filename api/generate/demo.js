@@ -503,7 +503,7 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 /** URL Safe Base64 */
 function urlsafe(s) {
   const b = typeof s === 'string' ? Buffer.from(s) : s
-  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')
 }
 
 /**

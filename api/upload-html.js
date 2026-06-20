@@ -10,7 +10,7 @@ import crypto from 'crypto'
 
 function urlsafe(s) {
   const b = typeof s === 'string' ? Buffer.from(s) : s
-  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')
 }
 
 export default async function handler(req, res) {

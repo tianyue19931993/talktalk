@@ -198,8 +198,8 @@ export default async function handler(req, res) {
             systemPrompt: fallbackPrompt,
             prompt: `题目原文：\n\n${question.question_text}`,
             temperature: 0.6,
-            maxTokens: 4096,
-            timeoutSeconds: 7,
+            maxTokens: 16384,
+            timeoutSeconds: 9,
           })
           if (!htmlResult.success || !htmlResult.content) {
             await patchQuestionFull(actualQuestionId, { status: 'pending' })
@@ -430,8 +430,8 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
         systemPrompt: htmlTemplate,
         prompt: `以下是题目的结构化分析数据，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
         temperature: 0.6,
-        maxTokens: 4096,
-        timeoutSeconds: 7,
+        maxTokens: 16384,
+        timeoutSeconds: 9,
       })
       if (!htmlResult.success || !htmlResult.content) {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })

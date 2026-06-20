@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTypes, addType, updateType, deleteType, subscribe } from '../../stores/appStore'
+import { getTypes, addType, updateType, deleteType, subscribe, refreshStore } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Plus, Pencil, Trash2, Check, X, BookType, FileText } from 'lucide-react'
@@ -32,6 +32,8 @@ export default function TypeManagePage() {
   const [batchText, setBatchText] = useState('')
 
   useEffect(() => {
+    // 页面挂载时刷新数据
+    refreshStore()
     const unsub = subscribe(() => setTick((t) => t + 1))
     return unsub
   }, [])

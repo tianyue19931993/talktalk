@@ -7,6 +7,7 @@ import crypto from 'crypto'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   const ak = process.env.QINIU_ACCESS_KEY
   const sk = process.env.QINIU_SECRET_KEY

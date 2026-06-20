@@ -77,13 +77,35 @@ export default function MyQuestionsPage() {
       alert('当前套餐不支持创建互动演示，请升级会员')
       return
     }
-    // 显示建议弹窗
+
     const demos = demosMap[questionId] || []
-    setSuggestQuestionId(questionId)
-    setSuggestDemos(demos)
-    setSuggestText('')
-    setSuggestError('')
-    setShowSuggestModal(true)
+
+    if (demos.length > 0) {
+      // 有 demo → 弹出优化建议弹窗（走 optimizeDemo）
+      setSuggestQuestionId(questionId)
+      setSuggestDemos(demos)
+      setSuggestText('')
+      setSuggestError('')
+      setShowSuggestModal(true)
+    } else {
+      // 没有 demo（待生成）→ 直接重新走完整 AI 生成链路
+      setRegenerating((prev) => ({ ...prev, [questionId]: true }))
+      try {
+        const result = await generateDemo(questionId, { type: 'regenerate' })
+        if (result.success) {
+          showToast('✅ 重新生成成功！')
+        } else if (result.timedOut) {
+          showToast('⏱ 生成超时，请稍后刷新查看')
+        } else {
+          showToast(result.error ? `❌ ${result.error}` : '❌ 重新生成失败')
+        }
+      } catch {
+        showToast('❌ 操作失败，请重试')
+      } finally {
+        setRegenerating((prev) => ({ ...prev, [questionId]: false }))
+        await loadAll()
+      }
+    }
   }
 
   const handleSubmitOptimize = async () => {

@@ -14,6 +14,7 @@
  */
 
 import { callAI } from '../lib/ai.js'
+import crypto from 'crypto'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -499,6 +500,15 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 /**
  * 将 HTML 内容存入可访问的存储（优先 Kodo，降级 data:URL）
  */
+/** URL Safe Base64 */
+function urlsafe(s) {
+  const b = typeof s === 'string' ? Buffer.from(s) : s
+  return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+}
+
+/**
+ * 将 HTML 内容存入七牛 Kodo（优先），失败降级 data:URL
+ */
 async function saveHtmlToStorage(htmlContent, questionId) {
   const ak = process.env.QINIU_ACCESS_KEY
   const sk = process.env.QINIU_SECRET_KEY
@@ -507,21 +517,17 @@ async function saveHtmlToStorage(htmlContent, questionId) {
 
   if (ak && sk && domain) {
     try {
-      const crypto = await import('crypto')
       const key = `MHTML/user/${questionId}/${Date.now()}.html`
-      function urlsafe(s) {
-        const b = typeof s === 'string' ? Buffer.from(s) : s
-        return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
-      }
       const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now()/1000)+3600 })
       const encodedPolicy = urlsafe(putPolicy)
-      const sign = crypto.default.createHmac('sha1', sk).update(encodedPolicy).digest()
-      const encodedSign = urlsafe(sign)
-      const token = `${ak}:${encodedSign}:${encodedPolicy}`
+      const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
+      const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
+
       const formData = new FormData()
       formData.append('token', token)
       formData.append('key', key)
-      formData.append('file', new Blob([htmlContent], { type: 'text/html; charset=utf-8' }))
+      formData.append('file', new Blob([htmlContent], { type: 'text/html; charset=utf-8' }), `${Date.now()}.html`)
+
       const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
       const res = await fetch(host, { method: 'POST', body: formData })
       if (res.ok) return `${domain}/${key}`

@@ -6,6 +6,8 @@
  * 响应:   { success: true, url: "..." } | { success: false, error: "..." }
  */
 
+import crypto from 'crypto'
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -26,7 +28,6 @@ export default async function handler(req, res) {
     const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
 
     if (ak && sk && domain) {
-      const crypto = await import('crypto')
       const folder = type === 'admin' ? 'admin' : 'user'
       const key = `MHTML/${folder}/${refId || 'unknown'}/${Date.now()}.html`
 
@@ -36,14 +37,13 @@ export default async function handler(req, res) {
       }
       const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now()/1000)+3600 })
       const encodedPolicy = urlsafe(putPolicy)
-      const sign = crypto.default.createHmac('sha1', sk).update(encodedPolicy).digest()
-      const encodedSign = urlsafe(sign)
-      const token = `${ak}:${encodedSign}:${encodedPolicy}`
+      const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
+      const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
 
       const formData = new FormData()
       formData.append('token', token)
       formData.append('key', key)
-      formData.append('file', new Blob([content], { type: 'text/html; charset=utf-8' }))
+      formData.append('file', new Blob([content], { type: 'text/html; charset=utf-8' }), `${Date.now()}.html`)
 
       const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
       const r = await fetch(host, { method: 'POST', body: formData })

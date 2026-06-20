@@ -284,25 +284,25 @@ export default function TypeManagePage() {
                       </div>
                     ) : (
                       <div>
-                        <div className="flex items-start gap-2 mb-2">
+                        <div className="flex items-start gap-3 mb-2">
                           <span className="text-sm text-[var(--color-ink)] font-medium shrink-0 min-w-[64px]">{t.name}</span>
-                          <div className="flex flex-wrap gap-1.5 min-w-0">
+                          <div className="flex flex-wrap gap-2 min-w-0 text-[11px] text-[var(--color-body)]">
                             {t.discoveryFlow && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] leading-tight rounded-full bg-purple-50 text-purple-700 border border-purple-100 max-w-[160px]">
-                                <span>🧠</span>
-                                <span className="truncate">{t.discoveryFlow.split('\n')[0]}</span>
+                              <span className="truncate max-w-[200px]">
+                                <span className="text-[var(--color-mute)] font-medium">discovery_flow: </span>
+                                {t.discoveryFlow.split('\n')[0]}
                               </span>
                             )}
                             {t.interactionFlow && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] leading-tight rounded-full bg-blue-50 text-blue-700 border border-blue-100 max-w-[160px]">
-                                <span>👆</span>
-                                <span className="truncate">{t.interactionFlow.split('\n')[0]}</span>
+                              <span className="truncate max-w-[200px]">
+                                <span className="text-[var(--color-mute)] font-medium">interaction_flow: </span>
+                                {t.interactionFlow.split('\n')[0]}
                               </span>
                             )}
                             {t.animationFlow && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] leading-tight rounded-full bg-pink-50 text-pink-700 border border-pink-100 max-w-[160px]">
-                                <span>👀</span>
-                                <span className="truncate">{t.animationFlow.split('\n')[0]}</span>
+                              <span className="truncate max-w-[200px]">
+                                <span className="text-[var(--color-mute)] font-medium">animation_flow: </span>
+                                {t.animationFlow.split('\n')[0]}
                               </span>
                             )}
                           </div>

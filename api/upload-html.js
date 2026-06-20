@@ -6,8 +6,6 @@
  * 响应:   { success: true, url: "..." } | { success: false, error: "..." }
  */
 
-import { uploadHtml, isQiniuConfigured } from '../lib/qiniu.js'
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -16,18 +14,46 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' })
 
-  if (!isQiniuConfigured()) {
-    return res.status(200).json({ success: false, error: '七牛存储未配置' })
-  }
-
   const { content, type, refId } = req.body
   if (!content) return res.status(400).json({ success: false, error: 'content 是必需的' })
 
   try {
-    const folder = type === 'admin' ? 'admin' : 'user'
-    const key = `MHTML/${folder}/${refId || 'unknown'}/${Date.now()}.html`
-    const url = await uploadHtml(content, key)
-    return res.status(200).json({ success: true, url, key })
+    let url = ''
+
+    const ak = process.env.QINIU_ACCESS_KEY
+    const sk = process.env.QINIU_SECRET_KEY
+    const domain = process.env.QINIU_DOMAIN
+    const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
+
+    if (ak && sk && domain) {
+      const crypto = await import('crypto')
+      const folder = type === 'admin' ? 'admin' : 'user'
+      const key = `MHTML/${folder}/${refId || 'unknown'}/${Date.now()}.html`
+
+      function urlsafe(s) {
+        const b = typeof s === 'string' ? Buffer.from(s) : s
+        return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+      }
+      const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now()/1000)+3600 })
+      const encodedPolicy = urlsafe(putPolicy)
+      const sign = crypto.default.createHmac('sha1', sk).update(encodedPolicy).digest()
+      const encodedSign = urlsafe(sign)
+      const token = `${ak}:${encodedSign}:${encodedPolicy}`
+
+      const formData = new FormData()
+      formData.append('token', token)
+      formData.append('key', key)
+      formData.append('file', new Blob([content], { type: 'text/html; charset=utf-8' }))
+
+      const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
+      const r = await fetch(host, { method: 'POST', body: formData })
+      if (r.ok) url = `${domain}/${key}`
+    }
+
+    if (!url) {
+      url = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
+    }
+    return res.status(200).json({ success: true, url })
   } catch (e) {
     console.error('[upload-html] error:', e.message)
     return res.status(200).json({ success: false, error: e.message || '上传失败' })

@@ -253,12 +253,32 @@ export default async function handler(req, res) {
       if (matchedType) {
         questionTypeId = matchedType.id
         htmlTemplate = matchedType.html_prompt || ''
+        // 收集题型所有字段（包括三个 flow）
+        const typeName = matchedType.name || ''
+        const typeDiscoveryFlow = matchedType.discovery_flow || ''
+        const typeInteractionFlow = matchedType.interaction_flow || ''
+        const typeAnimationFlow = matchedType.animation_flow || ''
 
         // ── Step 3: 结构化分析（使用 analysis_prompt）──
         if (matchedType.analysis_prompt) {
+          const flowInfo = [
+            typeDiscoveryFlow && `🧠 思维引导流程：\n${typeDiscoveryFlow}`,
+            typeInteractionFlow && `👆 交互操作流程：\n${typeInteractionFlow}`,
+            typeAnimationFlow && `👀 视觉呈现流程：\n${typeAnimationFlow}`,
+          ].filter(Boolean).join('\n\n')
+
           const analysisResult = await callAI({
             systemPrompt: matchedType.analysis_prompt,
-            prompt: `请分析以下数学题：\n\n${question.question_text}`,
+            prompt: [
+              `请分析以下数学题：`,
+              `题目原文：\n${question.question_text}`,
+              ``,
+              `--- 题型信息 ---`,
+              `题型名称：${typeName}`,
+              flowInfo ? `\n${flowInfo}` : '',
+              ``,
+              `请结合上述题型信息和流程指导，对题目进行结构化分析，输出符合要求的 JSON。`,
+            ].filter(Boolean).join('\n'),
             responseFormat: 'json_object',
             temperature: 0.5,
             maxTokens: 2048,

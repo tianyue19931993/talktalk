@@ -13,12 +13,18 @@ export default function TypeManagePage() {
   const [newDesc, setNewDesc] = useState('')
   const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
   const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
+  const [newDiscoveryFlow, setNewDiscoveryFlow] = useState('')
+  const [newInteractionFlow, setNewInteractionFlow] = useState('')
+  const [newAnimationFlow, setNewAnimationFlow] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editAnalysisPrompt, setEditAnalysisPrompt] = useState('')
   const [editHtmlPrompt, setEditHtmlPrompt] = useState('')
+  const [editDiscoveryFlow, setEditDiscoveryFlow] = useState('')
+  const [editInteractionFlow, setEditInteractionFlow] = useState('')
+  const [editAnimationFlow, setEditAnimationFlow] = useState('')
 
   const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null)
 
@@ -45,6 +51,9 @@ export default function TypeManagePage() {
     setNewAnalysisPrompt('')
     setNewHtmlPrompt('')
     setShowNewForm(false)
+    setNewDiscoveryFlow('')
+    setNewInteractionFlow('')
+    setNewAnimationFlow('')
   }
 
   const startEdit = (t: QuestionType) => {
@@ -178,7 +187,7 @@ export default function TypeManagePage() {
             />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewDiscoveryFlow(''); setNewInteractionFlow(''); setNewAnimationFlow('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>

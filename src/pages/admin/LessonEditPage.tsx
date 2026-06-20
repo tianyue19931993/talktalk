@@ -40,6 +40,7 @@ export default function LessonEditPage() {
         const content = reader.result as string
         // 尝试上传到 Kodo
         let url = ''
+        let uploadErr = ''
         try {
           const res = await fetch('/api/upload-html', {
             method: 'POST',
@@ -51,9 +52,16 @@ export default function LessonEditPage() {
             }),
           })
           const data = await res.json()
-          if (data.success && data.url) url = data.url
-        } catch { /* 静默降级到 data:URL */ }
+          if (data.success && data.url) {
+            url = data.url
+          } else {
+            uploadErr = data.error || '上传失败'
+          }
+        } catch (e: any) {
+          uploadErr = e.message || '网络错误'
+        }
         if (!url) {
+          console.warn('[uploadHtmlDemo] Kodo 上传失败，降级 data:URL:', uploadErr)
           url = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
         }
         const demos = [...form.htmlDemos]

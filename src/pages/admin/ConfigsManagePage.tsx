@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
-import { Pencil, Check, X, Settings, Plus, FileText } from 'lucide-react'
+import { Pencil, Check, X, Settings, Plus } from 'lucide-react'
 
 interface ConfigItem {
   key: string
@@ -89,15 +89,7 @@ export default function ConfigsManagePage() {
     setSaving(false)
   }
 
-  const handleDelete = async (key: string) => {
-    if (!confirm(`确定要删除配置「${key}」吗？`)) return
-    try {
-      await authedRequest(`/configs?key=eq.${key}`, { method: 'DELETE' })
-      await loadConfigs()
-    } catch {
-      alert('删除失败')
-    }
-  }
+
 
   if (!isAdmin) return null
 

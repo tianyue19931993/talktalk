@@ -6,7 +6,7 @@ import { getQuestions } from '../../stores/appStore'
 export default function DemoPage() {
   const { lessonId, demoId } = useParams<{ lessonId: string; demoId: string }>()
   const navigate = useNavigate()
-  const [kodoContent, setKodoContent] = useState<string | null>(null)
+  const [kodoContent, setKodoContent] = useState<string | undefined>(undefined)
 
   const questions = getQuestions()
   const question = questions.find((q) => q.id === lessonId)

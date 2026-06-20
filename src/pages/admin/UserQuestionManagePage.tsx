@@ -189,7 +189,7 @@ export default function UserQuestionManagePage() {
 
 // ─── 行内演示管理组件 ───────────────────────
 
-function InlineDemoManager({ question, demos, onUpload, onPreview, onRemove }: {
+function InlineDemoManager({ question: _question, demos, onUpload, onPreview, onRemove }: {
   question: any
   demos: any[]
   onUpload: () => void

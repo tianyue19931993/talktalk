@@ -14,6 +14,7 @@ const defaultForm: QuestionForm = {
   typeId: '',
   tags: [],
   question: '',
+  markdown: '',
   htmlDemos: [],
   status: 'draft',
 }
@@ -80,6 +81,7 @@ export default function LessonEditPage() {
           typeId: question.typeId,
           tags: question.tags,
           question: question.question,
+          markdown: question.content.markdown,
           htmlDemos: question.htmlDemos,
           status: question.status,
         })

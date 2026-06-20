@@ -86,7 +86,7 @@ export default function LoginPage() {
 
       await refreshUserData()
 
-      navigate(redirectPath || -1)
+      if (redirectPath) navigate(redirectPath); else navigate(-1)
     } catch (e: any) {
       setError(e.message || '操作失败')
     }

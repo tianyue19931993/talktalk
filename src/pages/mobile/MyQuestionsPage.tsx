@@ -8,11 +8,7 @@ import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
-const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock },
-  completed: { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle },
-  uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50', icon: CheckCircle },
-}
+
 
 export default function MyQuestionsPage() {
   const navigate = useNavigate()
@@ -58,7 +54,7 @@ export default function MyQuestionsPage() {
 
   const [regenerating, setRegenerating] = useState<Record<string, boolean>>({})
   const [showSuggestModal, setShowSuggestModal] = useState(false)
-  const [suggestQuestionId, setSuggestQuestionId] = useState('')
+  const [, setSuggestQuestionId] = useState('')
   const [suggestDemos, setSuggestDemos] = useState<QuestionDemo[]>([])
   const [suggestText, setSuggestText] = useState('')
   const [suggestLoading, setSuggestLoading] = useState(false)

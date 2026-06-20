@@ -56,7 +56,7 @@ function getComparisonPairs(data: ComparisonData) {
 
 function downloadAsHtml(
   rootEl: HTMLElement | null,
-  question: string,
+  _question: string,
   filename: string
 ) {
   if (!rootEl) return
@@ -109,7 +109,7 @@ export default function ComparisonExperiment({ data }: { data: ComparisonData })
 
   if (!pairs) return null
 
-  const { stateA, stateB, diffVariable, diffTotal, moreVariable, totalChange, isIncrease, sameUnit } = pairs
+  const { stateA, stateB, diffVariable: _diffVariable, diffTotal: _diffTotal, moreVariable, totalChange, isIncrease: _isIncrease, sameUnit } = pairs
 
   const variableIcon = data.objects.find((o) => o.type === 'variable')?.icon || '📦'
   const baseIcon = data.objects.find((o) => o.type === 'base')?.icon || '📦'

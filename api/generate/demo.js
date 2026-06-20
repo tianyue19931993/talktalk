@@ -198,8 +198,8 @@ export default async function handler(req, res) {
             systemPrompt: fallbackPrompt,
             prompt: `题目原文：\n\n${question.question_text}`,
             temperature: 0.6,
-            maxTokens: 8192,
-            timeoutSeconds: 25,
+            maxTokens: 4096,
+            timeoutSeconds: 7,
           })
           if (!htmlResult.success || !htmlResult.content) {
             await patchQuestionFull(actualQuestionId, { status: 'pending' })
@@ -260,6 +260,17 @@ export default async function handler(req, res) {
         const typeInteractionFlow = matchedType.interaction_flow || ''
         const typeAnimationFlow = matchedType.animation_flow || ''
 
+        // 先保存题型信息（即使后续超时，至少题型已记录）
+        await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${actualQuestionId}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            question_type_id: questionTypeId,
+            question_type: typeName,
+            status: 'pending',
+          }),
+        })
+
         // ── Step 3: 结构化分析（使用 analysis_prompt）──
         if (matchedType.analysis_prompt) {
           const flowInfo = [
@@ -283,7 +294,7 @@ export default async function handler(req, res) {
             responseFormat: 'json_object',
             temperature: 0.5,
             maxTokens: 2048,
-            timeoutSeconds: 8,
+            timeoutSeconds: 5,
           })
           if (!analysisResult.success) throw new Error(`AI 分析失败: ${analysisResult.error}`)
 
@@ -294,13 +305,11 @@ export default async function handler(req, res) {
           }
         }
 
-        // 保存题型 + 分析结果（不设 completed，等 HTML 生成后才设）
+        // 保存分析结果（即使后续 HTML 生成超时，分析结果已落库）
         await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${actualQuestionId}`, {
           method: 'PATCH',
           headers,
           body: JSON.stringify({
-            question_type_id: questionTypeId,
-            question_type: questionTypeName,
             analysis_json: analysisJson,
           }),
         })
@@ -421,8 +430,8 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
         systemPrompt: htmlTemplate,
         prompt: `以下是题目的结构化分析数据，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
         temperature: 0.6,
-        maxTokens: 8192,
-        timeoutSeconds: 25,
+        maxTokens: 4096,
+        timeoutSeconds: 7,
       })
       if (!htmlResult.success || !htmlResult.content) {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })

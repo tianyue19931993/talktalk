@@ -67,7 +67,7 @@ export default async function handler(req, res) {
       prompt: `以下是现有的 HTML 演示代码：\n\n\`\`\`html\n${currentHtml.slice(0, 30000)}\n\`\`\`\n\n用户的修改意见：\n${suggestions}\n\n请根据上述意见优化这个 HTML 文件，输出完整的 HTML 代码。`,
       temperature: 0.6,
       maxTokens: 8192,
-      timeoutSeconds: 30,
+      timeoutSeconds: 8,
     })
 
     if (!aiResult.success || !aiResult.content) {

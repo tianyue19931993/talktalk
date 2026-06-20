@@ -68,6 +68,9 @@ export default function TypeManagePage() {
 
   const cancelEdit = () => {
     setEditingId(null)
+    setEditDiscoveryFlow('')
+    setEditInteractionFlow('')
+    setEditAnimationFlow('')
   }
 
   const handleDelete = () => {
@@ -136,6 +139,44 @@ export default function TypeManagePage() {
                 focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
             />
           </div>
+
+          {/* 三个流程字段 */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[var(--color-body)]">🧠 discovery_flow（思维引导）</label>
+            <textarea
+              placeholder="设计孩子脑子里的路..."
+              value={newDiscoveryFlow}
+              onChange={(e) => setNewDiscoveryFlow(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
+                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[var(--color-body)]">👆 interaction_flow（交互操作）</label>
+            <textarea
+              placeholder="设计孩子手上的路..."
+              value={newInteractionFlow}
+              onChange={(e) => setNewInteractionFlow(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
+                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[var(--color-body)]">👀 animation_flow（视觉呈现）</label>
+            <textarea
+              placeholder="设计孩子眼睛看到的路..."
+              value={newAnimationFlow}
+              onChange={(e) => setNewAnimationFlow(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
+                focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
+            />
+          </div>
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt('') }}>
               取消
@@ -197,6 +238,27 @@ export default function TypeManagePage() {
                           onChange={(e) => setEditHtmlPrompt(e.target.value)}
                           placeholder="给 AI 的 HTML 生成提示词"
                           rows={4}
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
+                        />
+                        <textarea
+                          value={editDiscoveryFlow}
+                          onChange={(e) => setEditDiscoveryFlow(e.target.value)}
+                          placeholder="🧠 discovery_flow（思维引导）"
+                          rows={1}
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
+                        />
+                        <textarea
+                          value={editInteractionFlow}
+                          onChange={(e) => setEditInteractionFlow(e.target.value)}
+                          placeholder="👆 interaction_flow（交互操作）"
+                          rows={1}
+                          className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
+                        />
+                        <textarea
+                          value={editAnimationFlow}
+                          onChange={(e) => setEditAnimationFlow(e.target.value)}
+                          placeholder="👀 animation_flow（视觉呈现）"
+                          rows={1}
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)] font-mono resize-y"
                         />
                       </div>

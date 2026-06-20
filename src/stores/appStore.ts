@@ -45,6 +45,9 @@ function rowToType(row: any): QuestionType {
     description: row.description || '',
     analysisPrompt: row.analysis_prompt || '',
     htmlPrompt: row.html_prompt || '',
+    discoveryFlow: row.discovery_flow || '',
+    interactionFlow: row.interaction_flow || '',
+    animationFlow: row.animation_flow || '',
     createdAt: row.created_at?.slice(0, 10) || '',
     updatedAt: row.updated_at?.slice(0, 10) || '',
   }
@@ -154,25 +157,31 @@ export function deleteQuestion(id: string) {
   })
 }
 
-export async function addType(data: { name: string; description?: string; analysisPrompt?: string; htmlPrompt?: string }): Promise<QuestionType> {
+export async function addType(data: { name: string; description?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', {
     name: data.name,
     description: data.description || '',
     analysis_prompt: data.analysisPrompt || '',
     html_prompt: data.htmlPrompt || '',
+    discovery_flow: data.discoveryFlow || '',
+    interaction_flow: data.interactionFlow || '',
+    animation_flow: data.animationFlow || '',
   })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
   const t = rowToType(r.data[0]); types = [...types, t]; notify()
   return t
 }
 
-export async function updateType(id: string, data: { name?: string; description?: string; analysisPrompt?: string; htmlPrompt?: string }) {
+export async function updateType(id: string, data: { name?: string; description?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
-  const p: any = {};
+  const p: Record<string, string> = {};
   if (data.name !== undefined) p.name = data.name
   if (data.description !== undefined) p.description = data.description
   if (data.analysisPrompt !== undefined) p.analysis_prompt = data.analysisPrompt
   if (data.htmlPrompt !== undefined) p.html_prompt = data.htmlPrompt
+  if (data.discoveryFlow !== undefined) p.discovery_flow = data.discoveryFlow
+  if (data.interactionFlow !== undefined) p.interaction_flow = data.interactionFlow
+  if (data.animationFlow !== undefined) p.animation_flow = data.animationFlow
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames(); notify()
   supdate('question_types', 'id', parseInt(id, 10), p).catch((e) => {

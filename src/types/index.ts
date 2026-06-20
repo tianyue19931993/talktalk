@@ -5,6 +5,9 @@ export interface QuestionType {
   description?: string
   analysisPrompt?: string
   htmlPrompt?: string
+  discoveryFlow?: string
+  interactionFlow?: string
+  animationFlow?: string
   createdAt: string
   updatedAt: string
 }

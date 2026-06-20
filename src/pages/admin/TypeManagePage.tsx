@@ -47,6 +47,9 @@ export default function TypeManagePage() {
       description: newDesc.trim(),
       analysisPrompt: newAnalysisPrompt.trim(),
       htmlPrompt: newHtmlPrompt.trim(),
+      discoveryFlow: newDiscoveryFlow.trim(),
+      interactionFlow: newInteractionFlow.trim(),
+      animationFlow: newAnimationFlow.trim(),
     })
     setNewName('')
     setNewDesc('')
@@ -64,6 +67,9 @@ export default function TypeManagePage() {
     setEditDesc(t.description || '')
     setEditAnalysisPrompt(t.analysisPrompt || '')
     setEditHtmlPrompt(t.htmlPrompt || '')
+    setEditDiscoveryFlow(t.discoveryFlow || '')
+    setEditInteractionFlow(t.interactionFlow || '')
+    setEditAnimationFlow(t.animationFlow || '')
   }
 
   const handleUpdate = () => {
@@ -73,6 +79,9 @@ export default function TypeManagePage() {
       description: editDesc.trim(),
       analysisPrompt: editAnalysisPrompt.trim(),
       htmlPrompt: editHtmlPrompt.trim(),
+      discoveryFlow: editDiscoveryFlow.trim(),
+      interactionFlow: editInteractionFlow.trim(),
+      animationFlow: editAnimationFlow.trim(),
     })
     setEditingId(null)
   }
@@ -278,6 +287,36 @@ export default function TypeManagePage() {
                         <span className="text-sm text-[var(--color-ink)] font-medium">{t.name}</span>
                         {t.description && (
                           <p className="text-xs text-[var(--color-mute)] mt-0.5">{t.description}</p>
+                        )}
+                        {t.analysisPrompt && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-[var(--color-link)] cursor-pointer hover:opacity-80">分析 Prompt</summary>
+                            <pre className="mt-1 p-2 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)] text-[10px] text-[var(--color-body)] whitespace-pre-wrap overflow-auto max-h-28">{t.analysisPrompt}</pre>
+                          </details>
+                        )}
+                        {t.htmlPrompt && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-[var(--color-link)] cursor-pointer hover:opacity-80">HTML Prompt</summary>
+                            <pre className="mt-1 p-2 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)] text-[10px] text-[var(--color-body)] whitespace-pre-wrap overflow-auto max-h-28">{t.htmlPrompt}</pre>
+                          </details>
+                        )}
+                        {t.discoveryFlow && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-[var(--color-link)] cursor-pointer hover:opacity-80">🧠 discovery_flow（思维引导）</summary>
+                            <pre className="mt-1 p-2 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)] text-[10px] text-[var(--color-body)] whitespace-pre-wrap overflow-auto max-h-28">{t.discoveryFlow}</pre>
+                          </details>
+                        )}
+                        {t.interactionFlow && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-[var(--color-link)] cursor-pointer hover:opacity-80">👆 interaction_flow（交互操作）</summary>
+                            <pre className="mt-1 p-2 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)] text-[10px] text-[var(--color-body)] whitespace-pre-wrap overflow-auto max-h-28">{t.interactionFlow}</pre>
+                          </details>
+                        )}
+                        {t.animationFlow && (
+                          <details className="mt-1">
+                            <summary className="text-xs text-[var(--color-link)] cursor-pointer hover:opacity-80">👀 animation_flow（视觉呈现）</summary>
+                            <pre className="mt-1 p-2 bg-[var(--color-canvas-soft)] rounded-[var(--radius-sm)] text-[10px] text-[var(--color-body)] whitespace-pre-wrap overflow-auto max-h-28">{t.animationFlow}</pre>
+                          </details>
                         )}
                       </div>
                     )}

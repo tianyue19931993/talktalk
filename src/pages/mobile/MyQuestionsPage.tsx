@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw, Lock } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
@@ -58,13 +58,19 @@ export default function MyQuestionsPage() {
     setRegenerating(prev => new Set(prev).add(q.id))
     try {
       const result = await generateDemo(q.questionText, { type: 'submit' })
+      if (result.timedOut || result.error === 'timeout') {
+        // 超时但后端可能还在跑 → 不报错，提示用户稍等
+        setTimeout(() => loadAll(), 5000)
+        return
+      }
       if (result.success) {
         await loadAll()
-      } else {
+      } else if (!result.timedOut) {
         alert(result.error || '重新生成失败，请重试')
       }
     } catch {
-      alert('重新生成失败，请重试')
+      // 网络错误也不弹窗，后端可能已接收请求
+      setTimeout(() => loadAll(), 3000)
     } finally {
       setRegenerating(prev => {
         const next = new Set(prev)
@@ -74,17 +80,32 @@ export default function MyQuestionsPage() {
     }
   }
 
-  const downloadHtml = (url: string, label: string) => {
-    const link = document.createElement('a')
-    if (url.startsWith('data:text/html')) {
-      const content = decodeURIComponent(url.split(',')[1] || '')
-      const blob = new Blob([content], { type: 'text/html' })
-      link.href = URL.createObjectURL(blob)
-    } else {
-      link.href = url
+  const downloadHtml = async (url: string, label: string) => {
+    try {
+      let blobUrl: string | null = null
+      if (url.startsWith('data:text/html')) {
+        const content = decodeURIComponent(url.split(',')[1] || '')
+        blobUrl = URL.createObjectURL(new Blob([content], { type: 'text/html' }))
+      } else if (url.startsWith('http')) {
+        // 七牛直链 → fetch 后下载（避免跨域问题）
+        const res = await fetch(url, { mode: 'cors' })
+        if (!res.ok) throw new Error(`下载失败: ${res.status}`)
+        const content = await res.text()
+        blobUrl = URL.createObjectURL(new Blob([content], { type: 'text/html' }))
+      } else {
+        return
+      }
+      const link = document.createElement('a')
+      link.href = blobUrl || url
+      link.download = `${label || 'demo'}.html`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    } catch (e: any) {
+      console.error('[downloadHtml]', e)
+      alert('下载失败：' + (e.message || '未知错误'))
     }
-    link.download = `${label || 'demo'}.html`
-    link.click()
   }
 
   if (!isLoggedIn) return null
@@ -185,28 +206,27 @@ export default function MyQuestionsPage() {
                   </span>
                 </div>
 
-                {/* regenerate button */}
-                <div className="flex justify-end mb-1">
-                  <button
-                    onClick={() => handleRegenerate(q)}
-                    disabled={regenerating.has(q.id)}
-                    className="inline-flex items-center gap-1 px-3 py-1 text-[10px] font-medium
-                      text-purple-600 bg-purple-50 border border-purple-200
-                      rounded-full hover:bg-purple-100 hover:scale-[1.02] active:scale-[0.98]
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-all duration-200 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${regenerating.has(q.id) ? 'animate-spin' : ''}`} />
-                    重新生成
-                  </button>
-                </div>
-
-                {/* demos */}
+                {/* action buttons row: regenerate + demos */}
                 <div className="pt-2 border-t border-[var(--color-hairline)]">
                   <div className="flex flex-wrap gap-2">
+                    {/* 重新生成 — 始终显示 */}
+                    <button
+                      onClick={() => handleRegenerate(q)}
+                      disabled={regenerating.has(q.id)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                        text-purple-600 bg-purple-50 border border-purple-200
+                        rounded-full hover:bg-purple-100 hover:scale-[1.02] active:scale-[0.98]
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                        transition-all duration-200 cursor-pointer shrink-0"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${regenerating.has(q.id) ? 'animate-spin' : ''}`} />
+                      重新生成
+                    </button>
+
+                    {/* demos */}
                     {demos.length > 0 ? (
                       demos.map((demo) => (
-                        <div key={demo.id} className="flex items-center gap-1.5">
+                        <React.Fragment key={demo.id}>
                           {canViewDemo(subscription) ? (
                             <button
                               onClick={() => navigate(`/my/demo/${demo.id}`)}
@@ -239,10 +259,10 @@ export default function MyQuestionsPage() {
                               <Download className="w-3.5 h-3.5" />
                             </button>
                           )}
-                        </div>
+                        </React.Fragment>
                       ))
                     ) : (
-                      <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
+                      <span className="text-[10px] text-[var(--color-mute)] self-center">暂无演示动画</span>
                     )}
                   </div>
                 </div>

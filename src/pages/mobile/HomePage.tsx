@@ -139,17 +139,17 @@ export default function HomePage() {
         <span className="text-sm text-[var(--color-mute)]">搜索题目、题型、知识点…</span>
       </div>
 
-      {/* 生成题目演示动画板块 */}
+      {/* 应用题可视化演示板块 */}
       <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] shadow-[0_2px_8px_rgba(121,40,202,0.2)]">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <h2 className="text-base font-semibold text-[var(--color-ink)]">生成题目演示动画</h2>
+          <h2 className="text-base font-semibold text-[var(--color-ink)]">应用题可视化演示</h2>
         </div>
 
         <p className="text-xs text-[var(--color-mute)] mb-3">
-          录入题目文字，成长表达实验室 M 将为您生成互动演示动画
+          录入题目文字，成长表达实验室 M 将为您可视化～
         </p>
 
         <div className="flex flex-col gap-2">

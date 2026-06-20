@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Loader2, Search, RefreshCw, Lock, MessageSquare } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw, Lock } from 'lucide-react'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
-import { generateDemo, optimizeDemo } from '../../lib/generate'
+// import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
-import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
+import { canViewDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -52,86 +52,7 @@ export default function MyQuestionsPage() {
     setLoading(false)
   }
 
-  const [regenerating, setRegenerating] = useState<Record<string, boolean>>({})
-  const [showSuggestModal, setShowSuggestModal] = useState(false)
-  const [, setSuggestQuestionId] = useState('')
-  const [suggestDemos, setSuggestDemos] = useState<QuestionDemo[]>([])
-  const [suggestText, setSuggestText] = useState('')
-  const [suggestLoading, setSuggestLoading] = useState(false)
-  const [suggestError, setSuggestError] = useState('')
-  const [toastMessage, setToastMessage] = useState('')
-  const [toastVisible, setToastVisible] = useState(false)
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 6000)
-  }
-
-  const handleRegenerate = async (questionId: string) => {
-    if (!subscription || !canCreateDemo(subscription)) {
-      alert('当前套餐不支持创建互动演示，请升级会员')
-      return
-    }
-
-    const demos = demosMap[questionId] || []
-
-    if (demos.length > 0) {
-      // 有 demo → 弹出优化建议弹窗（走 optimizeDemo）
-      setSuggestQuestionId(questionId)
-      setSuggestDemos(demos)
-      setSuggestText('')
-      setSuggestError('')
-      setShowSuggestModal(true)
-    } else {
-      // 没有 demo（待生成）→ 直接重新走完整 AI 生成链路
-      setRegenerating((prev) => ({ ...prev, [questionId]: true }))
-      try {
-        const result = await generateDemo(questionId, { type: 'regenerate' })
-        if (result.success) {
-          showToast('✅ 重新生成成功！')
-        } else if (result.timedOut) {
-          showToast('⏱ 生成超时，请稍后刷新查看')
-        } else {
-          showToast(result.error ? `❌ ${result.error}` : '❌ 重新生成失败')
-        }
-      } catch {
-        showToast('❌ 操作失败，请重试')
-      } finally {
-        setRegenerating((prev) => ({ ...prev, [questionId]: false }))
-        await loadAll()
-      }
-    }
-  }
-
-  const handleSubmitOptimize = async () => {
-    if (!suggestText.trim()) {
-      setSuggestError('请输入修改意见')
-      return
-    }
-    const latestDemo = suggestDemos[0]
-    if (!latestDemo) {
-      setSuggestError('未找到可优化的演示')
-      return
-    }
-
-    setSuggestLoading(true)
-    setSuggestError('')
-    // 立即显示提示，关闭弹窗
-    setShowSuggestModal(false)
-    setSuggestText('')
-    showToast('请耐心等待 1～3 分钟，在我的互动演示模块刷新页面后查看结果')
-
-    // 后台继续调用优化 API
-    try {
-      await optimizeDemo(latestDemo.id, suggestText.trim())
-    } catch {
-      // 静默处理，用户稍后刷新即可看到结果
-    } finally {
-      setSuggestLoading(false)
-      await loadAll()
-    }
-  }
 
   const downloadHtml = (url: string, label: string) => {
     const link = document.createElement('a')
@@ -190,15 +111,7 @@ export default function MyQuestionsPage() {
         </div>
       </div>
 
-      {/* Toast */}
-      {toastVisible && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-6 py-4 rounded-2xl shadow-xl max-w-xs text-center">
-            <p className="font-medium mb-1">🕐 优化提交成功</p>
-            <p className="text-xs text-amber-600">{toastMessage}</p>
-          </div>
-        </div>
-      )}
+
 
       {/* List */}
       <div className="flex-1 px-5 pt-4 pb-6 space-y-4">
@@ -252,9 +165,9 @@ export default function MyQuestionsPage() {
                   </span>
                 </div>
 
-                {/* demos + 重新生成 */}
-                <div className="flex items-start justify-between gap-2 pt-2 border-t border-[var(--color-hairline)]">
-                  <div className="flex flex-wrap gap-2 flex-1">
+                {/* demos */}
+                <div className="pt-2 border-t border-[var(--color-hairline)]">
+                  <div className="flex flex-wrap gap-2">
                     {demos.length > 0 ? (
                       demos.map((demo) => (
                         <div key={demo.id} className="flex items-center gap-1.5">
@@ -296,20 +209,6 @@ export default function MyQuestionsPage() {
                       <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleRegenerate(q.id)}
-                    disabled={regenerating[q.id]}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium shrink-0
-                      text-[var(--color-link)] bg-[var(--color-link-bg-soft)] rounded-full
-                      hover:bg-blue-100 disabled:opacity-40 transition-colors cursor-pointer"
-                  >
-                    {regenerating[q.id] ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Play className="w-3 h-3" />
-                    )}
-                    {regenerating[q.id] ? '生成中...' : '重新生成'}
-                  </button>
                 </div>
             </div>
           )
@@ -317,54 +216,6 @@ export default function MyQuestionsPage() {
         )}
       </div>
 
-      {/* 优化建议弹窗 */}
-      {showSuggestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l3)] p-6 w-full max-w-sm">
-            <h3 className="text-base font-semibold text-[var(--color-ink)] mb-3">优化互动演示</h3>
-
-            {suggestDemos.length > 0 && (
-              <div className="mb-3">
-                <label className="text-xs text-[var(--color-mute)] block mb-1">基于以下演示进行优化：</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestDemos.slice(0, 3).map((d) => (
-                    <span key={d.id} className="text-[10px] text-[var(--color-link)] bg-[var(--color-link-bg-soft)] px-2 py-0.5 rounded-full">
-                      {d.title || '演示'}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <label className="text-xs text-[var(--color-body)] block mb-1.5">请输入您的修改意见：</label>
-            <textarea
-              placeholder="例如：颜色换成蓝色系、增加动画效果、调整布局更紧凑..."
-              value={suggestText}
-              onChange={(e) => setSuggestText(e.target.value)}
-              rows={5}
-              className="w-full px-4 py-2.5 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
-                text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
-                focus:outline-none focus:border-[var(--color-link)] transition-all resize-y"
-            />
-
-            {suggestError && (
-              <div className="bg-[var(--color-error-soft)] text-[var(--color-error)] text-xs px-3 py-2 rounded-[var(--radius-md)] mt-2">
-                {suggestError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2 mt-4">
-              <Button variant="secondary" size="sm" onClick={() => { setShowSuggestModal(false); setSuggestText(''); setSuggestError('') }}>
-                取消
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSubmitOptimize} loading={suggestLoading}>
-                <MessageSquare className="w-3.5 h-3.5" />
-                提交优化
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

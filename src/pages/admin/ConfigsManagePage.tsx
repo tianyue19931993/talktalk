@@ -38,7 +38,7 @@ export default function ConfigsManagePage() {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/test-qiniu')
+      const res = await fetch('/api/upload-html?action=test')
       const data = await res.json()
       setTestResult(JSON.stringify(data, null, 2))
     } catch (e: any) {

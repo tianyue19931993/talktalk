@@ -5,6 +5,7 @@ import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 // import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
 import { canViewDemo } from '../../lib/supabase-auth'
+import { generateDemo } from '../../lib/generate'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -17,6 +18,7 @@ export default function MyQuestionsPage() {
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [regenerating, setRegenerating] = useState<Set<string>>(new Set())
 
   const filteredQuestions = useMemo(() => {
     if (!search.trim()) return questions
@@ -52,7 +54,25 @@ export default function MyQuestionsPage() {
     setLoading(false)
   }
 
-
+  async function handleRegenerate(q: UserQuestion) {
+    setRegenerating(prev => new Set(prev).add(q.id))
+    try {
+      const result = await generateDemo(q.questionText, { type: 'submit' })
+      if (result.success) {
+        await loadAll()
+      } else {
+        alert(result.error || '重新生成失败，请重试')
+      }
+    } catch {
+      alert('重新生成失败，请重试')
+    } finally {
+      setRegenerating(prev => {
+        const next = new Set(prev)
+        next.delete(q.id)
+        return next
+      })
+    }
+  }
 
   const downloadHtml = (url: string, label: string) => {
     const link = document.createElement('a')
@@ -163,6 +183,22 @@ export default function MyQuestionsPage() {
                   <span className="text-[10px] text-[var(--color-mute)]">
                     {new Date(q.createdAt).toLocaleDateString('zh-CN')}
                   </span>
+                </div>
+
+                {/* regenerate button */}
+                <div className="flex justify-end mb-1">
+                  <button
+                    onClick={() => handleRegenerate(q)}
+                    disabled={regenerating.has(q.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1 text-[10px] font-medium
+                      text-purple-600 bg-purple-50 border border-purple-200
+                      rounded-full hover:bg-purple-100 hover:scale-[1.02] active:scale-[0.98]
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      transition-all duration-200 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${regenerating.has(q.id) ? 'animate-spin' : ''}`} />
+                    重新生成
+                  </button>
                 </div>
 
                 {/* demos */}

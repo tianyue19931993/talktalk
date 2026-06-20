@@ -10,7 +10,8 @@ export default function MyDemoPage() {
   const navigate = useNavigate()
   const { subscription, isLoggedIn, isLoading } = useAuth()
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
-  const [notFound, setNotFound] = useState(false)
+  const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound'>('loading')
 
   // 权限检查：需要有效订阅
   const hasAccess = isLoggedIn && canViewDemo(subscription)
@@ -28,19 +29,36 @@ export default function MyDemoPage() {
     const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
     const demo = data?.[0]
     if (!demo?.html_url) {
-      setNotFound(true)
+      setLoadState('notfound')
       return
     }
 
-    if (demo.html_url.startsWith('data:text/html')) {
+    const url = demo.html_url
+
+    if (url.startsWith('data:text/html')) {
+      // data:URL → 解码后用 srcdoc 渲染
       try {
-        const encoded = demo.html_url.split(',')[1]
+        const encoded = url.split(',')[1]
         setHtmlContent(decodeURIComponent(encoded))
+        setLoadState('ready')
       } catch {
-        setNotFound(true)
+        setLoadState('notfound')
+      }
+    } else if (url.startsWith('http')) {
+      // Kodo URL → 获取内容后用 srcdoc 渲染（避免跨域 iframe 限制）
+      try {
+        const res = await fetch(url)
+        if (!res.ok) { setLoadState('notfound'); return }
+        const content = await res.text()
+        setHtmlContent(content)
+        setLoadState('ready')
+      } catch {
+        // 如果 fetch 失败（CORS 未配置），退而直接用 iframe src
+        setHtmlUrl(url)
+        setLoadState('ready')
       }
     } else {
-      window.location.href = demo.html_url
+      setLoadState('notfound')
     }
   }
 
@@ -74,7 +92,15 @@ export default function MyDemoPage() {
     )
   }
 
-  if (notFound) {
+  if (loadState === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--color-canvas-soft)]">
+        <p className="text-sm text-[var(--color-mute)]">加载中...</p>
+      </div>
+    )
+  }
+
+  if (loadState === 'notfound') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
         <div className="flex flex-col items-center gap-2 text-[var(--color-mute)]">
@@ -103,6 +129,15 @@ export default function MyDemoPage() {
       {htmlContent && (
         <iframe
           srcDoc={htmlContent}
+          title="演示"
+          className="w-full h-full border-0"
+          sandbox="allow-scripts allow-same-origin"
+          allowFullScreen
+        />
+      )}
+      {htmlUrl && (
+        <iframe
+          src={htmlUrl}
           title="演示"
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin"

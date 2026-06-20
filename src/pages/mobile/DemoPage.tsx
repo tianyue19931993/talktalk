@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { getQuestions } from '../../stores/appStore'
@@ -6,6 +6,7 @@ import { getQuestions } from '../../stores/appStore'
 export default function DemoPage() {
   const { lessonId, demoId } = useParams<{ lessonId: string; demoId: string }>()
   const navigate = useNavigate()
+  const [kodoContent, setKodoContent] = useState<string | null>(null)
 
   const questions = getQuestions()
   const question = questions.find((q) => q.id === lessonId)
@@ -26,6 +27,18 @@ export default function DemoPage() {
     }
     return null
   }, [demo])
+
+  // Kodo URL → fetch 后用 srcdoc 渲染
+  useEffect(() => {
+    if (!demo?.url || demo.url.startsWith('data:text/html')) return
+    if (!demo.url.startsWith('http')) return
+    let cancelled = false
+    fetch(demo.url)
+      .then((r) => r.text())
+      .then((content) => { if (!cancelled) setKodoContent(content) })
+      .catch(() => { /* 降级到 iframe src */ })
+    return () => { cancelled = true }
+  }, [demo?.url])
 
   if (!demo) {
     return (
@@ -49,10 +62,10 @@ export default function DemoPage() {
         返回
       </button>
 
-      {/* srcdoc for uploaded HTML, src for external URLs */}
-      {htmlContent ? (
+      {/* srcdoc for uploaded HTML / Kodo content, src for external URLs */}
+      {htmlContent || kodoContent ? (
         <iframe
-          srcDoc={htmlContent}
+          srcDoc={htmlContent || kodoContent}
           title="演示"
           className="w-full h-full border-0"
           sandbox="allow-scripts allow-same-origin"

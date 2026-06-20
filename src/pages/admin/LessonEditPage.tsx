@@ -35,11 +35,28 @@ export default function LessonEditPage() {
       const file = input.files?.[0]
       if (!file) return
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onload = async () => {
         const content = reader.result as string
-        const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
+        // 尝试上传到 Kodo
+        let url = ''
+        try {
+          const res = await fetch('/api/upload/html', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              type: 'admin',
+              refId: id || 'new',
+            }),
+          })
+          const data = await res.json()
+          if (data.success && data.url) url = data.url
+        } catch { /* 静默降级到 data:URL */ }
+        if (!url) {
+          url = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
+        }
         const demos = [...form.htmlDemos]
-        demos[index] = { ...demos[index], url: dataUrl }
+        demos[index] = { ...demos[index], url }
         update('htmlDemos', demos)
       }
       reader.readAsText(file)

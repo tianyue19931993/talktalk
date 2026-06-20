@@ -110,16 +110,38 @@ export async function deleteQuestionDemo(id: string): Promise<void> {
   await authedRequest(`/question_demos?id=eq.${id}`, { method: 'DELETE' })
 }
 
-/** Admin：上传 HTML 文件到题目的演示列表 */
+/** Admin：上传 HTML 文件到题目的演示列表（优先 Kodo，降级 data:URL） */
 export async function adminUploadUserQuestionHtml(questionId: string, file: File): Promise<void> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = async () => {
-      const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(reader.result as string)
+      const content = reader.result as string
       try {
-        // 获取已有 demos 数量用于自动命名
+        // 尝试上传到 Kodo
+        let htmlUrl = ''
+        try {
+          const res = await fetch('/api/upload/html', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              type: 'user',
+              refId: questionId,
+            }),
+          })
+          const data = await res.json()
+          if (data.success && data.url) {
+            htmlUrl = data.url
+          }
+        } catch {
+          // Kodo 上传失败，静默降级
+        }
+        if (!htmlUrl) {
+          htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(content)
+        }
+
         const existing = await getQuestionDemos(questionId)
-        await createQuestionDemo(questionId, dataUrl, `演示 ${existing.length + 1}`)
+        await createQuestionDemo(questionId, htmlUrl, `演示 ${existing.length + 1}`)
         resolve()
       } catch (e) {
         reject(e)

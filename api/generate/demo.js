@@ -14,6 +14,7 @@
  */
 
 import { callAI } from '../lib/ai.js'
+import { uploadHtml, isQiniuConfigured } from '../lib/qiniu.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -213,7 +214,7 @@ export default async function handler(req, res) {
           const fallbackHtmlRaw = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
           const htmlEnd = fallbackHtmlRaw.search(/<\/html>\s*/i)
           const fallbackHtml = htmlEnd !== -1 ? fallbackHtmlRaw.slice(0, htmlEnd + '<\/html>'.length) : fallbackHtmlRaw
-          const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(fallbackHtml)
+          const dataUrl = await saveHtmlToStorage(fallbackHtml, actualQuestionId)
 
           // 标记为 completed（走 temp 不经过 analysis_json 流程）
           await patchQuestionFull(actualQuestionId, {
@@ -444,7 +445,7 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
         .replace(/\$\{question_text\}/g, () => question.question_text)
     }
 
-    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
+    const dataUrl = await saveHtmlToStorage(htmlContent, actualQuestionId)
 
     // ════════════════════════════════════════════════════════════
     // Step 5: 存入 question_demos + 标记 completed
@@ -485,4 +486,19 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
       questionId: actualQuestionId,
     })
   }
+}
+
+/**
+ * 将 HTML 内容存入可访问的存储（优先 Kodo，降级 data:URL）
+ */
+async function saveHtmlToStorage(htmlContent, questionId) {
+  if (isQiniuConfigured()) {
+    try {
+      const key = `MHTML/user/${questionId}/${Date.now()}.html`
+      return await uploadHtml(htmlContent, key)
+    } catch (e) {
+      console.warn('[saveHtmlToStorage] Kodo upload failed, falling back to data:URL:', e.message)
+    }
+  }
+  return 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent)
 }

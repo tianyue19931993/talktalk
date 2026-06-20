@@ -11,6 +11,7 @@
  */
 
 import { callAI } from '../lib/ai.js'
+import { uploadHtml, isQiniuConfigured } from '../lib/qiniu.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -79,16 +80,28 @@ export default async function handler(req, res) {
     const htmlEnd = rawHtml.search(/<\/html>\s*/i)
     const optimizedHtml = htmlEnd !== -1 ? rawHtml.slice(0, htmlEnd + 7) : rawHtml
 
-    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(optimizedHtml)
+    // 5. 存入存储（优先 Kodo，降级 data:URL）
+    let htmlUrl = ''
+    if (isQiniuConfigured()) {
+      try {
+        const key = `MHTML/user/${latestDemo.question_id}/${Date.now()}.html`
+        htmlUrl = await uploadHtml(optimizedHtml, key)
+      } catch (e) {
+        console.warn('[optimize] Kodo upload failed, falling back to data:URL:', e.message)
+      }
+    }
+    if (!htmlUrl) {
+      htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(optimizedHtml)
+    }
 
-    // 5. 存入 question_demos（新记录）
+    // 6. 存入 question_demos（新记录）
     const newTitle = `${latestDemo.title || '演示'}_优化`
     const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         question_id: latestDemo.question_id,
-        html_url: dataUrl,
+        html_url: htmlUrl,
         title: newTitle,
       }),
     })
@@ -99,7 +112,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       demoId: newDemo.id,
-      htmlUrl: dataUrl,
+      htmlUrl,
     })
   } catch (e) {
     console.error('[generate/optimize] error:', e.message)

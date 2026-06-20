@@ -146,10 +146,10 @@ export default async function handler(req, res) {
     // ════════════════════════════════════════════════════════════
     // Step 2-3: AI 识别题型 + 结构化分析
     //
-    // 重新生成（regenerate=true）：重新走完整流程
-    // 已有题型数据（questionTypeId 非空）：跳过分析
+    // 已有题型数据 → 跳过识别和分析（regenerate 也直接复用）
+    //   因为 Vercel Hobby 10s 限制，最多只够跑 1 次 AI 调用
     // ════════════════════════════════════════════════════════════
-    if (!questionTypeId || regenerate) {
+    if (!questionTypeId) {
       // 加载题型字典
       const typesRes = await fetch(
         `${SUPABASE_URL}/rest/v1/question_types?order=id.asc`,

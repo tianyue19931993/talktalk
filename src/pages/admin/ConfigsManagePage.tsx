@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
-import { Pencil, Check, X, Settings, Plus } from 'lucide-react'
+import { Pencil, Check, X, Settings, Plus, Upload } from 'lucide-react'
 
 interface ConfigItem {
   key: string
@@ -26,11 +26,27 @@ export default function ConfigsManagePage() {
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
   const [newDescription, setNewDescription] = useState('')
+  const [testResult, setTestResult] = useState<string | null>(null)
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     if (!isAdmin) return
     loadConfigs()
   }, [isAdmin])
+
+  async function testQiniu() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetch('/api/test-qiniu')
+      const data = await res.json()
+      setTestResult(JSON.stringify(data, null, 2))
+    } catch (e: any) {
+      setTestResult(`请求失败: ${e.message}`)
+    } finally {
+      setTesting(false)
+    }
+  }
 
   async function loadConfigs() {
     setLoading(true)
@@ -101,11 +117,27 @@ export default function ConfigsManagePage() {
           <Settings className="w-5 h-5 text-[var(--color-ink)]" />
           <h1 className="text-lg font-semibold text-[var(--color-ink)]">系统配置</h1>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowNewForm(true)}>
-          <Plus className="w-4 h-4" />
-          新增配置
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={testQiniu} loading={testing}>
+            <Upload className="w-4 h-4" />
+            {testing ? '测试中...' : '测试七牛'}
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setShowNewForm(true)}>
+            <Plus className="w-4 h-4" />
+            新增配置
+          </Button>
+        </div>
       </div>
+
+      {testResult && (
+        <div className="mb-6 p-4 bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] border border-[var(--color-hairline)]">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-[var(--color-ink)]">七牛连接测试结果</h3>
+            <button onClick={() => setTestResult(null)} className="text-xs text-[var(--color-mute)] hover:text-[var(--color-ink)] cursor-pointer">关闭</button>
+          </div>
+          <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--color-body)] max-h-60 overflow-auto">{testResult}</pre>
+        </div>
+      )}
 
       {/* Inline new config form */}
       {showNewForm && (

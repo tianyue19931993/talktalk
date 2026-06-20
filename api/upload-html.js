@@ -6,7 +6,7 @@
  * 响应:   { success: true, url: "..." } | { success: false, error: "..." }
  */
 
-import { uploadHtml, isQiniuConfigured } from './lib/qiniu.js'
+import { uploadHtml, isQiniuConfigured } from '../lib/qiniu.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')

@@ -40,13 +40,20 @@ export default async function handler(req, res) {
       const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
       const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
 
-      const formData = new FormData()
-      formData.append('token', token)
-      formData.append('key', key)
-      formData.append('file', new Blob([content], { type: 'text/html; charset=utf-8' }), `${Date.now()}.html`)
-
+      const boundary = `----QiniuFormBoundary${Date.now()}`
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n${token}\r\n`),
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="key"\r\n\r\n${key}\r\n`),
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${Date.now()}.html"\r\nContent-Type: text/html; charset=utf-8\r\n\r\n`),
+        Buffer.from(content, 'utf-8'),
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ])
       const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
-      const r = await fetch(host, { method: 'POST', body: formData })
+      const r = await fetch(host, {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+        body,
+      })
       if (r.ok) url = `${domain}/${key}`
     }
 

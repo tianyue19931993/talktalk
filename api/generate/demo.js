@@ -507,6 +507,21 @@ function urlsafe(s) {
 }
 
 /**
+ * 构建 multipart/form-data body（手动，不依赖 FormData）
+ */
+function buildMultipart(fields, boundary) {
+  const parts = []
+  for (const { name, value, filename } of fields) {
+    let header = `--${boundary}\r\nContent-Disposition: form-data; name="${name}"`
+    if (filename) header += `; filename="${filename}"\r\nContent-Type: text/html; charset=utf-8`
+    header += '\r\n\r\n'
+    parts.push(Buffer.from(header), typeof value === 'string' ? Buffer.from(value, 'utf-8') : value, Buffer.from('\r\n'))
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`))
+  return Buffer.concat(parts)
+}
+
+/**
  * 将 HTML 内容存入七牛 Kodo（优先），失败降级 data:URL
  */
 async function saveHtmlToStorage(htmlContent, questionId) {
@@ -523,13 +538,19 @@ async function saveHtmlToStorage(htmlContent, questionId) {
       const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
       const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
 
-      const formData = new FormData()
-      formData.append('token', token)
-      formData.append('key', key)
-      formData.append('file', new Blob([htmlContent], { type: 'text/html; charset=utf-8' }), `${Date.now()}.html`)
+      const boundary = `----QiniuFormBoundary${Date.now()}`
+      const body = buildMultipart([
+        { name: 'token', value: token },
+        { name: 'key', value: key },
+        { name: 'file', value: htmlContent, filename: `${Date.now()}.html` },
+      ], boundary)
 
       const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
-      const res = await fetch(host, { method: 'POST', body: formData })
+      const res = await fetch(host, {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+        body,
+      })
       if (res.ok) return `${domain}/${key}`
       const errText = await res.text().catch(() => '')
       console.warn('[saveHtmlToStorage] Kodo failed:', res.status, errText.slice(0, 200))

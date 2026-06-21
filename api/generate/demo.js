@@ -34,6 +34,39 @@ function getUserIdFromToken(req) {
   }
 }
 
+function normalizeTypeName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^[\s"'“”‘’]+|[\s"'“”‘’。！？!?.,,;；：:]+$/g, '')
+    .replace(/\s+/g, '')
+}
+
+function findMatchedType(allTypes, rawQuestionTypeName) {
+  const normalizedQuestionTypeName = normalizeTypeName(rawQuestionTypeName)
+  if (!normalizedQuestionTypeName) return null
+
+  const normalizedMap = allTypes.map((type) => ({
+    type,
+    normalizedName: normalizeTypeName(type.name),
+  }))
+
+  const exactMatch = normalizedMap.find(({ normalizedName }) => normalizedName === normalizedQuestionTypeName)
+  if (exactMatch) return exactMatch.type
+
+  const looseMatch = normalizedMap.find(({ normalizedName }) =>
+    normalizedQuestionTypeName.includes(normalizedName) || normalizedName.includes(normalizedQuestionTypeName)
+  )
+  return looseMatch?.type || null
+}
+
+function getTypeNames(allTypes) {
+  return allTypes.map((type) => type.name).filter(Boolean)
+}
+
+function logTypeMatchIssue(kind, payload) {
+  console.warn(`[generate/demo] ${kind}`, payload)
+}
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -175,10 +208,28 @@ export default async function handler(req, res) {
         })
       }
 
-      questionTypeName = identifyResult.content.trim()
-      const matchedType = allTypes.find((t) => t.name === questionTypeName)
+      const rawIdentifiedTypeName = identifyResult.content.trim()
+      questionTypeName = normalizeTypeName(rawIdentifiedTypeName)
+      const matchedType = findMatchedType(allTypes, rawIdentifiedTypeName)
 
       if (!matchedType) {
+        if (questionTypeName === '不匹配') {
+          await patchQuestionFull(actualQuestionId, { status: 'pending' })
+          logTypeMatchIssue('question type explicitly unmatched', {
+            questionId: actualQuestionId,
+            rawTypeName: rawIdentifiedTypeName,
+            normalizedTypeName: questionTypeName,
+            availableTypes: getTypeNames(allTypes),
+          })
+        } else {
+          logTypeMatchIssue('question type not matched after normalization', {
+            questionId: actualQuestionId,
+            rawTypeName: rawIdentifiedTypeName,
+            normalizedTypeName: questionTypeName,
+            availableTypes: getTypeNames(allTypes),
+          })
+        }
+
         // 没有匹配到题型 → 查询 configs 表 key='temp' 的值作为兜底
         let fallbackPrompt = ''
         try {
@@ -244,8 +295,22 @@ export default async function handler(req, res) {
           await patchQuestionFull(actualQuestionId, { status: 'pending' })
           return res.status(200).json({
             success: false,
-            error: '没有匹配到合适的题型，请尝试调整题目描述后重试',
+            error: questionTypeName === '不匹配'
+              ? '题型识别结果为“不匹配”，请确认题目描述是否符合现有题型'
+              : '没有匹配到合适的题型，请尝试调整题目描述后重试',
             questionId: actualQuestionId,
+          })
+        }
+      }
+
+      if (matchedType) {
+        const normalizedMatchedName = normalizeTypeName(matchedType.name)
+        if (normalizedMatchedName !== questionTypeName) {
+          console.info('[generate/demo] question type matched after normalization', {
+            questionId: actualQuestionId,
+            rawTypeName: rawIdentifiedTypeName,
+            normalizedTypeName: questionTypeName,
+            matchedTypeName: matchedType.name,
           })
         }
       }

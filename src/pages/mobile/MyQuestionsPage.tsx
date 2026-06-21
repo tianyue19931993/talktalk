@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw, Lock } from 'lucide-react'
-import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
 // import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
 import { canViewDemo } from '../../lib/supabase-auth'
@@ -9,7 +9,12 @@ import { generateDemo } from '../../lib/generate'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
-
+function formatDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
 
 export default function MyQuestionsPage() {
   const navigate = useNavigate()
@@ -19,6 +24,7 @@ export default function MyQuestionsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set())
+  const [regenNotice, setRegenNotice] = useState('')
 
   const filteredQuestions = useMemo(() => {
     if (!search.trim()) return questions
@@ -43,21 +49,17 @@ export default function MyQuestionsPage() {
     const list = await getMyQuestions()
     setQuestions(list)
 
-    // 并行加载每个题目的 demos
-    const map: Record<string, QuestionDemo[]> = {}
-    await Promise.all(
-      list.map(async (q) => {
-        map[q.id] = await getQuestionDemos(q.id)
-      })
-    )
+    const map = await getQuestionDemosBatch(list.map((q) => q.id))
     setDemosMap(map)
     setLoading(false)
   }
 
   async function handleRegenerate(q: UserQuestion) {
+    setRegenNotice('正在生成中，请耐心等待 1～3 分钟，后刷新页面查看。')
+    window.alert('正在生成中，请耐心等待 1～3 分钟，后刷新页面查看。')
     setRegenerating(prev => new Set(prev).add(q.id))
     try {
-      const result = await generateDemo(q.questionText, { type: 'submit' })
+      const result = await generateDemo(q.id, { type: 'regenerate' })
       if (result.timedOut || result.error === 'timeout') {
         // 超时但后端可能还在跑 → 不报错，提示用户稍等
         setTimeout(() => loadAll(), 5000)
@@ -65,12 +67,16 @@ export default function MyQuestionsPage() {
       }
       if (result.success) {
         await loadAll()
+        setRegenNotice('已收到重新生成请求，正在更新列表...')
+        setTimeout(() => setRegenNotice(''), 3000)
       } else if (!result.timedOut) {
         alert(result.error || '重新生成失败，请重试')
+        setRegenNotice('')
       }
     } catch {
       // 网络错误也不弹窗，后端可能已接收请求
       setTimeout(() => loadAll(), 3000)
+      setRegenNotice('请求已发出，稍后刷新查看结果')
     } finally {
       setRegenerating(prev => {
         const next = new Set(prev)
@@ -136,6 +142,11 @@ export default function MyQuestionsPage() {
             刷新
           </button>
         </div>
+        {regenNotice && (
+          <div className="mt-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            {regenNotice}
+          </div>
+        )}
         <p className="text-xs text-[var(--color-mute)] mt-1 mb-3">共 {filteredQuestions.length} 条</p>
         {/* 搜索框 */}
         <div className="relative">
@@ -144,7 +155,7 @@ export default function MyQuestionsPage() {
             type="text"
             placeholder="搜索题目内容..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
               text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
               focus:outline-none focus:border-[var(--color-link)] transition-colors"
@@ -177,6 +188,7 @@ export default function MyQuestionsPage() {
         ) : (
           filteredQuestions.map((q) => {
             const demos = demosMap[q.id] || []
+            const latestDemo = demos[0]
             const now = Date.now()
             const created = new Date(q.createdAt).getTime()
             const isRecent = (now - created) < 5 * 60 * 1000 // 5分钟内算"生成中"
@@ -202,7 +214,10 @@ export default function MyQuestionsPage() {
                     {st.label}
                   </span>
                   <span className="text-[10px] text-[var(--color-mute)]">
-                    {new Date(q.createdAt).toLocaleDateString('zh-CN')}
+                    {demos.length > 0 && latestDemo
+                      ? `生成于 ${formatDateTime(latestDemo.createdAt)}`
+                      : `提交于 ${formatDateTime(q.createdAt)}`
+                    }
                   </span>
                 </div>
 

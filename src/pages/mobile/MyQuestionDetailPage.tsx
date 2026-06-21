@@ -12,6 +12,13 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50' },
 }
 
+function formatDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 export default function MyQuestionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -98,7 +105,7 @@ export default function MyQuestionDetailPage() {
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
           <div className="flex items-center justify-between">
             <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
-            <span className="text-xs text-[var(--color-mute)]">提交于 {new Date(question.createdAt).toLocaleDateString('zh-CN')}</span>
+            <span className="text-xs text-[var(--color-mute)]">提交于 {formatDateTime(question.createdAt)}</span>
           </div>
         </div>
       </section>
@@ -110,6 +117,7 @@ export default function MyQuestionDetailPage() {
             {demos.map((demo) => (
               <div key={demo.id} className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
                 <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || '演示'}</p>
+                <p className="text-[10px] text-[var(--color-mute)] mb-3">生成于 {formatDateTime(demo.createdAt)}</p>
                 <div className="flex items-center gap-3">
                   {hasDemoAccess ? (
                     <button

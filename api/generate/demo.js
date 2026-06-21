@@ -45,22 +45,41 @@ function normalizeCoreDiscovery(value) {
   return normalizeTypeName(value)
 }
 
-function findMatchedTypeByCoreDiscovery(allTypes, rawCoreDiscovery) {
-  const normalizedCoreDiscovery = normalizeCoreDiscovery(rawCoreDiscovery)
-  if (!normalizedCoreDiscovery) return null
+function findMatchedTypeByCoreDiscoveryOrName(allTypes, rawValue) {
+  const normalizedValue = normalizeCoreDiscovery(rawValue)
+  if (!normalizedValue) return { type: null, matchedBy: null }
 
   const normalizedMap = allTypes.map((type) => ({
     type,
     normalizedCoreDiscovery: normalizeCoreDiscovery(type.core_discovery),
+    normalizedName: normalizeTypeName(type.name),
   }))
 
-  const exactMatch = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) => candidate === normalizedCoreDiscovery)
-  if (exactMatch) return exactMatch.type
+  const exactCoreDiscovery = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) => candidate === normalizedValue)
+  if (exactCoreDiscovery) {
+    return { type: exactCoreDiscovery.type, matchedBy: 'core_discovery' }
+  }
 
-  const looseMatch = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) =>
-    normalizedCoreDiscovery.includes(candidate) || candidate.includes(normalizedCoreDiscovery)
+  const exactName = normalizedMap.find(({ normalizedName }) => normalizedName === normalizedValue)
+  if (exactName) {
+    return { type: exactName.type, matchedBy: 'name' }
+  }
+
+  const looseCoreDiscovery = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) =>
+    normalizedValue.includes(candidate) || candidate.includes(normalizedValue)
   )
-  return looseMatch?.type || null
+  if (looseCoreDiscovery) {
+    return { type: looseCoreDiscovery.type, matchedBy: 'core_discovery' }
+  }
+
+  const looseName = normalizedMap.find(({ normalizedName }) =>
+    normalizedValue.includes(normalizedName) || normalizedName.includes(normalizedValue)
+  )
+  if (looseName) {
+    return { type: looseName.type, matchedBy: 'name' }
+  }
+
+  return { type: null, matchedBy: null }
 }
 
 function buildTypeSelectionPrompt(allTypes) {
@@ -224,12 +243,14 @@ export default async function handler(req, res) {
 
       const rawIdentifiedTypeName = identifyResult.content.trim()
       questionTypeName = normalizeTypeName(rawIdentifiedTypeName)
-      questionCoreDiscovery = rawIdentifiedTypeName
+      const matchResult = findMatchedTypeByCoreDiscoveryOrName(allTypes, rawIdentifiedTypeName)
+      const matchedType = matchResult.type
+      const resolvedCoreDiscovery = matchedType?.core_discovery || rawIdentifiedTypeName
+      questionCoreDiscovery = resolvedCoreDiscovery
       await patchQuestionFull(actualQuestionId, {
-        core_discovery: questionCoreDiscovery,
+        core_discovery: resolvedCoreDiscovery,
         status: 'pending',
       })
-      const matchedType = findMatchedTypeByCoreDiscovery(allTypes, rawIdentifiedTypeName)
 
       if (!matchedType) {
         if (questionTypeName === '不匹配') {
@@ -329,6 +350,7 @@ export default async function handler(req, res) {
             questionId: actualQuestionId,
             rawCoreDiscovery: rawIdentifiedTypeName,
             normalizedCoreDiscovery: questionTypeName,
+            matchedBy: matchResult.matchedBy,
             matchedTypeName: matchedType.name,
             matchedCoreDiscovery: matchedType.core_discovery,
           })

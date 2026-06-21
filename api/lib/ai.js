@@ -9,7 +9,7 @@
  */
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
 
 /**
  * 调用 AI（当前为 DeepSeek Chat）
@@ -45,7 +45,7 @@ export async function callAI(options) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const res = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
+    const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

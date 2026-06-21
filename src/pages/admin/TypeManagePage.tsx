@@ -10,7 +10,7 @@ export default function TypeManagePage() {
 
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newDesc, setNewDesc] = useState('')
+  const [newCoreDiscovery, setNewCoreDiscovery] = useState('')
   const [newAnalysisPrompt, setNewAnalysisPrompt] = useState('')
   const [newHtmlPrompt, setNewHtmlPrompt] = useState('')
   const [newDiscoveryFlow, setNewDiscoveryFlow] = useState('')
@@ -19,7 +19,7 @@ export default function TypeManagePage() {
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
-  const [editDesc, setEditDesc] = useState('')
+  const [editCoreDiscovery, setEditCoreDiscovery] = useState('')
   const [editAnalysisPrompt, setEditAnalysisPrompt] = useState('')
   const [editHtmlPrompt, setEditHtmlPrompt] = useState('')
   const [editDiscoveryFlow, setEditDiscoveryFlow] = useState('')
@@ -44,7 +44,7 @@ export default function TypeManagePage() {
     if (!newName.trim()) return
     addType({
       name: newName.trim(),
-      description: newDesc.trim(),
+      coreDiscovery: newCoreDiscovery.trim(),
       analysisPrompt: newAnalysisPrompt.trim(),
       htmlPrompt: newHtmlPrompt.trim(),
       discoveryFlow: newDiscoveryFlow.trim(),
@@ -52,7 +52,7 @@ export default function TypeManagePage() {
       animationFlow: newAnimationFlow.trim(),
     })
     setNewName('')
-    setNewDesc('')
+    setNewCoreDiscovery('')
     setNewAnalysisPrompt('')
     setNewHtmlPrompt('')
     setShowNewForm(false)
@@ -64,7 +64,7 @@ export default function TypeManagePage() {
   const startEdit = (t: QuestionType) => {
     setEditingId(t.id)
     setEditName(t.name)
-    setEditDesc(t.description || '')
+    setEditCoreDiscovery(t.coreDiscovery || '')
     setEditAnalysisPrompt(t.analysisPrompt || '')
     setEditHtmlPrompt(t.htmlPrompt || '')
     setEditDiscoveryFlow(t.discoveryFlow || '')
@@ -76,7 +76,7 @@ export default function TypeManagePage() {
     if (!editingId || !editName.trim()) return
     updateType(editingId, {
       name: editName.trim(),
-      description: editDesc.trim(),
+      coreDiscovery: editCoreDiscovery.trim(),
       analysisPrompt: editAnalysisPrompt.trim(),
       htmlPrompt: editHtmlPrompt.trim(),
       discoveryFlow: editDiscoveryFlow.trim(),
@@ -88,6 +88,7 @@ export default function TypeManagePage() {
 
   const cancelEdit = () => {
     setEditingId(null)
+    setEditCoreDiscovery('')
     setEditDiscoveryFlow('')
     setEditInteractionFlow('')
     setEditAnimationFlow('')
@@ -131,9 +132,9 @@ export default function TypeManagePage() {
               autoFocus
             />
             <Input
-              placeholder="题型描述（可选）"
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
+              placeholder="core_discovery（分类锚点）"
+              value={newCoreDiscovery}
+              onChange={(e) => setNewCoreDiscovery(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-2 mb-3">
@@ -198,7 +199,7 @@ export default function TypeManagePage() {
             />
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewDiscoveryFlow(''); setNewInteractionFlow(''); setNewAnimationFlow('') }}>
+            <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewCoreDiscovery(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewDiscoveryFlow(''); setNewInteractionFlow(''); setNewAnimationFlow('') }}>
               取消
             </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -213,7 +214,7 @@ export default function TypeManagePage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--color-hairline)]">
-              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">题型名称</th>
+              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">模板入口 / core_discovery</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
@@ -238,9 +239,9 @@ export default function TypeManagePage() {
                           autoFocus
                         />
                         <input
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          placeholder="描述（可选）"
+                          value={editCoreDiscovery}
+                          onChange={(e) => setEditCoreDiscovery(e.target.value)}
+                          placeholder="core_discovery（分类锚点）"
                           className="w-full px-2 py-1 text-xs bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-[var(--radius-sm)]"
                         />
                         <textarea
@@ -307,8 +308,8 @@ export default function TypeManagePage() {
                             )}
                           </div>
                         </div>
-                        {t.description && (
-                          <p className="text-xs text-[var(--color-mute)] mt-1">{t.description}</p>
+                        {t.coreDiscovery && (
+                          <p className="text-xs text-[var(--color-mute)] mt-1">{t.coreDiscovery}</p>
                         )}
                         {t.analysisPrompt && (
                           <details className="mt-1">
@@ -377,7 +378,7 @@ export default function TypeManagePage() {
             <h3 className="text-base font-semibold text-[var(--color-ink)] mb-2">批量新增题型</h3>
             <p className="text-xs text-[var(--color-mute)] mb-4">每行或每个中文分号（；）分隔一个题型名称</p>
             <textarea
-              placeholder={`沪教版；\n期末复习；\n应用题；\n易错题；\n重量问题；\n两端都种`}
+              placeholder={`格式：name 或 name|core_discovery\n例如：\n统一单位|不同单位必须先统一\n平均分配|总量平均分成若干份`}
               value={batchText}
               onChange={(e) => setBatchText(e.target.value)}
               rows={8}
@@ -396,8 +397,11 @@ export default function TypeManagePage() {
                   .split(/[；;\n]+/)
                   .map(s => s.trim())
                   .filter(Boolean)
-                names.forEach(name => {
-                  addType({ name, description: '' })
+                names.forEach((entry) => {
+                  const [rawName, rawCoreDiscovery] = entry.split('|').map((s) => s.trim())
+                  const name = rawName || ''
+                  if (!name) return
+                  addType({ name, coreDiscovery: rawCoreDiscovery || name })
                 })
                 setShowBatchForm(false)
                 setBatchText('')

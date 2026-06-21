@@ -13,6 +13,7 @@ function rowToUserQuestion(row: any): UserQuestion {
     questionText: row.question_text,
     questionType: row.question_type || '',
     questionTypeId: row.question_type_id || null,
+    coreDiscovery: row.core_discovery || '',
     analysisJson: row.analysis_json || {},
     status: row.status,
     createdAt: row.created_at,

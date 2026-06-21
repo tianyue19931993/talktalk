@@ -42,7 +42,7 @@ function questionToRow(q: Question) {
 function rowToType(row: any): QuestionType {
   return {
     id: String(row.id), name: row.name,
-    description: row.description || '',
+    coreDiscovery: row.core_discovery || '',
     analysisPrompt: row.analysis_prompt || '',
     htmlPrompt: row.html_prompt || '',
     discoveryFlow: row.discovery_flow || '',
@@ -157,10 +157,10 @@ export function deleteQuestion(id: string) {
   })
 }
 
-export async function addType(data: { name: string; description?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }): Promise<QuestionType> {
+export async function addType(data: { name: string; coreDiscovery?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', {
     name: data.name,
-    description: data.description || '',
+    core_discovery: data.coreDiscovery || '',
     analysis_prompt: data.analysisPrompt || '',
     html_prompt: data.htmlPrompt || '',
     discovery_flow: data.discoveryFlow || '',
@@ -172,11 +172,11 @@ export async function addType(data: { name: string; description?: string; analys
   return t
 }
 
-export async function updateType(id: string, data: { name?: string; description?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }) {
+export async function updateType(id: string, data: { name?: string; coreDiscovery?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
   const p: Record<string, string> = {};
   if (data.name !== undefined) p.name = data.name
-  if (data.description !== undefined) p.description = data.description
+  if (data.coreDiscovery !== undefined) p.core_discovery = data.coreDiscovery
   if (data.analysisPrompt !== undefined) p.analysis_prompt = data.analysisPrompt
   if (data.htmlPrompt !== undefined) p.html_prompt = data.htmlPrompt
   if (data.discoveryFlow !== undefined) p.discovery_flow = data.discoveryFlow

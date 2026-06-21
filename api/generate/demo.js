@@ -41,26 +41,39 @@ function normalizeTypeName(value) {
     .replace(/\s+/g, '')
 }
 
-function findMatchedType(allTypes, rawQuestionTypeName) {
-  const normalizedQuestionTypeName = normalizeTypeName(rawQuestionTypeName)
-  if (!normalizedQuestionTypeName) return null
+function normalizeCoreDiscovery(value) {
+  return normalizeTypeName(value)
+}
+
+function findMatchedTypeByCoreDiscovery(allTypes, rawCoreDiscovery) {
+  const normalizedCoreDiscovery = normalizeCoreDiscovery(rawCoreDiscovery)
+  if (!normalizedCoreDiscovery) return null
 
   const normalizedMap = allTypes.map((type) => ({
     type,
-    normalizedName: normalizeTypeName(type.name),
+    normalizedCoreDiscovery: normalizeCoreDiscovery(type.core_discovery),
   }))
 
-  const exactMatch = normalizedMap.find(({ normalizedName }) => normalizedName === normalizedQuestionTypeName)
+  const exactMatch = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) => candidate === normalizedCoreDiscovery)
   if (exactMatch) return exactMatch.type
 
-  const looseMatch = normalizedMap.find(({ normalizedName }) =>
-    normalizedQuestionTypeName.includes(normalizedName) || normalizedName.includes(normalizedQuestionTypeName)
+  const looseMatch = normalizedMap.find(({ normalizedCoreDiscovery: candidate }) =>
+    normalizedCoreDiscovery.includes(candidate) || candidate.includes(normalizedCoreDiscovery)
   )
   return looseMatch?.type || null
 }
 
-function getTypeNames(allTypes) {
-  return allTypes.map((type) => type.name).filter(Boolean)
+function buildTypeSelectionPrompt(allTypes) {
+  return allTypes
+    .map((type) => [
+      `name: ${type.name || ''}`,
+      `core_discovery: ${type.core_discovery || ''}`,
+    ].join('\n'))
+    .join('\n\n')
+}
+
+function getCoreDiscoveries(allTypes) {
+  return allTypes.map((type) => type.core_discovery).filter(Boolean)
 }
 
 function logTypeMatchIssue(kind, payload) {
@@ -173,6 +186,7 @@ export default async function handler(req, res) {
 
     let questionTypeId = question.question_type_id
     let questionTypeName = question.question_type || ''
+    let questionCoreDiscovery = question.core_discovery || ''
     let analysisJson = question.analysis_json || {}
     let htmlTemplate = ''  // 将从 question_types.html_prompt 加载
 
@@ -192,9 +206,9 @@ export default async function handler(req, res) {
       const allTypes = await typesRes.json()
 
       // ── Step 2: AI 识别题型 ──
-      const typeNames = allTypes.map((t) => t.name).join('、')
+      const typeSelectionPrompt = buildTypeSelectionPrompt(allTypes)
       const identifyResult = await callAI({
-        prompt: `判断下面这道题属于以下哪个题型。\n\n可用题型：${typeNames}\n\n题目：${question.question_text}\n\n规则（严格遵循）：\n1. 如果属于以上某一种题型 → 只返回该题型名称\n2. 如果不属于以上任何题型 → 只返回「不匹配」\n\n只返回一个词，不要任何其他文字。`,
+        prompt: `判断下面这道题最匹配哪个 core_discovery。\n\n可用配置：\n${typeSelectionPrompt}\n\n题目：${question.question_text}\n\n规则（严格遵循）：\n1. 如果匹配某一条配置 → 只返回该条配置的 core_discovery\n2. 如果不属于以上任何配置 → 只返回「不匹配」\n\n只返回一个词，不要任何其他文字。`,
         temperature: 0,
         maxTokens: 20,
         timeoutSeconds: 5,
@@ -210,23 +224,28 @@ export default async function handler(req, res) {
 
       const rawIdentifiedTypeName = identifyResult.content.trim()
       questionTypeName = normalizeTypeName(rawIdentifiedTypeName)
-      const matchedType = findMatchedType(allTypes, rawIdentifiedTypeName)
+      questionCoreDiscovery = rawIdentifiedTypeName
+      await patchQuestionFull(actualQuestionId, {
+        core_discovery: questionCoreDiscovery,
+        status: 'pending',
+      })
+      const matchedType = findMatchedTypeByCoreDiscovery(allTypes, rawIdentifiedTypeName)
 
       if (!matchedType) {
         if (questionTypeName === '不匹配') {
           await patchQuestionFull(actualQuestionId, { status: 'pending' })
           logTypeMatchIssue('question type explicitly unmatched', {
             questionId: actualQuestionId,
-            rawTypeName: rawIdentifiedTypeName,
-            normalizedTypeName: questionTypeName,
-            availableTypes: getTypeNames(allTypes),
+            rawCoreDiscovery: rawIdentifiedTypeName,
+            normalizedCoreDiscovery: questionTypeName,
+            availableCoreDiscoveries: getCoreDiscoveries(allTypes),
           })
         } else {
           logTypeMatchIssue('question type not matched after normalization', {
             questionId: actualQuestionId,
-            rawTypeName: rawIdentifiedTypeName,
-            normalizedTypeName: questionTypeName,
-            availableTypes: getTypeNames(allTypes),
+            rawCoreDiscovery: rawIdentifiedTypeName,
+            normalizedCoreDiscovery: questionTypeName,
+            availableCoreDiscoveries: getCoreDiscoveries(allTypes),
           })
         }
 
@@ -304,13 +323,14 @@ export default async function handler(req, res) {
       }
 
       if (matchedType) {
-        const normalizedMatchedName = normalizeTypeName(matchedType.name)
-        if (normalizedMatchedName !== questionTypeName) {
+        const normalizedMatchedCoreDiscovery = normalizeCoreDiscovery(matchedType.core_discovery)
+        if (normalizedMatchedCoreDiscovery !== questionTypeName) {
           console.info('[generate/demo] question type matched after normalization', {
             questionId: actualQuestionId,
-            rawTypeName: rawIdentifiedTypeName,
-            normalizedTypeName: questionTypeName,
+            rawCoreDiscovery: rawIdentifiedTypeName,
+            normalizedCoreDiscovery: questionTypeName,
             matchedTypeName: matchedType.name,
+            matchedCoreDiscovery: matchedType.core_discovery,
           })
         }
       }
@@ -321,6 +341,7 @@ export default async function handler(req, res) {
         htmlTemplate = matchedType.html_prompt || ''
         // 收集题型所有字段（包括三个 flow）
         const typeName = matchedType.name || ''
+        const typeCoreDiscovery = matchedType.core_discovery || ''
         const typeDiscoveryFlow = matchedType.discovery_flow || ''
         const typeInteractionFlow = matchedType.interaction_flow || ''
         const typeAnimationFlow = matchedType.animation_flow || ''
@@ -332,6 +353,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             question_type_id: questionTypeId,
             question_type: typeName,
+            core_discovery: typeCoreDiscovery,
             status: 'pending',
           }),
         })
@@ -351,6 +373,7 @@ export default async function handler(req, res) {
               `题目原文：\n${question.question_text}`,
               ``,
               `--- 题型信息 ---`,
+              `core_discovery：${typeCoreDiscovery}`,
               `题型名称：${typeName}`,
               flowInfo ? `\n${flowInfo}` : '',
               ``,

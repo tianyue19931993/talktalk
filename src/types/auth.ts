@@ -73,6 +73,7 @@ export interface UserQuestion {
   questionText: string
   questionType: string
   questionTypeId: number | null
+  coreDiscovery: string
   analysisJson: any
   status: 'pending' | 'completed' | 'uploaded'
   createdAt: string

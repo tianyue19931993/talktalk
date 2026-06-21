@@ -2,7 +2,7 @@
 export interface QuestionType {
   id: string
   name: string
-  description?: string
+  coreDiscovery?: string
   analysisPrompt?: string
   htmlPrompt?: string
   discoveryFlow?: string

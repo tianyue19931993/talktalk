@@ -36,7 +36,7 @@ export default function MyQuestionsPage() {
       return
     }
     loadAll()
-  }, [isLoggedIn])
+  }, [isLoggedIn, navigate])
 
   async function loadAll() {
     setLoading(true)
@@ -144,7 +144,7 @@ export default function MyQuestionsPage() {
             type="text"
             placeholder="搜索题目内容..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
               text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
               focus:outline-none focus:border-[var(--color-link)] transition-colors"

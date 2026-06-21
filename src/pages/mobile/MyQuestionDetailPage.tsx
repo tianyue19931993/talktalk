@@ -22,21 +22,24 @@ export default function MyQuestionDetailPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!id) return
-    loadAll()
-  }, [id])
+    let cancelled = false
 
-  async function loadAll() {
-    if (!id) return
-    setLoading(true)
-    const q = await getUserQuestion(id)
-    setQuestion(q)
-    if (q) {
-      const d = await getQuestionDemos(q.id)
-      setDemos(d)
+    const loadAll = async () => {
+      if (!id) return
+      setLoading(true)
+      const q = await getUserQuestion(id)
+      if (cancelled) return
+      setQuestion(q)
+      if (q) {
+        const d = await getQuestionDemos(q.id)
+        if (!cancelled) setDemos(d)
+      }
+      if (!cancelled) setLoading(false)
     }
-    setLoading(false)
-  }
+
+    void loadAll()
+    return () => { cancelled = true }
+  }, [id])
 
   const downloadHtml = (url: string, label: string) => {
     const link = document.createElement('a')

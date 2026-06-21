@@ -52,9 +52,21 @@ export default function PlanManagePage() {
   const [editPermissions, setEditPermissions] = useState<string[]>([])
 
   useEffect(() => {
-    if (!isAdmin) { navigate('/admin/lessons'); return }
-    loadPlans()
-  }, [isAdmin])
+    let cancelled = false
+
+    const run = async () => {
+      if (!isAdmin) { navigate('/admin/lessons'); return }
+      setLoading(true)
+      const { data } = await authedRequest<any[]>('/plans?order=sort.asc')
+      if (!cancelled) {
+        if (data) setPlans(data.map(rowToPlan))
+        setLoading(false)
+      }
+    }
+
+    void run()
+    return () => { cancelled = true }
+  }, [isAdmin, navigate])
 
   async function loadPlans() {
     setLoading(true)

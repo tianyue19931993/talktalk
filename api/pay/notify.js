@@ -84,3 +84,10 @@ export default async (req, res) => {
     } else {
       console.log('[pay/notify] subscription already exists, skip creation')
     }
+
+    res.status(200).json({ code: 'SUCCESS', message: 'success' })
+  } catch (e) {
+    console.error('[pay/notify] error:', e)
+    res.status(200).json({ code: 'FAIL', message: e.message || 'notify failed' })
+  }
+}

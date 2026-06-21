@@ -88,48 +88,52 @@ export default function ExperimentPage() {
   }, [analysisJson, experimentType])
 
   useEffect(() => {
-    if (!demoId || !hasAccess || isLoading) return
-    loadData()
-  }, [demoId, hasAccess, isLoading])
+    let cancelled = false
 
-  async function loadData() {
-    if (!demoId) return
+    const loadData = async () => {
+      if (!demoId || !hasAccess || isLoading) return
 
-    try {
-      const { authedRequest } = await import('../lib/supabase-auth')
+      try {
+        const { authedRequest } = await import('../lib/supabase-auth')
 
-      const { data: demoData } = await authedRequest<unknown[]>(`/question_demos?id=eq.${demoId}`)
-      const demo = demoData?.[0] as Record<string, unknown> | undefined
-      if (!demo) {
-        setLoadState('notfound')
-        return
+        const { data: demoData } = await authedRequest<unknown[]>(`/question_demos?id=eq.${demoId}`)
+        const demo = demoData?.[0] as Record<string, unknown> | undefined
+        if (!demo || cancelled) {
+          if (!cancelled) setLoadState('notfound')
+          return
+        }
+
+        const questionId = demo.question_id as string | undefined
+        if (!questionId || cancelled) {
+          if (!cancelled) setLoadState('notfound')
+          return
+        }
+
+        const { data: questionData } = await authedRequest<unknown[]>(`/user_questions?id=eq.${questionId}`)
+        const question = questionData?.[0] as Record<string, unknown> | undefined
+        if (!question || cancelled) {
+          if (!cancelled) setLoadState('notfound')
+          return
+        }
+
+        const json = question.analysis_json as AnalysisJson | undefined
+        if (!json || typeof json !== 'object') {
+          if (!cancelled) setLoadState('notfound')
+          return
+        }
+
+        if (!cancelled) {
+          setAnalysisJson(json)
+          setLoadState('ready')
+        }
+      } catch {
+        if (!cancelled) setLoadState('notfound')
       }
-
-      const questionId = demo.question_id as string | undefined
-      if (!questionId) {
-        setLoadState('notfound')
-        return
-      }
-
-      const { data: questionData } = await authedRequest<unknown[]>(`/user_questions?id=eq.${questionId}`)
-      const question = questionData?.[0] as Record<string, unknown> | undefined
-      if (!question) {
-        setLoadState('notfound')
-        return
-      }
-
-      const json = question.analysis_json as AnalysisJson | undefined
-      if (!json || typeof json !== 'object') {
-        setLoadState('notfound')
-        return
-      }
-
-      setAnalysisJson(json)
-      setLoadState('ready')
-    } catch {
-      setLoadState('notfound')
     }
-  }
+
+    void loadData()
+    return () => { cancelled = true }
+  }, [demoId, hasAccess, isLoading])
 
   // 权限不足
   if (!isLoading && !hasAccess) {

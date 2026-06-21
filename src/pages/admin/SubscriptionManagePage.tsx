@@ -27,36 +27,42 @@ export default function SubscriptionManagePage() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    if (!isAdmin) { navigate('/admin/lessons'); return }
-    loadData()
-  }, [isAdmin])
+    let cancelled = false
 
-  async function loadData() {
-    setLoading(true)
-    const { data, error } = await authedRequest<any[]>('/active_subscriptions?order=created_at.desc')
-    if (error) { setLoading(false); return }
+    const run = async () => {
+      if (!isAdmin) { navigate('/admin/lessons'); return }
 
-    // 补上 user email（active_subscriptions 只有 user_id）
-    const { data: profiles } = await authedRequest<any[]>('/profiles?select=id,email')
-    const emailMap = new Map<string, string>()
-    if (profiles) {
-      profiles.forEach((p: any) => emailMap.set(p.id, p.email || ''))
+      setLoading(true)
+      const { data, error } = await authedRequest<any[]>('/active_subscriptions?order=created_at.desc')
+      if (error) { if (!cancelled) setLoading(false); return }
+
+      // 补上 user email（active_subscriptions 只有 user_id）
+      const { data: profiles } = await authedRequest<any[]>('/profiles?select=id,email')
+      const emailMap = new Map<string, string>()
+      if (profiles) {
+        profiles.forEach((p: any) => emailMap.set(p.id, p.email || ''))
+      }
+
+      if (!cancelled) {
+        setRows(
+          (data || []).map((r: any) => ({
+            id: r.id,
+            userId: r.user_id,
+            email: emailMap.get(r.user_id) || '-',
+            planName: r.plan_name,
+            planCode: r.plan_code,
+            status: r.status,
+            startAt: r.start_at,
+            expireAt: r.expire_at,
+          }))
+        )
+        setLoading(false)
+      }
     }
 
-    setRows(
-      (data || []).map((r: any) => ({
-        id: r.id,
-        userId: r.user_id,
-        email: emailMap.get(r.user_id) || '-',
-        planName: r.plan_name,
-        planCode: r.plan_code,
-        status: r.status,
-        startAt: r.start_at,
-        expireAt: r.expire_at,
-      }))
-    )
-    setLoading(false)
-  }
+    void run()
+    return () => { cancelled = true }
+  }, [isAdmin, navigate])
 
   const filtered = useMemo(() => {
     const result = search
@@ -70,7 +76,6 @@ export default function SubscriptionManagePage() {
   const safePage = Math.min(page, Math.max(1, pageCount))
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  useEffect(() => { setPage(1) }, [search])
 
   if (loading) return <div className="text-center py-12 text-sm text-[var(--color-mute)]">加载中...</div>
 
@@ -87,7 +92,7 @@ export default function SubscriptionManagePage() {
           <input
             placeholder="搜索用户邮箱..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="h-9 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-link)]"
           />
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Receipt, XCircle } from 'lucide-react'
-import { getOrders } from '../../lib/supabase-auth'
+import { ensureValidSession, getOrders } from '../../lib/supabase-auth'
 import { useAuth } from '../../stores/authStore'
 import { refreshStore } from '../../stores/appStore'
 import type { Order } from '../../types/auth'
@@ -31,7 +31,7 @@ export default function OrdersPage() {
     if (!confirm('确定取消此订单？')) return
     setCancellingId(orderId)
     try {
-      const token = getAccessToken()
+      const token = (await ensureValidSession())?.accessToken
       const res = await fetch('/api/pay/cancel', {
         method: 'POST',
         headers: {
@@ -52,22 +52,22 @@ export default function OrdersPage() {
     }
   }
 
-  function getAccessToken() {
-    try {
-      const raw = localStorage.getItem('talktalk_auth')
-      if (!raw) return null
-      const session = JSON.parse(raw)
-      if (session.expiresAt && Date.now() > session.expiresAt * 1000) return null
-      return session.accessToken || null
-    } catch { return null }
-  }
-
   useEffect(() => {
-    if (!isLoggedIn) {
-      navigate('/login')
-      return
+    let cancelled = false
+
+    const run = async () => {
+      if (!isLoggedIn) {
+        navigate('/login')
+        return
+      }
+      const r = await getOrders()
+      if (cancelled) return
+      if (r.data) setOrders(r.data)
+      setLoading(false)
     }
-    loadOrders()
+
+    void run()
+    return () => { cancelled = true }
   }, [isLoggedIn, navigate])
 
   return (

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Download } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { getPlans, loadSession } from '../../lib/supabase-auth'
+import { ensureValidSession, getPlans } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
 import type { Plan } from '../../types/auth'
 import QRCode from 'qrcode'
@@ -19,11 +19,23 @@ interface PayParams {
   }
 }
 
+async function readJsonResponse<T = unknown>(res: Response): Promise<T | null> {
+  const text = await res.text()
+  if (!text) return null
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
+
 export default function SubscribePage() {
   const navigate = useNavigate()
   const { subscription, isLoggedIn } = useAuth()
   const [plans, setPlans] = useState<Plan[]>([])
-  const [_loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   // 支付状态
   const [payState, setPayState] = useState<PayState>('idle')
@@ -64,12 +76,11 @@ export default function SubscribePage() {
   useEffect(() => {
     if (payState !== 'polling' || !payParams) return
 
-    const token = loadSession()?.accessToken
-    if (!token) return
-
     let cancelled = false
     let attempts = 0
     const maxAttempts = 60 // 最多轮询 3 分钟
+
+    const getToken = async () => (await ensureValidSession())?.accessToken || null
 
     const poll = async () => {
       if (cancelled || attempts >= maxAttempts) {
@@ -82,16 +93,25 @@ export default function SubscribePage() {
       attempts++
 
       try {
+        const token = await getToken()
+        if (!token) {
+          setPayError('登录已失效，请重新登录')
+          setPayState('error')
+          return
+        }
+
         const res = await fetch(`/api/pay/query?orderNo=${payParams.orderNo}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        const data = await res.json()
-        if (data.status === 'paid') {
+        const data = await readJsonResponse<{ status?: string }>(res)
+        if (data?.status === 'paid') {
           await refreshUserData()
           setPayState('success')
           return
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[SubscribePage] polling failed:', error)
+      }
 
       if (!cancelled) {
         setTimeout(poll, 3000)
@@ -105,7 +125,6 @@ export default function SubscribePage() {
   // 支付倒计时（Native 模式，二维码过期倒计时）
   useEffect(() => {
     if (payState !== 'waiting' || !payParams) return
-    setCountdown(120)
     const timer = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
@@ -130,6 +149,13 @@ export default function SubscribePage() {
       return
     }
 
+    const session = await ensureValidSession()
+    const token = session?.accessToken
+    if (!token) {
+      navigate('/login?redirect=/subscribe')
+      return
+    }
+
     if (plan.price === 0) {
       // 免费套餐
       setLoading(true)
@@ -138,21 +164,22 @@ export default function SubscribePage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${loadSession()?.accessToken}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ planId: plan.id }),
         })
 
         if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error || '下单失败')
+          const err = await readJsonResponse<{ error?: string; message?: string; detail?: string }>(res)
+          throw new Error(err?.error || err?.message || err?.detail || '下单失败')
         }
 
         // 将免费套餐当成功效（实际免费套餐不会触发支付）
         await refreshUserData()
         setPayState('success')
-      } catch (e: any) {
-        alert('操作失败：' + e.message)
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : '操作失败'
+        alert('操作失败：' + message)
       } finally {
         setLoading(false)
       }
@@ -165,9 +192,6 @@ export default function SubscribePage() {
     setPayError('')
 
     try {
-      const token = loadSession()?.accessToken
-      if (!token) throw new Error('请先登录')
-
       const res = await fetch('/api/pay/create-order', {
         method: 'POST',
         headers: {
@@ -177,20 +201,33 @@ export default function SubscribePage() {
         body: JSON.stringify({ planId: plan.id }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || data.detail || '下单失败')
+      const data = await readJsonResponse<{
+        orderNo?: string
+        payment?: { mode: 'native'; codeUrl?: string; message?: string | null }
+        error?: string
+        detail?: string
+        message?: string
+      }>(res)
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || data?.detail || '下单失败')
+      }
+      if (!data) {
+        throw new Error('服务器返回空响应，请稍后重试')
+      }
 
       setPayParams(data)
       if (data.payment?.codeUrl) {
         // 有有效的付款码 → 显示二维码
+        setCountdown(120)
         setPayState('waiting')
       } else {
         // 无付款码（如有未完成的订单）→ 跳转到我的页面查看
         setPayError(data.payment?.message || '下单异常，请到我的页面检查订单状态')
         setPayState('error')
       }
-    } catch (e: any) {
-      setPayError(e.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '下单失败'
+      setPayError(message)
       setPayState('error')
     }
   }
@@ -258,7 +295,7 @@ export default function SubscribePage() {
 
           <div className="flex flex-col items-center gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <Button variant="primary" size="lg" onClick={() => { startPolling(); navigate('/my') }}>
+              <Button variant="primary" size="lg" onClick={() => { startPolling() }}>
                 已完成支付
               </Button>
               <Button
@@ -268,6 +305,7 @@ export default function SubscribePage() {
                   setPayState('idle')
                   setPayParams(null)
                   setSelectedPlan(null)
+                  setCountdown(0)
                 }}
               >
                 取消
@@ -309,6 +347,7 @@ export default function SubscribePage() {
               setPayParams(null)
               setSelectedPlan(null)
               setPayError('')
+              setCountdown(0)
             }}>
               重新选择
             </Button>
@@ -427,7 +466,7 @@ export default function SubscribePage() {
                   size="lg"
                   className="w-full"
                   onClick={() => handleSubscribe(plan)}
-                  loading={payState === 'creating' && selectedPlan?.id === plan.id}
+                  loading={(loading && plan.price === 0) || (payState === 'creating' && selectedPlan?.id === plan.id)}
                   disabled={isCurrent || plan.price === 0}
                 >
                   {isCurrent ? '已订阅' : plan.price === 0 ? '价格待定' : '立即开通'}

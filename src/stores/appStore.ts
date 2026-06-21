@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Question, QuestionType, Tag, QuestionForm } from '../types'
 import { query, insert, update as supdate, remove, isConfigured } from '../lib/supabase'
 
@@ -227,9 +227,11 @@ export async function deleteTag(id: string) {
 // ---------- React hook ----------
 export function useStore() {
   const [, setTick] = useState(0)
-  useMemo(() => {
+
+  useEffect(() => {
     const unsub = subscribe(() => setTick((t) => t + 1))
     return unsub
   }, [])
+
   return { questions, types, tags }
 }

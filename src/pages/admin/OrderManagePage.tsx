@@ -36,9 +36,42 @@ export default function OrderManagePage() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    if (!isAdmin) { navigate('/admin/lessons'); return }
-    loadData()
-  }, [isAdmin])
+    let cancelled = false
+
+    const run = async () => {
+      if (!isAdmin) { navigate('/admin/lessons'); return }
+      setLoading(true)
+
+      // 获取所有 orders + 关联的 user email
+      const { data: orders } = await authedRequest<any[]>('/orders?order=created_at.desc&limit=100')
+      const { data: profiles } = await authedRequest<any[]>('/profiles?select=id,email')
+
+      const emailMap = new Map<string, string>()
+      if (profiles) {
+        profiles.forEach((p: any) => emailMap.set(p.id, p.email || ''))
+      }
+
+      if (!cancelled) {
+        setRows(
+          (orders || []).map((o: any) => ({
+            id: o.id,
+            orderNo: o.order_no,
+            userId: o.user_id,
+            planId: o.plan_id,
+            email: emailMap.get(o.user_id) || o.user_id.slice(0, 8),
+            amount: Number(o.amount),
+            status: o.status,
+            paidAt: o.paid_at,
+            createdAt: o.created_at,
+          }))
+        )
+        setLoading(false)
+      }
+    }
+
+    void run()
+    return () => { cancelled = true }
+  }, [isAdmin, navigate])
 
   async function loadData() {
     setLoading(true)
@@ -80,7 +113,6 @@ export default function OrderManagePage() {
   const safePage = Math.min(page, Math.max(1, pageCount))
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  useEffect(() => { setPage(1) }, [search])
 
   if (loading) return <div className="text-center py-12 text-sm text-[var(--color-mute)]">加载中...</div>
 
@@ -97,7 +129,7 @@ export default function OrderManagePage() {
           <input
             placeholder="搜索订单号或邮箱..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="h-9 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-link)]"
           />
         </div>

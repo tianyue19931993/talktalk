@@ -7,6 +7,8 @@
  *   重新生成: generateDemo(questionId, { type: 'regenerate' })
  */
 
+import { getQuestionDemos } from './user-questions'
+
 interface GenerateResult {
   success: boolean
   demoId?: string
@@ -132,8 +134,6 @@ export async function pollQuestionDemos(
 ): Promise<void> {
   let attempts = 0
   const maxAttempts = 30
-
-  const { getQuestionDemos } = await import('./user-questions')
 
   const poll = async () => {
     attempts++

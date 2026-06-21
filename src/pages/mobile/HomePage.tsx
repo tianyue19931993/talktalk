@@ -16,10 +16,8 @@ export default function HomePage() {
   const [generateStatus, setGenerateStatus] = useState('')
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
-  const [pendingQuestionId, setPendingQuestionId] = useState<string | null>(null)
   const [notMathError, setNotMathError] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const pollingRef = useRef(false)
 
   // 加载最新题目
   const loadLatest = async (forceReload?: boolean) => {
@@ -37,7 +35,34 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    loadLatest()
+    let cancelled = false
+
+    const run = async () => {
+      if (!isLoggedIn && !submitted) {
+        if (!cancelled) {
+          setLatestQuestion(null)
+          setLatestDemos([])
+        }
+        return
+      }
+
+      if (!isLoggedIn) return
+
+      const list = await getMyQuestions()
+      if (cancelled) return
+
+      if (list.length > 0) {
+        setLatestQuestion(list[0])
+        const demos = await getQuestionDemos(list[0].id)
+        if (!cancelled) setLatestDemos(demos)
+      } else {
+        setLatestQuestion(null)
+        setLatestDemos([])
+      }
+    }
+
+    void run()
+    return () => { cancelled = true }
   }, [isLoggedIn, submitted])
 
   const handleSubmit = async () => {
@@ -76,41 +101,34 @@ export default function HomePage() {
 
       if (result.success) {
         setGenerateStatus('生成完成！')
-        setPendingQuestionId(null)
         await loadLatest(true)
         setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
       } else if (result.timedOut) {
         // 超时 — 启动轮询检测是否实际已生成
         setGenerateStatus('⏱ 生成超时，正在确认结果...')
-        pollingRef.current = true
         if (result.questionId) {
           pollQuestionDemos(
             result.questionId,
             (demos) => {
               setLatestDemos(demos as QuestionDemo[])
               setGenerateStatus('生成完成！')
-              setPendingQuestionId(null)
+              setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
             },
             () => {
-              pollingRef.current = false
               loadLatest(true)
             },
             () => {
-              pollingRef.current = false
               setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
-              setPendingQuestionId(null)
+              setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 5000)
             }
           )
         } else {
-          pollingRef.current = false
           setGenerateStatus('⏱ 生成超时，可到「我的互动列表」重新生成')
-          setPendingQuestionId(null)
           setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 5000)
         }
       } else {
         // 其他错误（API 已落库题目，只是生成失败了）
         setGenerateStatus(result.error || '生成失败，请重试')
-        setPendingQuestionId(null)
         setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 5000)
       }
     } catch {
@@ -215,18 +233,8 @@ export default function HomePage() {
             {latestQuestion.questionText}
           </p>
 
-          {/* 生成中状态 */}
-          {pendingQuestionId && (
-            <div className="pt-2 border-t border-[var(--color-hairline)]">
-              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-blue-600 bg-blue-50">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                生成中，请耐心等待 1～3 分钟
-              </span>
-            </div>
-          )}
-
           {/* 已生成（有演示） */}
-          {!pendingQuestionId && latestDemos.length > 0 && (
+          {latestDemos.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--color-hairline)]">
               {latestDemos.map((demo) => (
                 <button
@@ -244,21 +252,14 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* 无演示 — 状态与互动列表保持一致 */}
-          {!pendingQuestionId && latestDemos.length === 0 && (() => {
-            const now = Date.now()
-            const created = new Date(latestQuestion.createdAt).getTime()
-            const isRecent = (now - created) < 5 * 60 * 1000
-            return (
-              <div className="pt-2 border-t border-[var(--color-hairline)]">
-                <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
-                  isRecent ? 'text-yellow-600 bg-yellow-50' : 'text-yellow-600 bg-yellow-50'
-                }`}>
-                  {isRecent ? '生成中，请耐心等待 1～3 分钟' : '待生成'}
-                </span>
-              </div>
-            )
-          })()}
+          {/* 无演示 */}
+          {latestDemos.length === 0 && (
+            <div className="pt-2 border-t border-[var(--color-hairline)]">
+              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-yellow-600 bg-yellow-50">
+                待生成
+              </span>
+            </div>
+          )}
         </div>
       )}
 

@@ -4,7 +4,7 @@ import {
   LogIn, LogOut, Sparkles, ChevronRight, Shield, KeyRound
 } from 'lucide-react'
 import { useAuth, resetAuth } from '../../stores/authStore'
-import { signOut, loadSession } from '../../lib/supabase-auth'
+import { ensureValidSession, signOut } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import { useState } from 'react'
 
@@ -25,7 +25,7 @@ export default function MyPage() {
     if (newPassword.length < 6) { setPasswordError('密码至少 6 位'); return }
     if (newPassword !== confirmPassword) { setPasswordError('两次输入的密码不一致'); return }
 
-    const session = loadSession()
+    const session = await ensureValidSession()
     if (!session) { setPasswordError('未登录'); return }
 
     setPasswordLoading(true)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Crown } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
-import { canViewDemo } from '../../lib/supabase-auth'
+import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 
 export default function MyDemoPage() {
@@ -17,50 +17,55 @@ export default function MyDemoPage() {
   const hasAccess = isLoggedIn && canViewDemo(subscription)
 
   useEffect(() => {
-    if (!demoId || !hasAccess || isLoading) return
-    loadDemo()
-  }, [demoId, hasAccess, isLoading])
+    let cancelled = false
 
-  async function loadDemo() {
-    if (!demoId) return
+    const loadDemo = async () => {
+      if (!demoId || !hasAccess || isLoading) return
 
-    // 通过 authedRequest 从 question_demos 读取
-    const { authedRequest } = await import('../../lib/supabase-auth')
-    const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
-    const demo = data?.[0]
-    if (!demo?.html_url) {
-      setLoadState('notfound')
-      return
-    }
+      const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
+      const demo = data?.[0]
+      if (!demo?.html_url || cancelled) {
+        if (!cancelled) setLoadState('notfound')
+        return
+      }
 
-    const url = demo.html_url
+      const url = demo.html_url
 
-    if (url.startsWith('data:text/html')) {
-      // data:URL → 解码后用 srcdoc 渲染
-      try {
-        const encoded = url.split(',')[1]
-        setHtmlContent(decodeURIComponent(encoded))
-        setLoadState('ready')
-      } catch {
+      if (url.startsWith('data:text/html')) {
+        // data:URL → 解码后用 srcdoc 渲染
+        try {
+          const encoded = url.split(',')[1]
+          if (!encoded) throw new Error('empty data url')
+          setHtmlContent(decodeURIComponent(encoded))
+          if (!cancelled) setLoadState('ready')
+        } catch {
+          if (!cancelled) setLoadState('notfound')
+        }
+      } else if (url.startsWith('http')) {
+        // Kodo URL → 获取内容后用 srcdoc 渲染（避免跨域 iframe 限制）
+        try {
+          const res = await fetch(url)
+          if (!res.ok) { if (!cancelled) setLoadState('notfound'); return }
+          const content = await res.text()
+          if (!cancelled) {
+            setHtmlContent(content)
+            setLoadState('ready')
+          }
+        } catch {
+          // 如果 fetch 失败（CORS 未配置），退而直接用 iframe src
+          if (!cancelled) {
+            setHtmlUrl(url)
+            setLoadState('ready')
+          }
+        }
+      } else if (!cancelled) {
         setLoadState('notfound')
       }
-    } else if (url.startsWith('http')) {
-      // Kodo URL → 获取内容后用 srcdoc 渲染（避免跨域 iframe 限制）
-      try {
-        const res = await fetch(url)
-        if (!res.ok) { setLoadState('notfound'); return }
-        const content = await res.text()
-        setHtmlContent(content)
-        setLoadState('ready')
-      } catch {
-        // 如果 fetch 失败（CORS 未配置），退而直接用 iframe src
-        setHtmlUrl(url)
-        setLoadState('ready')
-      }
-    } else {
-      setLoadState('notfound')
     }
-  }
+
+    void loadDemo()
+    return () => { cancelled = true }
+  }, [demoId, hasAccess, isLoading])
 
   // 权限不足 → 锁定页面
   if (!isLoading && !hasAccess) {

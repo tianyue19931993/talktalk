@@ -16,7 +16,9 @@ const STORAGE_KEY = 'talktalk_auth'
 export function saveSession(session: AuthSession) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-  } catch {}
+  } catch (error) {
+    console.warn('[supabase-auth] saveSession failed:', error)
+  }
 }
 
 /** 同步：从 localStorage 读取原始 session（不过期检查） */
@@ -76,7 +78,9 @@ export function loadSession(): AuthSession | null {
 export function clearSession() {
   try {
     localStorage.removeItem(STORAGE_KEY)
-  } catch {}
+  } catch (error) {
+    console.warn('[supabase-auth] clearSession failed:', error)
+  }
 }
 
 // ============================================================
@@ -134,7 +138,7 @@ export async function authedRequest<T>(
     body?: any
   } = {}
 ): Promise<AuthResponse<T>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
 
   try {
@@ -255,7 +259,7 @@ export async function refreshSession(): Promise<AuthResponse<AuthSession>> {
 
 /** 退出 */
 export async function signOut(): Promise<void> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (session) {
     await authRequest('/logout', { method: 'POST', token: session.accessToken })
   }
@@ -268,7 +272,7 @@ export async function signOut(): Promise<void> {
 
 /** 获取当前用户 Profile */
 export async function getProfile(): Promise<AuthResponse<Profile>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
 
   const id = session.user.id
@@ -295,7 +299,7 @@ export async function getProfile(): Promise<AuthResponse<Profile>> {
 
 /** 更新 Profile */
 export async function updateProfile(data: { nickname?: string; avatar?: string }): Promise<AuthResponse<any>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
   return authedRequest(`/profiles?id=eq.${session.user.id}`, {
     method: 'PATCH',
@@ -338,7 +342,7 @@ function rowToPlan(row: any): Plan {
 
 /** 获取当前用户的有效订阅 */
 export async function getActiveSubscription(): Promise<AuthResponse<Subscription | null>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
 
   const { data, error } = await authedRequest<any[]>(
@@ -409,7 +413,7 @@ export async function createSubscription(userId: string, planId: string): Promis
 
 /** 创建订单（V1 简化：直接标记已支付，等接入真实支付后再改为 pending+回调） */
 export async function createOrder(planId: string, amount: number): Promise<AuthResponse<Order>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
 
   const orderNo = `ORD${Date.now()}${String(Math.random()).slice(2, 8)}`
@@ -449,7 +453,7 @@ export async function adminConfirmOrder(orderId: string, userId: string, planId:
 
 /** 获取用户订单列表 */
 export async function getOrders(): Promise<AuthResponse<Order[]>> {
-  const session = loadSession()
+  const session = await ensureValidSession()
   if (!session) return { data: null, error: 'Not authenticated' }
 
   const { data, error } = await authedRequest<any[]>(

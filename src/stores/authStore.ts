@@ -51,7 +51,9 @@ async function loadUserData() {
       await fetch('/api/subscription/check', {
         headers: { Authorization: `Bearer ${session.accessToken}` },
       })
-    } catch {}
+    } catch (error) {
+      console.warn('[authStore] subscription check failed:', error)
+    }
 
     const [profileRes, subRes] = await Promise.all([
       getProfile(),

@@ -90,7 +90,7 @@ export default function HomePage() {
 
       if (result.notMath) {
         // 不是数学题 → 不落库，不清空输入框，显示提示
-        setGenerateStatus('❌ 请输入正确的数学题')
+        setGenerateStatus('❌ 请输入正确的内容')
         setNotMathError(true)
         setTimeout(() => { setSubmitted(false); setGenerateStatus(''); setNotMathError(false) }, 4000)
         return

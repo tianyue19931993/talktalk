@@ -99,7 +99,7 @@ export default function MyPage() {
   // ===== 已登录状态 =====
   const isSubscribed = !!subscription
   const isBasic = subscription?.planCode === 'basic'
-  const isSmart = subscription ? ['ai', 'test'].includes(subscription.planCode) : false
+  const isSmart = subscription?.planCode === 'test'
   const remainingGenerations = getRemainingGenerations(subscription, generation)
 
   return (

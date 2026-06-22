@@ -1,13 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, X, Play, Lock } from 'lucide-react'
+import { Search, X, Play } from 'lucide-react'
 import { Badge } from '../../components/ui/Badge'
 import { getQuestions, getTypes } from '../../stores/appStore'
-import { useAuth } from '../../stores/authStore'
-import { canViewDemo } from '../../lib/supabase-auth'
 import { GRADES, Question } from '../../types'
 
-function QuestionCard({ question, hasDemoAccess, isLoggedIn }: { question: Question; hasDemoAccess: boolean; isLoggedIn: boolean }) {
+function QuestionCard({ question }: { question: Question }) {
   const navigate = useNavigate()
   const demos = question.htmlDemos || []
   const demoCount = demos.length
@@ -33,35 +31,19 @@ function QuestionCard({ question, hasDemoAccess, isLoggedIn }: { question: Quest
       )}
       {demoCount > 0 && (
         <div className="flex flex-wrap gap-2 pt-1">
-          {hasDemoAccess ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(`/demo/${question.id}/${latestDemoIndex}`)
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                transition-all duration-200 cursor-pointer"
-            >
-              <Play className="w-3 h-3" />
-              查看演示动画
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(isLoggedIn ? '/subscribe' : '/login')
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                text-[var(--color-mute)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)]
-                rounded-full hover:text-[var(--color-link)] hover:border-[var(--color-link)]
-                transition-all duration-200 cursor-pointer"
-            >
-              <Lock className="w-3 h-3" />
-              会员可看演示动画
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/demo/${question.id}/${latestDemoIndex}`)
+            }}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+              text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+              rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+              transition-all duration-200 cursor-pointer"
+          >
+            <Play className="w-3 h-3" />
+            查看演示动画
+          </button>
           <span className="self-center text-[10px] text-[var(--color-mute)]">{demoCount}个演示</span>
         </div>
       )}
@@ -72,11 +54,9 @@ function QuestionCard({ question, hasDemoAccess, isLoggedIn }: { question: Quest
 export default function LessonListPage() {
   const allQuestions = getQuestions().filter((q) => q.status === 'published')
   const allTypes = getTypes()
-  const { subscription, isLoggedIn } = useAuth()
   const [search, setSearch] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
-  const hasDemoAccess = isLoggedIn && canViewDemo(subscription)
 
   const filtered = useMemo(() => {
     let result = allQuestions
@@ -162,7 +142,7 @@ export default function LessonListPage() {
         {filtered.length === 0 ? (
           <p className="text-sm text-[var(--color-mute)] text-center py-12">没有找到匹配的题目</p>
         ) : (
-          filtered.map((q) => <QuestionCard key={q.id} question={q} hasDemoAccess={hasDemoAccess} isLoggedIn={isLoggedIn} />)
+          filtered.map((q) => <QuestionCard key={q.id} question={q} />)
         )}
       </div>
     </div>

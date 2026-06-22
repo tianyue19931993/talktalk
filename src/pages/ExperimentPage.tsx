@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Lock, Crown, Download } from 'lucide-react'
+import { ArrowLeft, Download } from 'lucide-react'
 import { useAuth } from '../stores/authStore'
-import { canViewDemo } from '../lib/supabase-auth'
-import { Button } from '../components/ui/Button'
 import ComparisonExperiment from '../components/experiments/ComparisonExperiment'
 import FractionExperiment from '../components/experiments/FractionExperiment'
 import AreaExperiment from '../components/experiments/AreaExperiment'
@@ -50,9 +48,9 @@ function detectType(data: AnalysisJson): ExperimentType | null {
 export default function ExperimentPage() {
   const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
-  const { user, subscription, isLoggedIn, isLoading } = useAuth()
+  const { isLoading } = useAuth()
   const [analysisJson, setAnalysisJson] = useState<AnalysisJson | null>(null)
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound'>('loading')
   const experimentType = useMemo(() => (analysisJson ? detectType(analysisJson) : null), [analysisJson])
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -117,13 +115,6 @@ export default function ExperimentPage() {
           return
         }
 
-        const isOwner = !!user && question.user_id === user.id
-        const hasAccess = isLoggedIn && (isOwner || canViewDemo(subscription))
-        if (!cancelled && !hasAccess) {
-          setLoadState('locked')
-          return
-        }
-
         const json = question.analysis_json as AnalysisJson | undefined
         if (!json || typeof json !== 'object') {
           if (!cancelled) setLoadState('notfound')
@@ -141,30 +132,7 @@ export default function ExperimentPage() {
 
     void loadData()
     return () => { cancelled = true }
-  }, [demoId, isLoading, isLoggedIn, subscription, user])
-
-  // 权限不足
-  if (!isLoading && loadState === 'locked') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
-        <button onClick={() => navigate(-1)} className="self-start mb-4 inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer">
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
-        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] p-8 border border-[var(--color-hairline)] text-center max-w-sm shadow-[var(--shadow-l2)]">
-          <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center">
-            <Lock className="w-7 h-7 text-[var(--color-mute)]" />
-          </div>
-          <p className="text-base font-semibold text-[var(--color-ink)] mb-1">互动实验已锁定</p>
-          <p className="text-sm text-[var(--color-mute)] mb-5">开通会员后即可查看全部互动实验</p>
-          <Button variant="primary" size="sm" onClick={() => navigate(isLoggedIn ? '/subscribe' : '/login')}>
-            <Crown className="w-4 h-4" />
-            {isLoggedIn ? '开通会员' : '登录开通'}
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  }, [demoId, isLoading])
 
   if (loadState === 'loading') {
     return (

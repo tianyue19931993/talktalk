@@ -521,7 +521,6 @@ function rowToOrder(row: any): Order {
  */
 const BUILTIN_PLAN_PERMISSIONS: Record<string, string[]> = {
   basic: ['view_demo'],
-  ai: ['view_demo', 'create_demo'],
   test: ['view_demo', 'create_demo'],
 }
 

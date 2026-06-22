@@ -169,7 +169,7 @@ export default async function handler(req, res) {
       if (mathCheck.content.trim() !== '是') {
         return res.status(200).json({
           success: false,
-          error: '请输入正确的数学题',
+          error: '请输入正确的内容',
           notMath: true,
         })
       }

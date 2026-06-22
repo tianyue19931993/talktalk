@@ -56,7 +56,7 @@ export default async (req, res) => {
       }
     }
 
-    // 1.5 没有活跃订阅时，自动补发 basic 会员
+    // 1.5 首次登录的新用户自动补发 basic 会员；已有历史记录的过期用户不自动补发
     if (!hasActive) {
       const ensured = await ensureBasicSubscription(userId)
       if (ensured) {

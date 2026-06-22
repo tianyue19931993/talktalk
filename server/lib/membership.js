@@ -100,6 +100,14 @@ export async function ensureBasicSubscription(userId) {
     return active
   }
 
+  const { data: history, error } = await query('subscriptions', {
+    filters: { user_id: userId },
+    select: 'id',
+    limit: 1,
+  })
+  if (error) throw error
+  if (history && history.length > 0) return null
+
   const basicPlan = await fetchPlanByCode('basic')
   if (!basicPlan || basicPlan.status !== 'active') return null
   return ensureSubscriptionForPlan(userId, basicPlan.id, { resetUsage: true })

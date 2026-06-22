@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw, Lock } from 'lucide-react'
+import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
 import { getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
 // import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
-import { canViewDemo } from '../../lib/supabase-auth'
 import { generateDemo } from '../../lib/generate'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -18,7 +17,7 @@ function formatDateTime(value: string) {
 
 export default function MyQuestionsPage() {
   const navigate = useNavigate()
-  const { isLoggedIn, subscription } = useAuth()
+  const { isLoggedIn } = useAuth()
   const [questions, setQuestions] = useState<UserQuestion[]>([])
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
@@ -32,7 +31,8 @@ export default function MyQuestionsPage() {
     return questions.filter(
       (item) =>
         item.questionText.toLowerCase().includes(q) ||
-        (item.questionType && item.questionType.toLowerCase().includes(q))
+        (item.questionType && item.questionType.toLowerCase().includes(q)) ||
+        (item.coreDiscovery && item.coreDiscovery.toLowerCase().includes(q))
     )
   }, [questions, search])
 
@@ -153,7 +153,7 @@ export default function MyQuestionsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
           <input
             type="text"
-            placeholder="搜索题目内容..."
+            placeholder="搜索题目"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
@@ -174,11 +174,11 @@ export default function MyQuestionsPage() {
             <div className="w-16 h-16 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center mb-4">
               <FileText className="w-8 h-8 text-[var(--color-mute)]" />
             </div>
-            <p className="text-sm font-medium text-[var(--color-ink)] mb-1">还没有录入题目</p>
-            <p className="text-xs text-[var(--color-mute)] mb-6">在首页录入题目后，会在这里显示</p>
+            <p className="text-sm font-medium text-[var(--color-ink)] mb-1">还没有生成</p>
+            <p className="text-xs text-[var(--color-mute)] mb-6">在首页操作生成后，会在这里显示</p>
             <Button variant="primary" size="sm" onClick={() => navigate('/')}>
               <Sparkles className="w-4 h-4" />
-              去录入题目
+              去生成
             </Button>
           </div>
         ) : filteredQuestions.length === 0 ? (
@@ -242,38 +242,23 @@ export default function MyQuestionsPage() {
                     {demos.length > 0 ? (
                       demos.map((demo) => (
                         <React.Fragment key={demo.id}>
-                          {canViewDemo(subscription) ? (
-                            <button
-                              onClick={() => navigate(`/my/demo/${demo.id}`)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                                text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                                rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                                transition-all duration-200 cursor-pointer"
-                            >
-                              <Play className="w-3 h-3" />
-                              观看 {demo.title || '演示'}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => navigate('/subscribe')}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                                text-[var(--color-mute)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)]
-                                rounded-full hover:text-[var(--color-link)] hover:border-[var(--color-link)]
-                                transition-all duration-200 cursor-pointer"
-                            >
-                              <Lock className="w-3 h-3" />
-                              会员可看
-                            </button>
-                          )}
-                          {canViewDemo(subscription) && (
-                            <button
-                              onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                              className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                              title="下载 HTML"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => navigate(`/my/demo/${demo.id}`)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                              text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                              rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                              transition-all duration-200 cursor-pointer"
+                          >
+                            <Play className="w-3 h-3" />
+                            观看 {demo.title || '演示'}
+                          </button>
+                          <button
+                            onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                            className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
+                            title="下载 HTML"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
                         </React.Fragment>
                       ))
                     ) : (

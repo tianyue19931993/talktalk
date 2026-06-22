@@ -3,29 +3,39 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Crown } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
+import { getUserQuestion } from '../../lib/user-questions'
 import { Button } from '../../components/ui/Button'
 
 export default function MyDemoPage() {
   const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
-  const { subscription, isLoggedIn, isLoading } = useAuth()
+  const { user, subscription, isLoggedIn, isLoading } = useAuth()
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound'>('loading')
-
-  // 权限检查：需要有效订阅
-  const hasAccess = isLoggedIn && canViewDemo(subscription)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
 
   useEffect(() => {
     let cancelled = false
 
     const loadDemo = async () => {
-      if (!demoId || !hasAccess || isLoading) return
+      if (!demoId || isLoading) return
+
+      setLoadState('loading')
+      setHtmlContent(null)
+      setHtmlUrl(null)
 
       const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
       const demo = data?.[0]
       if (!demo?.html_url || cancelled) {
         if (!cancelled) setLoadState('notfound')
+        return
+      }
+
+      const question = await getUserQuestion(demo.question_id)
+      const isOwner = !!user && question?.userId === user.id
+      const hasAccess = isLoggedIn && (isOwner || canViewDemo(subscription))
+      if (!cancelled && !hasAccess) {
+        setLoadState('locked')
         return
       }
 
@@ -65,10 +75,10 @@ export default function MyDemoPage() {
 
     void loadDemo()
     return () => { cancelled = true }
-  }, [demoId, hasAccess, isLoading])
+  }, [demoId, isLoading, isLoggedIn, subscription, user])
 
   // 权限不足 → 锁定页面
-  if (!isLoading && !hasAccess) {
+  if (!isLoading && loadState === 'locked') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
         <button

@@ -50,11 +50,9 @@ function detectType(data: AnalysisJson): ExperimentType | null {
 export default function ExperimentPage() {
   const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
-  const { subscription, isLoggedIn, isLoading } = useAuth()
+  const { user, subscription, isLoggedIn, isLoading } = useAuth()
   const [analysisJson, setAnalysisJson] = useState<AnalysisJson | null>(null)
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound'>('loading')
-
-  const hasAccess = isLoggedIn && canViewDemo(subscription)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
   const experimentType = useMemo(() => (analysisJson ? detectType(analysisJson) : null), [analysisJson])
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -91,7 +89,10 @@ export default function ExperimentPage() {
     let cancelled = false
 
     const loadData = async () => {
-      if (!demoId || !hasAccess || isLoading) return
+      if (!demoId || isLoading) return
+
+      setLoadState('loading')
+      setAnalysisJson(null)
 
       try {
         const { authedRequest } = await import('../lib/supabase-auth')
@@ -116,6 +117,13 @@ export default function ExperimentPage() {
           return
         }
 
+        const isOwner = !!user && question.user_id === user.id
+        const hasAccess = isLoggedIn && (isOwner || canViewDemo(subscription))
+        if (!cancelled && !hasAccess) {
+          setLoadState('locked')
+          return
+        }
+
         const json = question.analysis_json as AnalysisJson | undefined
         if (!json || typeof json !== 'object') {
           if (!cancelled) setLoadState('notfound')
@@ -133,10 +141,10 @@ export default function ExperimentPage() {
 
     void loadData()
     return () => { cancelled = true }
-  }, [demoId, hasAccess, isLoading])
+  }, [demoId, isLoading, isLoggedIn, subscription, user])
 
   // 权限不足
-  if (!isLoading && !hasAccess) {
+  if (!isLoading && loadState === 'locked') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--color-canvas-soft)] p-4">
         <button onClick={() => navigate(-1)} className="self-start mb-4 inline-flex items-center gap-1 text-sm text-[var(--color-link)] hover:opacity-80 cursor-pointer">

@@ -2,8 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import MobileLayout from './components/mobile/MobileLayout'
 import AdminLayout from './components/admin/AdminLayout'
 import HomePage from './pages/mobile/HomePage'
-import LessonListPage from './pages/mobile/LessonListPage'
-import LessonDetailPage from './pages/mobile/LessonDetailPage'
 import DemoPage from './pages/mobile/DemoPage'
 import MyPage from './pages/mobile/MyPage'
 import LoginPage from './pages/mobile/LoginPage'
@@ -31,8 +29,8 @@ export default function App() {
       {/* Mobile routes */}
       <Route element={<MobileLayout />}>
         <Route path="/" element={<HomePage />} />
-        <Route path="/lessons" element={<LessonListPage />} />
-        <Route path="/lesson/:id" element={<LessonDetailPage />} />
+        <Route path="/lessons" element={<Navigate to="/my/questions" replace />} />
+        <Route path="/lesson/:id" element={<Navigate to="/my/questions" replace />} />
         <Route path="/my" element={<MyPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/subscribe" element={<SubscribePage />} />

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Clock, Play, Lock } from 'lucide-react'
+import { ArrowLeft, Download, Clock, Play } from 'lucide-react'
 import { getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
-import { useAuth } from '../../stores/authStore'
-import { canViewDemo } from '../../lib/supabase-auth'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -22,8 +20,6 @@ function formatDateTime(value: string) {
 export default function MyQuestionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { subscription, isLoggedIn } = useAuth()
-  const hasDemoAccess = isLoggedIn && canViewDemo(subscription)
   const [question, setQuestion] = useState<UserQuestion | null>(null)
   const [demos, setDemos] = useState<QuestionDemo[]>([])
   const [loading, setLoading] = useState(true)
@@ -119,37 +115,23 @@ export default function MyQuestionDetailPage() {
                 <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || '演示'}</p>
                 <p className="text-[10px] text-[var(--color-mute)] mb-3">生成于 {formatDateTime(demo.createdAt)}</p>
                 <div className="flex items-center gap-3">
-                  {hasDemoAccess ? (
-                    <button
-                      onClick={() => navigate(`/my/demo/${demo.id}`)}
-                      className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium text-white rounded-full
-                        bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                        shadow-[0_1px_4px_rgba(121,40,202,0.15)] hover:scale-[1.02] active:scale-[0.98]
-                        transition-all duration-200 cursor-pointer"
-                    >
-                      <Play className="w-3.5 h-3.5" />观看
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => navigate('/subscribe')}
-                      className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium
-                        text-[var(--color-mute)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
-                        hover:text-[var(--color-link)] hover:border-[var(--color-link)]
-                        transition-all duration-200 cursor-pointer"
-                    >
-                      <Lock className="w-3.5 h-3.5" />会员可看
-                    </button>
-                  )}
-                  {hasDemoAccess && (
-                    <button
-                      onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                      className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
-                        bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
-                        hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />下载
-                    </button>
-                  )}
+                  <button
+                    onClick={() => navigate(`/my/demo/${demo.id}`)}
+                    className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium text-white rounded-full
+                      bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                      shadow-[0_1px_4px_rgba(121,40,202,0.15)] hover:scale-[1.02] active:scale-[0.98]
+                      transition-all duration-200 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5" />观看
+                  </button>
+                  <button
+                    onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
+                    className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
+                      bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
+                      hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />下载
+                  </button>
                 </div>
               </div>
             ))}

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
+import { Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
 import { useAuth, refreshUserData } from '../../stores/authStore'
-import { canViewDemo, getRemainingGenerations } from '../../lib/supabase-auth'
+import { getRemainingGenerations } from '../../lib/supabase-auth'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -150,15 +150,6 @@ export default function HomePage() {
         </span>
       </div>
 
-      {/* Search Bar — 进题库 */}
-      <div
-        className="flex items-center gap-2.5 h-12 px-5 bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-full shadow-[var(--shadow-l2)] cursor-pointer mb-7 hover:shadow-[var(--shadow-l3)] hover:border-[var(--color-mute)] transition-all duration-200"
-        onClick={() => navigate('/lessons')}
-      >
-        <Search className="w-4 h-4 text-[var(--color-mute)] shrink-0" />
-        <span className="text-sm text-[var(--color-mute)]">搜索题目、题型、知识点…</span>
-      </div>
-
       {/* 应用题可视化演示板块 */}
       <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5">
         <div className="flex items-center gap-2 mb-4">
@@ -227,8 +218,8 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 最近生成的互动 — 需要有效订阅才能查看 */}
-      {isLoggedIn && latestQuestion && canViewDemo(subscription) && (
+      {/* 最近生成的互动 — 自己生成的内容始终可查看 */}
+      {isLoggedIn && latestQuestion && (
         <div
           className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5 cursor-pointer hover:shadow-[var(--shadow-l3)] transition-all duration-200"
           onClick={() => navigate('/my/questions')}
@@ -271,18 +262,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 我的互动演示入口 */}
-      <button
-        onClick={() => navigate('/my/questions')}
-        className="inline-flex items-center justify-center gap-2 w-full h-12 text-sm font-medium text-white rounded-full
-          bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-          shadow-[0_1px_8px_rgba(121,40,202,0.2)]
-          hover:shadow-[0_2px_16px_rgba(121,40,202,0.3)] hover:scale-[1.02] active:scale-[0.98]
-          transition-all duration-200 cursor-pointer"
-      >
-        <BookOpen className="w-4 h-4" />
-        我的互动演示
-      </button>
     </div>
   )
 }

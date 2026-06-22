@@ -1,5 +1,7 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import type { MouseEvent } from 'react'
 import { Home, BookOpen, User } from 'lucide-react'
+import { useAuth } from '../../stores/authStore'
 
 const navItems = [
   { path: '/', label: '首页', icon: Home },
@@ -11,6 +13,8 @@ const activeColors = ['#7928ca', '#0070f3', '#ff0080']
 
 export default function MobileLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { isLoggedIn } = useAuth()
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
@@ -28,11 +32,18 @@ export default function MobileLayout() {
         <div className="bg-white/72 backdrop-blur-[20px] -webkit-backdrop-blur-[20px] border-t border-white/40 flex items-center justify-around h-16">
           {navItems.map((item, idx) => {
             const active = isActive(item.path)
+            const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+              if (item.path === '/my/questions' && !isLoggedIn) {
+                e.preventDefault()
+                navigate('/my')
+              }
+            }
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 end={item.path === '/'}
+                onClick={handleClick}
                 className="flex flex-col items-center justify-center gap-0.5 px-5 py-1 transition-all duration-200"
               >
                 <item.icon

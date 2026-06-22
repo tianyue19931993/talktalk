@@ -119,41 +119,43 @@ export default function MyQuestionsPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] max-w-lg mx-auto">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[var(--color-canvas-soft)]/95 backdrop-blur-md border-b border-[var(--color-hairline)] px-4 pt-3 pb-3">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h1 className="text-base font-semibold text-[var(--color-ink)]">互动</h1>
-            <p className="text-[10px] text-[var(--color-mute)] mt-0.5">共 {filteredQuestions.length} 条</p>
+      <div className="sticky top-0 z-10 bg-[var(--color-canvas-soft)]/95 backdrop-blur-md px-4 pt-3 pb-3">
+        <div className="bg-white rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] border border-[var(--color-hairline)] p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h1 className="text-base font-semibold text-[var(--color-ink)]">互动</h1>
+              <p className="text-[10px] text-[var(--color-mute)] mt-0.5">共 {filteredQuestions.length} 条</p>
+            </div>
+            <button
+              onClick={() => { setLoading(true); loadAll() }}
+              disabled={loading}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                text-[var(--color-body)] bg-[var(--color-canvas)] border border-[var(--color-hairline)]
+                rounded-full hover:text-[var(--color-ink)] hover:border-[var(--color-mute)]
+                disabled:opacity-40 transition-all cursor-pointer"
+              title="刷新"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              刷新
+            </button>
           </div>
-          <button
-            onClick={() => { setLoading(true); loadAll() }}
-            disabled={loading}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-              text-[var(--color-body)] bg-[var(--color-canvas)] border border-[var(--color-hairline)]
-              rounded-full hover:text-[var(--color-ink)] hover:border-[var(--color-mute)]
-              disabled:opacity-40 transition-all cursor-pointer"
-            title="刷新"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            刷新
-          </button>
-        </div>
-        {regenNotice && (
-          <div className="mb-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            {regenNotice}
+          {regenNotice && (
+            <div className="mb-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              {regenNotice}
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
+            <input
+              type="text"
+              placeholder="搜索题目"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-full
+                text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
+                focus:outline-none focus:border-[var(--color-link)] transition-colors"
+            />
           </div>
-        )}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
-          <input
-            type="text"
-            placeholder="搜索题目"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-full
-              text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
-              focus:outline-none focus:border-[var(--color-link)] transition-colors"
-          />
         </div>
       </div>
 

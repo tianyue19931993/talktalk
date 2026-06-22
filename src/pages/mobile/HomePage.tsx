@@ -70,7 +70,7 @@ export default function HomePage() {
     if (!questionText.trim()) return
 
     if (!isLoggedIn) {
-      navigate('/login?redirect=/')
+      navigate('/my')
       return
     }
 
@@ -143,24 +143,19 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-5 pt-6">
-      {/* Logo */}
-      <div className="mb-6">
-        <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] bg-clip-text text-transparent">
-          成长表达实验室 M
-        </span>
-      </div>
-
       {/* 应用题可视化演示板块 */}
       <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5">
         <div className="flex items-center gap-2 mb-4">
           <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] shadow-[0_2px_8px_rgba(121,40,202,0.2)]">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <h2 className="text-base font-semibold text-[var(--color-ink)]">应用题可视化演示</h2>
+          <h2 className="text-base font-bold tracking-tight bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-gradient-end)] bg-clip-text text-transparent">
+            成长表达实验室 M
+          </h2>
         </div>
 
         <p className="text-xs text-[var(--color-mute)] mb-3">
-          录入题目文字，成长表达实验室 M 将为您可视化～
+          成长表达实验室 M 带您一起探索～
         </p>
         {isLoggedIn && (
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs text-blue-700">
@@ -172,7 +167,7 @@ export default function HomePage() {
         <div className="flex flex-col gap-2">
           <textarea
             ref={textareaRef}
-            placeholder="在此输入题目文字…"
+            placeholder="在此输入文字..."
             value={questionText}
             onChange={(e) => setQuestionText(e.target.value)}
             rows={4}

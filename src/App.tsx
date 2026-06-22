@@ -31,6 +31,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/lessons" element={<Navigate to="/my/questions" replace />} />
         <Route path="/lesson/:id" element={<Navigate to="/my/questions" replace />} />
+        <Route path="/my/questions" element={<MyQuestionsPage />} />
         <Route path="/my" element={<MyPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/subscribe" element={<SubscribePage />} />
@@ -38,7 +39,6 @@ export default function App() {
       </Route>
 
       {/* Mobile full-screen pages (no bottom nav) */}
-      <Route path="/my/questions" element={<MyQuestionsPage />} />
       <Route path="/my/question/:id" element={<MyQuestionDetailPage />} />
       <Route path="/my/demo/:demoId" element={<MyDemoPage />} />
 

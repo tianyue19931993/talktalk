@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
+import { FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
 import { getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
 // import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
@@ -119,21 +119,17 @@ export default function MyQuestionsPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] max-w-lg mx-auto">
       {/* Header */}
-      <div className="bg-[var(--color-canvas)] px-5 pt-5 pb-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1 text-sm text-[var(--color-body)] hover:text-[var(--color-ink)] mb-4 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          返回
-        </button>
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-[var(--color-ink)]">我的互动列表</h1>
+      <div className="sticky top-0 z-10 bg-[var(--color-canvas-soft)]/95 backdrop-blur-md border-b border-[var(--color-hairline)] px-4 pt-3 pb-3">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-base font-semibold text-[var(--color-ink)]">互动</h1>
+            <p className="text-[10px] text-[var(--color-mute)] mt-0.5">共 {filteredQuestions.length} 条</p>
+          </div>
           <button
             onClick={() => { setLoading(true); loadAll() }}
             disabled={loading}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-              text-[var(--color-body)] bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)]
+              text-[var(--color-body)] bg-[var(--color-canvas)] border border-[var(--color-hairline)]
               rounded-full hover:text-[var(--color-ink)] hover:border-[var(--color-mute)]
               disabled:opacity-40 transition-all cursor-pointer"
             title="刷新"
@@ -143,12 +139,10 @@ export default function MyQuestionsPage() {
           </button>
         </div>
         {regenNotice && (
-          <div className="mt-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+          <div className="mb-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
             {regenNotice}
           </div>
         )}
-        <p className="text-xs text-[var(--color-mute)] mt-1 mb-3">共 {filteredQuestions.length} 条</p>
-        {/* 搜索框 */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
           <input
@@ -156,14 +150,12 @@ export default function MyQuestionsPage() {
             placeholder="搜索题目"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
+            className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--color-canvas)] border border-[var(--color-hairline)] rounded-full
               text-[var(--color-ink)] placeholder:text-[var(--color-mute)]
               focus:outline-none focus:border-[var(--color-link)] transition-colors"
           />
         </div>
       </div>
-
-
 
       {/* List */}
       <div className="flex-1 px-5 pt-4 pb-6 space-y-4">

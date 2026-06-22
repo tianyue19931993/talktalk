@@ -452,7 +452,7 @@ export default async function handler(req, res) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>互动学习</title>
+<title>互动演示</title>
 <style>
 :root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}

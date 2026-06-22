@@ -46,8 +46,25 @@ export default async (req, res) => {
     const plan = plans[0]
     if (plan.status !== 'active') { res.status(400).json({ error: '套餐已下架' }); return }
 
+    // 查当前有效订阅，免费基础会员不能覆盖正在生效的智能会员
+    const { data: activeSubs } = await supabaseQuery('active_subscriptions', {
+      filters: { user_id: userId },
+      select: 'id,plan_id,plan_code,plan_name',
+      limit: 1,
+    })
+    const activeSub = activeSubs?.[0] || null
+
     const priceInYuan = Number(plan.price)
     if (priceInYuan <= 0) {
+      if (activeSub) {
+        if (activeSub.plan_code !== 'basic') {
+          res.status(400).json({ error: '当前智能会员未到期，请到期后再领取基础会员' })
+          return
+        }
+        res.status(400).json({ error: '该套餐已订阅，无需重复领取' })
+        return
+      }
+
       await ensureSubscriptionForPlan(userId, plan.id, { resetUsage: true })
 
       const freeOrderNo = `FREE${Date.now()}${String(Math.random()).slice(2, 8)}`
@@ -68,12 +85,12 @@ export default async (req, res) => {
     }
 
     // 检查是否已有有效订阅
-    const { data: activeSubs } = await supabaseQuery('active_subscriptions', {
+    const { data: samePlanSubs } = await supabaseQuery('active_subscriptions', {
       filters: { user_id: userId, plan_id: planId },
       select: 'id',
       limit: 1,
     })
-    if (activeSubs && activeSubs.length > 0) {
+    if (samePlanSubs && samePlanSubs.length > 0) {
       res.status(400).json({ error: '该套餐已订阅，无需重复购买' })
       return
     }

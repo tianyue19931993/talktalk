@@ -66,6 +66,7 @@ CREATE TABLE plans (
   name TEXT NOT NULL,
   price NUMERIC NOT NULL DEFAULT 0,
   description TEXT DEFAULT '',
+  generation_limit INT NOT NULL DEFAULT 0,
   permissions JSONB DEFAULT '[]'::jsonb,   -- 权限列表，如 ["view_demo"]
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disabled')),
   sort INT DEFAULT 0,
@@ -139,7 +140,8 @@ SELECT
   s.*,
   p.code AS plan_code,
   p.name AS plan_name,
-  p.permissions
+  p.permissions,
+  p.generation_limit
 FROM subscriptions s
 JOIN plans p ON p.id = s.plan_id
 WHERE s.status = 'active'

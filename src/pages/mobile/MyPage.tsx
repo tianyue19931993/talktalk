@@ -205,9 +205,6 @@ export default function MyPage() {
         )}
         <LinkItem icon={CreditCard} label="订单记录" onClick={() => navigate('/orders')} />
         <LinkItem icon={KeyRound} label="修改密码" onClick={() => setShowPasswordForm(true)} />
-        {isSmart && (
-          <LinkItem icon={Sparkles} label="智能功能" onClick={() => {}} />
-        )}
         {isAdmin && (
           <LinkItem icon={Shield} label="管理后台" onClick={() => navigate('/admin')} />
         )}

@@ -78,7 +78,7 @@ export default function MyPage() {
             <User className="w-8 h-8 text-[var(--color-mute)]" />
           </div>
           <h2 className="text-base font-semibold text-[var(--color-ink)] mb-1">未登录</h2>
-          <p className="text-sm text-[var(--color-mute)] mb-4">登录后开启学习之旅</p>
+          <p className="text-sm text-[var(--color-mute)] mb-4">登录后即可使用</p>
           <Button variant="primary" size="lg" className="w-full" onClick={() => navigate('/login')}>
             <LogIn className="w-4 h-4" />
             登录 / 注册

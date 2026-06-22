@@ -271,13 +271,12 @@ export default function SubscribePage() {
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-5 animate-bounce">
             <Check className="w-10 h-10 text-green-600" />
           </div>
-          <h2 className="text-xl font-semibold text-[var(--color-ink)] mb-2">开通成功！🎉</h2>
-          <p className="text-sm text-[var(--color-body)] mb-2">您现在可以解锁全部互动演示了</p>
+          <h2 className="text-xl font-semibold text-[var(--color-ink)] mb-2">领取成功！</h2>
           {selectedPlan && (
             <p className="text-xs text-[var(--color-mute)] mb-8">{selectedPlan.name} · 有效期{selectedPlan.durationDays}天</p>
           )}
-          <Button variant="primary" size="lg" onClick={() => navigate('/lessons')}>
-            开始学习
+          <Button variant="primary" size="lg" onClick={() => navigate('/')}>
+            返回首页
           </Button>
         </div>
       </div>
@@ -410,6 +409,9 @@ export default function SubscribePage() {
       <div className="flex-1 px-6 pt-4 pb-8 space-y-4">
         {plans.map((plan) => {
           const isCurrent = subscription?.planId === plan.id
+          const isBasicPlan = plan.code === 'basic'
+          const isLockedByActiveSubscription = isBasicPlan && !!subscription && subscription.planCode !== 'basic'
+          const isDisabled = isCurrent || isLockedByActiveSubscription
 
           return (
             <div
@@ -476,7 +478,7 @@ export default function SubscribePage() {
                 className="w-full"
                 onClick={() => handleSubscribe(plan)}
                 loading={(loading && plan.price === 0) || (payState === 'creating' && selectedPlan?.id === plan.id)}
-                disabled={isCurrent}
+                disabled={isDisabled}
               >
                   {isCurrent ? '已订阅' : plan.price === 0 ? '免费领取' : '立即开通'}
                 </Button>

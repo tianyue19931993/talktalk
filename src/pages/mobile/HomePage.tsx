@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Sparkles, Send, BookOpen, Loader2, Check, Play, AlertCircle, Clock } from 'lucide-react'
-import { useAuth } from '../../stores/authStore'
-import { canCreateDemo, canViewDemo } from '../../lib/supabase-auth'
+import { useAuth, refreshUserData } from '../../stores/authStore'
+import { canViewDemo, getRemainingGenerations } from '../../lib/supabase-auth'
 import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { generateDemo, pollQuestionDemos } from '../../lib/generate'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { isLoggedIn, subscription } = useAuth()
+  const { isLoggedIn, subscription, generation } = useAuth()
   const [questionText, setQuestionText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -18,6 +18,7 @@ export default function HomePage() {
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
   const [notMathError, setNotMathError] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const remainingGenerations = getRemainingGenerations(subscription, generation)
 
   // 加载最新题目
   const loadLatest = async (forceReload?: boolean) => {
@@ -73,9 +74,9 @@ export default function HomePage() {
       return
     }
 
-    // 权限检查：只有 AI 会员才能创建互动演示
-    if (!subscription || !canCreateDemo(subscription)) {
-      alert('当前套餐不支持创建互动演示，请升级会员')
+    // 次数检查：按套餐配置控制生成次数
+    if (!subscription || remainingGenerations <= 0) {
+      alert('当前套餐已没有可用的生成次数，请升级会员或联系管理员')
       navigate('/subscribe')
       return
     }
@@ -101,6 +102,7 @@ export default function HomePage() {
 
       if (result.success) {
         setGenerateStatus('生成完成！')
+        await refreshUserData()
         await loadLatest(true)
         setTimeout(() => { setSubmitted(false); setGenerateStatus('') }, 3500)
       } else if (result.timedOut) {
@@ -169,6 +171,12 @@ export default function HomePage() {
         <p className="text-xs text-[var(--color-mute)] mb-3">
           录入题目文字，成长表达实验室 M 将为您可视化～
         </p>
+        {isLoggedIn && (
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs text-blue-700">
+            <Sparkles className="w-3.5 h-3.5" />
+            当前可生成 {remainingGenerations} 次
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <textarea

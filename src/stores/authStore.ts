@@ -1,6 +1,7 @@
 // 认证与订阅状态管理
 import { useState, useEffect } from 'react'
 import { ensureValidSession, clearSession, getProfile, getActiveSubscription, hasStoredSession } from '../lib/supabase-auth'
+import { getUserGeneration } from '../lib/user-questions'
 import type { Profile, Subscription } from '../types/auth'
 
 // ============================================================
@@ -9,6 +10,7 @@ import type { Profile, Subscription } from '../types/auth'
 
 let currentUser: Profile | null = null
 let currentSubscription: Subscription | null = null
+let currentGeneration: { totalCount: number; usedCount: number } | null = null
 let initialized = false
 let loading = false
 let listeners: Array<() => void> = []
@@ -40,6 +42,7 @@ async function loadUserData() {
       clearSession()
       currentUser = null
       currentSubscription = null
+      currentGeneration = null
       initialized = true
       loading = false
       notify()
@@ -66,6 +69,7 @@ async function loadUserData() {
         clearSession()
         currentUser = null
         currentSubscription = null
+        currentGeneration = null
       } else {
         currentUser = profileRes.data
       }
@@ -74,9 +78,11 @@ async function loadUserData() {
       clearSession()
       currentUser = null
       currentSubscription = null
+      currentGeneration = null
     }
 
     currentSubscription = subRes.data || null
+    currentGeneration = await getUserGeneration()
   } catch (e) {
     console.warn('[authStore] load failed:', e)
   }
@@ -92,6 +98,7 @@ async function loadUserData() {
 
 export function getUser(): Profile | null { return currentUser }
 export function getSubscription(): Subscription | null { return currentSubscription }
+export function getGenerationUsage() { return currentGeneration }
 
 /** 手动刷新用户数据（登录/登出后调用） */
 export async function refreshUserData() {
@@ -99,6 +106,7 @@ export async function refreshUserData() {
   loading = false
   currentUser = null
   currentSubscription = null
+  currentGeneration = null
 
   if (hasStoredSession()) {
     await loadUserData()
@@ -132,6 +140,7 @@ export function useAuth() {
   return {
     user: currentUser,
     subscription: currentSubscription,
+    generation: currentGeneration,
     isLoggedIn: !!currentUser,
     isLoading: !initialized && hasStoredSession(),
     isAdmin: currentUser?.role === 'admin',

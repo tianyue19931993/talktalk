@@ -9,7 +9,7 @@
  */
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com'
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro'
+const DEEPSEEK_MODEL = 'deepseek-v4-pro'
 
 /**
  * 调用 AI（当前为 DeepSeek Chat）

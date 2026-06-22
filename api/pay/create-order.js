@@ -5,6 +5,7 @@
  */
 import { unifiedOrder, isWechatPayConfigured, getConfigStatus } from '../lib/wechat-pay.js'
 import { query as supabaseQuery, insert } from '../lib/supabase-admin.js'
+import { ensureSubscriptionForPlan } from '../lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -46,7 +47,25 @@ export default async (req, res) => {
     if (plan.status !== 'active') { res.status(400).json({ error: '套餐已下架' }); return }
 
     const priceInYuan = Number(plan.price)
-    if (priceInYuan <= 0) { res.status(400).json({ error: '免费套餐无需支付' }); return }
+    if (priceInYuan <= 0) {
+      await ensureSubscriptionForPlan(userId, plan.id, { resetUsage: true })
+
+      const freeOrderNo = `FREE${Date.now()}${String(Math.random()).slice(2, 8)}`
+      await insert('orders', {
+        order_no: freeOrderNo,
+        user_id: userId,
+        plan_id: planId,
+        amount: 0,
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+      }).catch(() => {})
+
+      res.status(200).json({
+        orderNo: freeOrderNo,
+        payment: { mode: 'native', codeUrl: null, message: '免费套餐已开通' },
+      })
+      return
+    }
 
     // 检查是否已有有效订阅
     const { data: activeSubs } = await supabaseQuery('active_subscriptions', {

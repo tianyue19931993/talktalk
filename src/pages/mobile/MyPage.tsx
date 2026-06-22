@@ -7,10 +7,11 @@ import { useAuth, resetAuth } from '../../stores/authStore'
 import { ensureValidSession, signOut } from '../../lib/supabase-auth'
 import { Button } from '../../components/ui/Button'
 import { useState } from 'react'
+import { getRemainingGenerations } from '../../lib/supabase-auth'
 
 export default function MyPage() {
   const navigate = useNavigate()
-  const { user, subscription, isLoggedIn, isAdmin } = useAuth()
+  const { user, subscription, generation, isLoggedIn, isAdmin } = useAuth()
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -98,7 +99,8 @@ export default function MyPage() {
   // ===== 已登录状态 =====
   const isSubscribed = !!subscription
   const isBasic = subscription?.planCode === 'basic'
-  const isAi = subscription?.planCode === 'ai'
+  const isSmart = subscription ? ['ai', 'test'].includes(subscription.planCode) : false
+  const remainingGenerations = getRemainingGenerations(subscription, generation)
 
   return (
     <div className="flex flex-col gap-6 px-5 pt-5 pb-6">
@@ -142,18 +144,21 @@ export default function MyPage() {
                 <span>到期 {new Date(subscription.expireAt).toLocaleDateString('zh-CN')}</span>
               </div>
             )}
+            <div className="text-xs text-[var(--color-body)] mb-3">
+              生成次数：{remainingGenerations} 次可用
+            </div>
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
               查看会员套餐
             </Button>
           </div>
         )}
 
-        {/* AI 会员 */}
-        {isSubscribed && isAi && (
+        {/* 智能会员 */}
+        {isSubscribed && isSmart && (
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[var(--radius-xl)] p-4">
             <div className="flex items-center gap-2 mb-1">
               <Sparkles className="w-4 h-4 text-[var(--color-violet)]" />
-              <span className="text-sm font-semibold text-[var(--color-violet)]">AI 会员</span>
+              <span className="text-sm font-semibold text-[var(--color-violet)]">智能会员</span>
             </div>
             {subscription.expireAt && (
               <div className="flex items-center gap-1.5 text-xs text-[var(--color-body)] mb-3">
@@ -161,6 +166,9 @@ export default function MyPage() {
                 <span>到期 {new Date(subscription.expireAt).toLocaleDateString('zh-CN')}</span>
               </div>
             )}
+            <div className="text-xs text-[var(--color-body)] mb-3">
+              生成次数：{remainingGenerations} 次可用
+            </div>
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
               查看会员套餐
             </Button>
@@ -168,7 +176,7 @@ export default function MyPage() {
         )}
 
         {/* 其他套餐（通用展示） */}
-        {isSubscribed && !isBasic && !isAi && (
+        {isSubscribed && !isBasic && !isSmart && (
           <div className="bg-[var(--color-canvas-soft)] rounded-[var(--radius-xl)] p-4">
             <div className="flex items-center gap-2 mb-1">
               <Crown className="w-4 h-4 text-[var(--color-link)]" />
@@ -180,6 +188,9 @@ export default function MyPage() {
                 <span>到期 {new Date(subscription.expireAt).toLocaleDateString('zh-CN')}</span>
               </div>
             )}
+            <div className="text-xs text-[var(--color-body)] mb-3">
+              生成次数：{remainingGenerations} 次可用
+            </div>
             <Button variant="primary-sm" size="sm" onClick={() => navigate('/subscribe')}>
               查看会员套餐
             </Button>
@@ -194,8 +205,8 @@ export default function MyPage() {
         )}
         <LinkItem icon={CreditCard} label="订单记录" onClick={() => navigate('/orders')} />
         <LinkItem icon={KeyRound} label="修改密码" onClick={() => setShowPasswordForm(true)} />
-        {isAi && (
-          <LinkItem icon={Sparkles} label="AI 功能" onClick={() => {}} />
+        {isSmart && (
+          <LinkItem icon={Sparkles} label="智能功能" onClick={() => {}} />
         )}
         {isAdmin && (
           <LinkItem icon={Shield} label="管理后台" onClick={() => navigate('/admin')} />

@@ -22,6 +22,7 @@ export interface Plan {
   name: string
   price: number
   description: string
+  generationLimit: number
   permissions: string[]
   status: string
   sort: number
@@ -36,6 +37,7 @@ export interface Subscription {
   planId: string
   planCode: string
   planName: string
+  generationLimit?: number
   permissions: string[]
   status: 'active' | 'expired' | 'cancelled'
   startAt: string

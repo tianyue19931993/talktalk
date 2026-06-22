@@ -7,6 +7,7 @@
  */
 import { query, updateWhere, insert } from '../lib/supabase-admin.js'
 import { queryOrder } from '../lib/wechat-pay.js'
+import { ensureBasicSubscription, syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -55,6 +56,16 @@ export default async (req, res) => {
       }
     }
 
+    // 1.5 没有活跃订阅时，自动补发 basic 会员
+    if (!hasActive) {
+      const ensured = await ensureBasicSubscription(userId)
+      if (ensured) {
+        hasActive = true
+      }
+    } else {
+      await syncGenerationQuotaFromActiveSubscription(userId).catch(() => {})
+    }
+
     // 2. 没有活跃订阅 → 查找待支付订单，尝试向微信同步
     if (!hasActive) {
       const { data: pendingOrders } = await query('orders', {
@@ -99,13 +110,16 @@ export default async (req, res) => {
               })
 
               if (!existing || existing.length === 0) {
-                await insert('subscriptions', {
+                const subResult = await insert('subscriptions', {
                   user_id: userId,
                   plan_id: order.plan_id,
                   status: 'active',
                   start_at: actualStart.toISOString(),
                   expire_at: expireAt.toISOString(),
                 })
+                if (!subResult.error) {
+                  await syncGenerationQuotaFromActiveSubscription(userId).catch(() => {})
+                }
                 console.log('[sub/check] synced from WeChat:', { userId, orderNo: order.order_no })
               }
 

@@ -3,6 +3,7 @@
  */
 import { verifyAndDecryptNotify } from '../lib/wechat-pay.js'
 import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin.js'
+import { syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
 
 /** 从请求流读取原始 body（UTF-8） */
 function readRawBody(req) {
@@ -80,6 +81,7 @@ export default async (req, res) => {
         user_id: order.user_id, plan_id: order.plan_id, status: 'active',
         start_at: actualStart.toISOString(), expire_at: expireAt.toISOString(),
       })
+      await syncGenerationQuotaFromActiveSubscription(order.user_id).catch(() => {})
       console.log('[pay/notify] activated:', { userId: order.user_id, orderNo: outTradeNo, planId: order.plan_id })
     } else {
       console.log('[pay/notify] subscription already exists, skip creation')

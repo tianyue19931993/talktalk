@@ -14,6 +14,7 @@ function rowToPlan(row: any): Plan {
     name: row.name,
     price: Number(row.price),
     description: row.description || '',
+    generationLimit: Number(row.generation_limit || 0),
     permissions: row.permissions || [],
     status: row.status,
     sort: row.sort || 0,
@@ -40,6 +41,7 @@ export default function PlanManagePage() {
   const [newName, setNewName] = useState('')
   const [newPrice, setNewPrice] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newGenerationLimit, setNewGenerationLimit] = useState('0')
   const [newDuration, setNewDuration] = useState('30')
   const [newPermissions, setNewPermissions] = useState<string[]>([])
 
@@ -48,6 +50,7 @@ export default function PlanManagePage() {
   const [editName, setEditName] = useState('')
   const [editPrice, setEditPrice] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [editGenerationLimit, setEditGenerationLimit] = useState('0')
   const [editDuration, setEditDuration] = useState('30')
   const [editPermissions, setEditPermissions] = useState<string[]>([])
 
@@ -84,13 +87,14 @@ export default function PlanManagePage() {
         name: newName.trim(),
         price: Number(newPrice),
         description: newDesc.trim(),
+        generation_limit: Number(newGenerationLimit) || 0,
         duration_days: Number(newDuration) || 30,
         permissions: newPermissions,
         sort: plans.length + 1,
       },
     })
     setShowNew(false)
-    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc(''); setNewDuration('30'); setNewPermissions([])
+    setNewCode(''); setNewName(''); setNewPrice(''); setNewDesc(''); setNewGenerationLimit('0'); setNewDuration('30'); setNewPermissions([])
     loadPlans()
   }
 
@@ -99,6 +103,7 @@ export default function PlanManagePage() {
     setEditName(plan.name)
     setEditPrice(String(plan.price))
     setEditDesc(plan.description)
+    setEditGenerationLimit(String(plan.generationLimit || 0))
     setEditDuration(String(plan.durationDays))
     setEditPermissions(plan.permissions || [])
   }
@@ -111,6 +116,7 @@ export default function PlanManagePage() {
         name: editName.trim(),
         price: Number(editPrice),
         description: editDesc.trim(),
+        generation_limit: Number(editGenerationLimit) || 0,
         duration_days: Number(editDuration) || 30,
         permissions: editPermissions,
       },
@@ -143,10 +149,11 @@ export default function PlanManagePage() {
       {/* New form */}
       {showNew && (
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-xl)] shadow-[var(--shadow-l2)] p-5 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 mb-3">
             <Input placeholder="套餐编码 (basic)" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
             <Input placeholder="套餐名称" value={newName} onChange={(e) => setNewName(e.target.value)} />
             <Input placeholder="价格" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} type="number" />
+            <Input placeholder="生成次数" value={newGenerationLimit} onChange={(e) => setNewGenerationLimit(e.target.value)} type="number" />
             <Input placeholder="有效期(天)" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} type="number" />
             <Input placeholder="描述（可选）" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
           </div>
@@ -186,13 +193,14 @@ export default function PlanManagePage() {
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">编码</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">名称</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">价格</th>
+              <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">生成次数</th>
               <th className="text-left text-xs font-medium text-[var(--color-mute)] px-4 py-3">有效期</th>
               <th className="text-right text-xs font-medium text-[var(--color-mute)] px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody>
             {plans.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无套餐数据</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-sm text-[var(--color-mute)]">暂无套餐数据</td></tr>
             ) : (
               plans.map((plan) => (
                 <tr key={plan.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors">
@@ -202,6 +210,7 @@ export default function PlanManagePage() {
                       <div className="space-y-1">
                         <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-2 py-1 text-sm border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" autoFocus />
                         <input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="描述" className="w-full px-2 py-1 text-xs border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" />
+                        <input value={editGenerationLimit} onChange={(e) => setEditGenerationLimit(e.target.value)} placeholder="生成次数" type="number" className="w-full px-2 py-1 text-xs border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" />
                         <div className="flex items-center gap-3 pt-1">
                           {PERMISSION_OPTIONS.map((opt) => (
                             <label key={opt.key} className="flex items-center gap-1 text-xs text-[var(--color-body)] cursor-pointer">
@@ -226,6 +235,9 @@ export default function PlanManagePage() {
                       <div>
                         <span className="text-sm text-[var(--color-ink)] font-medium">{plan.name}</span>
                         {plan.description && <p className="text-xs text-[var(--color-mute)] mt-0.5">{plan.description}</p>}
+                        <p className="text-[11px] text-[var(--color-link)] mt-0.5">
+                          生成次数：{plan.generationLimit} 次
+                        </p>
                       </div>
                     )}
                   </td>
@@ -237,6 +249,13 @@ export default function PlanManagePage() {
                         <DollarSign className="w-3.5 h-3.5 text-[var(--color-mute)]" />
                         {plan.price}
                       </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === plan.id ? (
+                      <input value={editGenerationLimit} onChange={(e) => setEditGenerationLimit(e.target.value)} type="number" className="w-24 px-2 py-1 text-sm border border-[var(--color-hairline)] rounded-[var(--radius-sm)]" />
+                    ) : (
+                      <span className="text-sm text-[var(--color-ink)]">{plan.generationLimit} 次</span>
                     )}
                   </td>
                   <td className="px-4 py-3">

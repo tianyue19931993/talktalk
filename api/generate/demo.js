@@ -14,6 +14,7 @@
  */
 
 import { callAI } from '../lib/ai.js'
+import { consumeGeneration } from '../lib/membership.js'
 import crypto from 'crypto'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
@@ -581,6 +582,22 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
     if (!demoRes.ok) throw new Error('保存演示失败')
     const demos = await demoRes.json()
     const demo = demos?.[0] || {}
+
+    const generationResult = await consumeGeneration(question.user_id)
+    if (!generationResult.success) {
+      await fetch(`${SUPABASE_URL}/rest/v1/question_demos?id=eq.${demo.id}`, {
+        method: 'DELETE',
+        headers,
+      }).catch(() => {})
+      await patchQuestionFull(actualQuestionId, { status: 'pending' }).catch(() => {})
+      return res.status(200).json({
+        success: false,
+        error: generationResult.error === 'quota_exceeded'
+          ? '当前套餐生成次数已用完，请升级会员后再试'
+          : '当前套餐没有可用的生成次数',
+        questionId: actualQuestionId,
+      })
+    }
 
     // 全部流程成功 → 标记为 completed（使用完整 headers，非 best effort）
     await patchQuestionFull(actualQuestionId, { status: 'completed' })

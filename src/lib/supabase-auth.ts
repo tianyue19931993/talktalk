@@ -328,6 +328,7 @@ function rowToPlan(row: any): Plan {
     name: row.name,
     price: Number(row.price),
     description: row.description || '',
+    generationLimit: Number(row.generation_limit || 0),
     permissions: row.permissions || [],
     status: row.status,
     sort: row.sort || 0,
@@ -362,6 +363,7 @@ export async function getActiveSubscription(): Promise<AuthResponse<Subscription
       planId: row.plan_id,
       planCode: row.plan_code,
       planName: row.plan_name,
+      generationLimit: Number(row.generation_limit || 0),
       permissions: row.permissions || [],
       status: row.status,
       startAt: row.start_at,
@@ -401,6 +403,34 @@ export async function createSubscription(userId: string, planId: string): Promis
   })
 
   if (error || !data) return { data: null, error }
+
+  const generationLimit = Number(plan?.generation_limit || 0)
+  const existingGenerations = await authedRequest<any[]>(
+    `/user_generations?user_id=eq.${userId}`,
+    { method: 'GET' }
+  )
+  if (!existingGenerations.error) {
+    if (existingGenerations.data && existingGenerations.data.length > 0) {
+      await authedRequest(`/user_generations?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: {
+          total_count: generationLimit,
+          used_count: 0,
+          updated_at: new Date().toISOString(),
+        },
+      }).catch(() => {})
+    } else {
+      await authedRequest('/user_generations', {
+        method: 'POST',
+        body: {
+          user_id: userId,
+          total_count: generationLimit,
+          used_count: 0,
+        },
+      }).catch(() => {})
+    }
+  }
+
   return {
     data: data[0],
     error: null,
@@ -492,6 +522,7 @@ function rowToOrder(row: any): Order {
 const BUILTIN_PLAN_PERMISSIONS: Record<string, string[]> = {
   basic: ['view_demo'],
   ai: ['view_demo', 'create_demo'],
+  test: ['view_demo', 'create_demo'],
 }
 
 /** 获取套餐实际权限（优先用数据库配置，降级用内置映射） */
@@ -517,6 +548,17 @@ export function canViewDemo(subscription: Subscription | null): boolean {
 /** 是否可创建互动演示 */
 export function canCreateDemo(subscription: Subscription | null): boolean {
   return can('create_demo', subscription)
+}
+
+/** 剩余生成次数 */
+export function getRemainingGenerations(
+  subscription: Subscription | null,
+  generation: { totalCount: number; usedCount: number } | null
+): number {
+  if (!subscription || !generation) return 0
+  const total = Number(generation.totalCount || subscription.generationLimit || 0)
+  const used = Number(generation.usedCount || 0)
+  return Math.max(total - used, 0)
 }
 
 /** 是否已登录 */

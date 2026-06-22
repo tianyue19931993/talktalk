@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Download } from 'lucide-r
 import { Button } from '../../components/ui/Button'
 import { ensureValidSession, getPlans } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
+import { getRemainingGenerations } from '../../lib/supabase-auth'
 import type { Plan } from '../../types/auth'
 import QRCode from 'qrcode'
 
@@ -33,7 +34,7 @@ async function readJsonResponse<T = unknown>(res: Response): Promise<T | null> {
 
 export default function SubscribePage() {
   const navigate = useNavigate()
-  const { subscription, isLoggedIn } = useAuth()
+  const { subscription, generation, isLoggedIn } = useAuth()
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -43,6 +44,7 @@ export default function SubscribePage() {
   const [payError, setPayError] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null)
   const [countdown, setCountdown] = useState(0)
+  const remainingGenerations = getRemainingGenerations(subscription, generation)
 
   // QR 码 canvas 引用 + 渲染
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -202,7 +204,7 @@ export default function SubscribePage() {
       })
 
       const data = await readJsonResponse<{
-        orderNo?: string
+        orderNo: string
         payment?: { mode: 'native'; codeUrl?: string; message?: string | null }
         error?: string
         detail?: string
@@ -215,7 +217,14 @@ export default function SubscribePage() {
         throw new Error('服务器返回空响应，请稍后重试')
       }
 
-      setPayParams(data)
+      if (!data.orderNo) {
+        throw new Error('服务器返回的订单号无效，请稍后重试')
+      }
+
+      setPayParams({
+        orderNo: data.orderNo,
+        payment: data.payment || { mode: 'native' },
+      })
       if (data.payment?.codeUrl) {
         // 有有效的付款码 → 显示二维码
         setCountdown(120)
@@ -390,6 +399,9 @@ export default function SubscribePage() {
                 到期 {new Date(subscription.expireAt).toLocaleDateString('zh-CN')}
               </span>
             )}
+            <div className="mt-1 text-[var(--color-body)]">
+              还可生成 {remainingGenerations} 次
+            </div>
           </div>
         )}
       </div>
@@ -445,6 +457,11 @@ export default function SubscribePage() {
 
               {/* Description */}
               <p className="text-sm text-[var(--color-body)] mb-4">{plan.description}</p>
+              <div className="mb-4 text-xs text-[var(--color-body)]">
+                {plan.generationLimit > 0
+                  ? `包含 ${plan.generationLimit} 次互动生成`
+                  : '生成次数待配置'}
+              </div>
 
               {/* Permissions */}
               <div className="space-y-2 mb-6">
@@ -462,14 +479,14 @@ export default function SubscribePage() {
 
                 {/* Action */}
                 <Button
-                  variant={isCurrent ? 'secondary' : 'primary'}
-                  size="lg"
-                  className="w-full"
-                  onClick={() => handleSubscribe(plan)}
-                  loading={(loading && plan.price === 0) || (payState === 'creating' && selectedPlan?.id === plan.id)}
-                  disabled={isCurrent || plan.price === 0}
-                >
-                  {isCurrent ? '已订阅' : plan.price === 0 ? '价格待定' : '立即开通'}
+                variant={isCurrent ? 'secondary' : 'primary'}
+                size="lg"
+                className="w-full"
+                onClick={() => handleSubscribe(plan)}
+                loading={(loading && plan.price === 0) || (payState === 'creating' && selectedPlan?.id === plan.id)}
+                disabled={isCurrent}
+              >
+                  {isCurrent ? '已订阅' : plan.price === 0 ? '免费领取' : '立即开通'}
                 </Button>
               </div>
             )
@@ -478,4 +495,3 @@ export default function SubscribePage() {
       </div>
     )
   }
-  

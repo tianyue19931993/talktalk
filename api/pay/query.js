@@ -4,6 +4,7 @@
  */
 import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin.js'
 import { queryOrder } from '../lib/wechat-pay.js'
+import { syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -79,6 +80,8 @@ export default async (req, res) => {
             })
             if (subResult.error) {
               console.error('[pay/query] create subscription failed:', subResult.error)
+            } else {
+              await syncGenerationQuotaFromActiveSubscription(order.user_id).catch(() => {})
             }
           } else {
             console.log('[pay/query] subscription already exists, skip creation')

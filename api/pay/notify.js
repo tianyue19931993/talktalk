@@ -1,9 +1,9 @@
 /**
  * POST /api/pay/notify - 微信支付回调通知（ESM 版）
  */
-import { verifyAndDecryptNotify } from '../lib/wechat-pay.js'
-import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin.js'
-import { syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
+import { verifyAndDecryptNotify } from '../../server/lib/wechat-pay.js'
+import { query as supabaseQuery, updateWhere, insert } from '../../server/lib/supabase-admin.js'
+import { syncGenerationQuotaFromActiveSubscription } from '../../server/lib/membership.js'
 
 /** 从请求流读取原始 body（UTF-8） */
 function readRawBody(req) {

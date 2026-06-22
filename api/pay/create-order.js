@@ -3,9 +3,9 @@
  * GET /api/pay/create-order?debug=env  — 环境变量诊断
  * POST /api/pay/create-order           — 创建订单
  */
-import { unifiedOrder, isWechatPayConfigured, getConfigStatus } from '../lib/wechat-pay.js'
-import { query as supabaseQuery, insert } from '../lib/supabase-admin.js'
-import { ensureSubscriptionForPlan } from '../lib/membership.js'
+import { unifiedOrder, isWechatPayConfigured, getConfigStatus } from '../../server/lib/wechat-pay.js'
+import { query as supabaseQuery, insert } from '../../server/lib/supabase-admin.js'
+import { ensureSubscriptionForPlan } from '../../server/lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')

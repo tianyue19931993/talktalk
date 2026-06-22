@@ -90,7 +90,6 @@ export async function ensureSubscriptionForPlan(userId, planId, { resetUsage = t
   if (error) throw error
 
   await upsertGenerationRow(userId, plan.generation_limit || 0, resetUsage ? 0 : (await fetchGenerationRow(userId))?.used_count || 0)
-
   return data?.[0] || null
 }
 

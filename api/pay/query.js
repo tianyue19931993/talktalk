@@ -2,9 +2,9 @@
  * GET /api/pay/query - 查询订单支付状态（ESM 版）
  * 支持通过微信支付 API 重新查询以确认状态
  */
-import { query as supabaseQuery, updateWhere, insert } from '../lib/supabase-admin.js'
-import { queryOrder } from '../lib/wechat-pay.js'
-import { syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
+import { query as supabaseQuery, updateWhere, insert } from '../../server/lib/supabase-admin.js'
+import { queryOrder } from '../../server/lib/wechat-pay.js'
+import { syncGenerationQuotaFromActiveSubscription } from '../../server/lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')

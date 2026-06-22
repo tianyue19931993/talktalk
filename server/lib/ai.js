@@ -1,6 +1,6 @@
 /**
  * AI 调用工具层
- * 
+ *
  * 当前预留 DeepSeek API 位置。
  * 使用方式：
  *   1. 在 Vercel Dashboard 配置 DEEPSEEK_API_KEY
@@ -13,10 +13,10 @@ const DEEPSEEK_MODEL = 'deepseek-v4-pro'
 
 /**
  * 调用 AI（当前为 DeepSeek Chat）
- * 
+ *
  * 未配置 API Key 时返回 mock 数据，方便前端调试。
  * 配置 DEEPSEEK_API_KEY 后自动切换为真实调用。
- * 
+ *
  * @param {Object} options
  * @param {string} options.prompt - 用户消息（主要输入）
  * @param {string} [options.systemPrompt] - 系统消息（角色设定 / prompt 模板）
@@ -39,7 +39,6 @@ export async function callAI(options) {
   }
   messages.push({ role: 'user', content: options.prompt })
 
-  // Vercel Hobby 计划函数最大 10s，每个 AI 调用单独设超时
   const timeoutMs = (options.timeoutSeconds || 7) * 1000
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -81,13 +80,10 @@ export async function callAI(options) {
   }
 }
 
-// ─── Mock 模式（无 API Key 时使用） ───────────────────────
-
 function mockAI(options) {
   const promptText = String(options.prompt || '')
   const coreDiscovery = mockCoreDiscovery(promptText)
 
-  // 如果 prompt 包含 analysis_prompt 字样，返回分析 JSON
   if (options.responseFormat === 'json_object' || promptText.includes('严格按照以下 JSON')) {
     return {
       success: true,
@@ -101,7 +97,6 @@ function mockAI(options) {
     }
   }
 
-  // HTML 生成 prompt → 返回一个简单的演示 HTML
   if (promptText.includes('html_prompt') || promptText.includes('生成互动HTML')) {
     const color = ['#7928ca', '#0070f3', '#ff0080'][Math.floor(Math.random() * 3)]
     return {
@@ -131,7 +126,6 @@ h1{font-size:24px;color:#171717;margin:0 0 16px}
     }
   }
 
-  // 题型识别 → 返回一个 core_discovery
   return {
     success: true,
     content: coreDiscovery,

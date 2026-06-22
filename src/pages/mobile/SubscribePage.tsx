@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, Sparkles, Lock, Smartphone, Download } from 'lucide-react'
+import { ArrowLeft, Check, Sparkles, Lock, Download } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { ensureValidSession, getPlans } from '../../lib/supabase-auth'
 import { refreshUserData, useAuth } from '../../stores/authStore'
@@ -389,7 +389,6 @@ export default function SubscribePage() {
           成长表达实验室 M
         </span>
         <h1 className="text-xl font-semibold text-[var(--color-ink)] mt-3">选择会员套餐</h1>
-        <p className="text-sm text-[var(--color-mute)] mt-1">解锁全部互动演示学习资源</p>
 
         {subscription && (
           <div className="mt-4 p-3 bg-[var(--color-link-bg-soft)] rounded-[var(--radius-md)] text-sm">
@@ -407,13 +406,6 @@ export default function SubscribePage() {
       </div>
 
       {/* 支付方式提示 */}
-      <div className="px-6 pt-3">
-        <div className="flex items-center gap-2 text-xs text-[var(--color-mute)] bg-[var(--color-canvas)] rounded-[var(--radius-md)] px-4 py-2.5">
-          <Smartphone className="w-3.5 h-3.5 shrink-0" />
-          <span>微信扫码支付 · 手机/电脑通用</span>
-        </div>
-      </div>
-
       {/* Plan cards */}
       <div className="flex-1 px-6 pt-4 pb-8 space-y-4">
         {plans.map((plan) => {
@@ -448,7 +440,7 @@ export default function SubscribePage() {
               {/* Price */}
               <div className="mb-4">
                 <span className="text-3xl font-bold text-[var(--color-ink)]">
-                  {plan.price === 0 ? '价格待定' : `¥${plan.price}`}
+                  {plan.price === 0 ? '免费' : `¥${plan.price}`}
                 </span>
                 {plan.price > 0 && (
                   <span className="text-sm text-[var(--color-mute)] ml-1">/月</span>
@@ -467,7 +459,7 @@ export default function SubscribePage() {
               <div className="space-y-2 mb-6">
                 <div className="flex items-center gap-2 text-sm text-[var(--color-body)]">
                   <Check className="w-4 h-4 text-green-500 shrink-0" />
-                  <span>查看题库全部互动演示</span>
+                  <span>查看全部互动演示</span>
                 </div>
                 {plan.permissions.includes('create_demo') && (
                   <div className="flex items-center gap-2 text-sm text-[var(--color-body)]">

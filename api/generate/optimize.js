@@ -10,7 +10,7 @@
  *        | { success: false, error: string }
  */
 
-import { callAI } from '../lib/ai.js'
+import { callAI } from '../../server/lib/ai.js'
 import crypto from 'crypto'
 
 const SUPABASE_URL = process.env.SUPABASE_URL

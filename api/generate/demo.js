@@ -13,8 +13,8 @@
  *   Step 5: 存入 question_demos + 标记 completed
  */
 
-import { callAI } from '../lib/ai.js'
-import { consumeGeneration } from '../lib/membership.js'
+import { callAI } from '../../server/lib/ai.js'
+import { consumeGeneration } from '../../server/lib/membership.js'
 import crypto from 'crypto'
 
 const SUPABASE_URL = process.env.SUPABASE_URL

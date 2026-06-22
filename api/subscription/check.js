@@ -5,9 +5,9 @@
  * 1. 检查有效订阅，过期则标记 expired
  * 2. 如果没有订阅，查找待支付订单，尝试向微信同步真实状态
  */
-import { query, updateWhere, insert } from '../lib/supabase-admin.js'
-import { queryOrder } from '../lib/wechat-pay.js'
-import { ensureBasicSubscription, syncGenerationQuotaFromActiveSubscription } from '../lib/membership.js'
+import { query, updateWhere, insert } from '../../server/lib/supabase-admin.js'
+import { queryOrder } from '../../server/lib/wechat-pay.js'
+import { ensureBasicSubscription, syncGenerationQuotaFromActiveSubscription } from '../../server/lib/membership.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')

@@ -80,8 +80,8 @@ CREATE TRIGGER trg_plans_updated_at
 
 -- 初始套餐数据
 INSERT INTO plans (code, name, price, description, permissions, sort, duration_days) VALUES
-  ('basic', '基础会员', 1, '每月1元，解锁全部互动演示', '["view_demo"]', 1, 30),
-  ('ai', 'AI会员', 0, 'AI功能即将开放（价格待定）', '["view_demo", "create_demo"]', 2, 365)
+  ('basic', '基础会员', 0, '注册即享基础会员', '["view_demo"]', 1, 20000),
+  ('ai', '智能会员', 0, '开通后即可查看全部互动演示', '["view_demo", "create_demo"]', 2, 365)
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================

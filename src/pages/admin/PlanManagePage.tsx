@@ -25,7 +25,7 @@ function rowToPlan(row: any): Plan {
 
 // 可用权限列表
 const PERMISSION_OPTIONS = [
-  { key: 'view_demo', label: '查看题库全部互动演示' },
+  { key: 'view_demo', label: '查看全部互动演示' },
   { key: 'create_demo', label: '创建互动演示' },
 ]
 

@@ -48,6 +48,14 @@ function rowToType(row: any): QuestionType {
     discoveryFlow: row.discovery_flow || '',
     interactionFlow: row.interaction_flow || '',
     animationFlow: row.animation_flow || '',
+    layoutComponent: row.layout_component || '',
+    controlComponent: row.control_component || '',
+    visualComponent: row.visual_component || '',
+    animationComponent: row.animation_component || '',
+    defaultAssets: row.default_assets || [],
+    pageSchemaVersion: Number(row.page_schema_version || 1),
+    componentRules: row.component_rules || {},
+    fallbackStrategy: row.fallback_strategy || {},
     createdAt: row.created_at?.slice(0, 10) || '',
     updatedAt: row.updated_at?.slice(0, 10) || '',
   }
@@ -157,7 +165,23 @@ export function deleteQuestion(id: string) {
   })
 }
 
-export async function addType(data: { name: string; coreDiscovery?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }): Promise<QuestionType> {
+export async function addType(data: {
+  name: string
+  coreDiscovery?: string
+  analysisPrompt?: string
+  htmlPrompt?: string
+  discoveryFlow?: string
+  interactionFlow?: string
+  animationFlow?: string
+  layoutComponent?: string
+  controlComponent?: string
+  visualComponent?: string
+  animationComponent?: string
+  defaultAssets?: any[]
+  pageSchemaVersion?: number
+  componentRules?: Record<string, any>
+  fallbackStrategy?: Record<string, any>
+}): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', {
     name: data.name,
     core_discovery: data.coreDiscovery || '',
@@ -166,15 +190,39 @@ export async function addType(data: { name: string; coreDiscovery?: string; anal
     discovery_flow: data.discoveryFlow || '',
     interaction_flow: data.interactionFlow || '',
     animation_flow: data.animationFlow || '',
+    layout_component: data.layoutComponent || '',
+    control_component: data.controlComponent || '',
+    visual_component: data.visualComponent || '',
+    animation_component: data.animationComponent || '',
+    default_assets: data.defaultAssets || [],
+    page_schema_version: data.pageSchemaVersion || 1,
+    component_rules: data.componentRules || {},
+    fallback_strategy: data.fallbackStrategy || {},
   })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
   const t = rowToType(r.data[0]); types = [...types, t]; notify()
   return t
 }
 
-export async function updateType(id: string, data: { name?: string; coreDiscovery?: string; analysisPrompt?: string; htmlPrompt?: string; discoveryFlow?: string; interactionFlow?: string; animationFlow?: string }) {
+export async function updateType(id: string, data: {
+  name?: string
+  coreDiscovery?: string
+  analysisPrompt?: string
+  htmlPrompt?: string
+  discoveryFlow?: string
+  interactionFlow?: string
+  animationFlow?: string
+  layoutComponent?: string
+  controlComponent?: string
+  visualComponent?: string
+  animationComponent?: string
+  defaultAssets?: any[]
+  pageSchemaVersion?: number
+  componentRules?: Record<string, any>
+  fallbackStrategy?: Record<string, any>
+}) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
-  const p: Record<string, string> = {};
+  const p: Record<string, any> = {};
   if (data.name !== undefined) p.name = data.name
   if (data.coreDiscovery !== undefined) p.core_discovery = data.coreDiscovery
   if (data.analysisPrompt !== undefined) p.analysis_prompt = data.analysisPrompt
@@ -182,6 +230,14 @@ export async function updateType(id: string, data: { name?: string; coreDiscover
   if (data.discoveryFlow !== undefined) p.discovery_flow = data.discoveryFlow
   if (data.interactionFlow !== undefined) p.interaction_flow = data.interactionFlow
   if (data.animationFlow !== undefined) p.animation_flow = data.animationFlow
+  if (data.layoutComponent !== undefined) p.layout_component = data.layoutComponent
+  if (data.controlComponent !== undefined) p.control_component = data.controlComponent
+  if (data.visualComponent !== undefined) p.visual_component = data.visualComponent
+  if (data.animationComponent !== undefined) p.animation_component = data.animationComponent
+  if (data.defaultAssets !== undefined) p.default_assets = data.defaultAssets as any
+  if (data.pageSchemaVersion !== undefined) p.page_schema_version = data.pageSchemaVersion
+  if (data.componentRules !== undefined) p.component_rules = data.componentRules as any
+  if (data.fallbackStrategy !== undefined) p.fallback_strategy = data.fallbackStrategy as any
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames(); notify()
   supdate('question_types', 'id', parseInt(id, 10), p).catch((e) => {

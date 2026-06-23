@@ -8,6 +8,14 @@ export interface QuestionType {
   discoveryFlow?: string
   interactionFlow?: string
   animationFlow?: string
+  layoutComponent?: string
+  controlComponent?: string
+  visualComponent?: string
+  animationComponent?: string
+  defaultAssets?: any[]
+  pageSchemaVersion?: number
+  componentRules?: Record<string, any>
+  fallbackStrategy?: Record<string, any>
   createdAt: string
   updatedAt: string
 }

@@ -21,7 +21,7 @@ import SubscriptionManagePage from './pages/admin/SubscriptionManagePage'
 import OrderManagePage from './pages/admin/OrderManagePage'
 import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
 import ConfigsManagePage from './pages/admin/ConfigsManagePage'
-// import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
+import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
 
 export default function App() {
   return (
@@ -62,7 +62,7 @@ export default function App() {
         <Route path="orders" element={<OrderManagePage />} />
         <Route path="user-questions" element={<UserQuestionManagePage />} />
         <Route path="configs" element={<ConfigsManagePage />} />
-        {/* <Route path="component-preview" element={<ComponentPreviewPage />} /> */}
+        <Route path="component-preview" element={<ComponentPreviewPage />} />
       </Route>
 
       {/* Fallback */}

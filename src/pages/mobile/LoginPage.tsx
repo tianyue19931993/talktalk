@@ -99,7 +99,7 @@ export default function LoginPage() {
     : '重置密码'
 
   const pageDesc = mode === 'login' ? '登录后解锁更多功能'
-    : mode === 'register' ? '注册后开启数学思维之旅'
+    : mode === 'register' ? ''
     : '输入邮箱和新密码，直接重置'
 
   const btnText = mode === 'login' ? '登录'
@@ -123,7 +123,7 @@ export default function LoginPage() {
           成长表达实验室 M
         </span>
         <h1 className="text-xl font-semibold text-[var(--color-ink)] mt-3">{pageTitle}</h1>
-        <p className="text-sm text-[var(--color-mute)] mt-1">{pageDesc}</p>
+        {pageDesc && <p className="text-sm text-[var(--color-mute)] mt-1">{pageDesc}</p>}
       </div>
 
       {/* Success */}

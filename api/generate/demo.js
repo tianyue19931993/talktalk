@@ -8,9 +8,11 @@
  * 完整链路：
  *   Step 0: 验证是否为数学题（仅新提交）→ 非数学题不落库
  *   Step 1: 保存题目到 user_questions（仅新提交）
- *   Step 2-3: AI 识别题型 + 结构化分析
- *   Step 4: 模板替换生成 HTML
- *   Step 5: 存入 question_demos + 标记 completed
+ *   Step 2: AI 选择最匹配的 core_discovery
+ *   Step 3: 基于题型配置做结构化分析
+ *   Step 4: 基于 analysis_json + 题型配置生成渲染计划
+ *   Step 5: 模板/提示词生成 HTML
+ *   Step 6: 存入 question_demos + 生成日志 + 标记 completed
  */
 
 import { callAI } from '../../server/lib/ai.js'
@@ -98,6 +100,353 @@ function getCoreDiscoveries(allTypes) {
 
 function logTypeMatchIssue(kind, payload) {
   console.warn(`[generate/demo] ${kind}`, payload)
+}
+
+function safeJsonParse(value, fallback) {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'object') return value
+  if (typeof value !== 'string') return fallback
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
+function asStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      const parsed = safeJsonParse(trimmed, null)
+      if (Array.isArray(parsed)) return parsed.map((item) => String(item || '').trim()).filter(Boolean)
+      if (parsed && typeof parsed === 'object') return Object.values(parsed).map((item) => String(item || '').trim()).filter(Boolean)
+    }
+    return trimmed
+      .split(/[,，\n；;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).map((item) => String(item || '').trim()).filter(Boolean)
+  }
+  return []
+}
+
+function pickFirstString(...values) {
+  for (const value of values) {
+    const text = String(value || '').trim()
+    if (text) return text
+  }
+  return ''
+}
+
+function normalizeComponentList(value) {
+  return asStringArray(value).map(normalizeTypeName)
+}
+
+function normalizeQuestionTypeRow(row) {
+  return {
+    id: row?.id,
+    name: row?.name || '',
+    coreDiscovery: row?.core_discovery || '',
+    discoveryFlow: row?.discovery_flow || '',
+    interactionFlow: row?.interaction_flow || '',
+    animationFlow: row?.animation_flow || '',
+    analysisPrompt: row?.analysis_prompt || '',
+    htmlPrompt: row?.html_prompt || '',
+    layoutComponent: row?.layout_component || '',
+    controlComponent: row?.control_component || '',
+    visualComponent: row?.visual_component || '',
+    animationComponent: row?.animation_component || '',
+    defaultAssets: safeJsonParse(row?.default_assets, []),
+    pageSchemaVersion: Number(row?.page_schema_version || 1),
+    componentRules: safeJsonParse(row?.component_rules, {}),
+    fallbackStrategy: safeJsonParse(row?.fallback_strategy, {}),
+    createdAt: row?.created_at || '',
+    updatedAt: row?.updated_at || '',
+  }
+}
+
+const KNOWN_COMPONENT_LIBRARY = {
+  layout: new Set(['SceneFrame', 'TwoColumnLayout', 'SingleColumnLayout', 'ThreeZoneLayout', 'StickyAsideLayout']),
+  control: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'AnswerInput']),
+  visual: new Set(['ItemIcon', 'ItemGroup', 'Counter', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment']),
+  asset: new Set(['PersonIcon', 'BoxIcon', 'CupIcon', 'TreeIcon', 'CherryIcon', 'AppleIcon', 'RoadIcon', 'CoinIcon', 'MachineIcon', 'AnimalIcon']),
+  animation: new Set(['Highlight', 'Move', 'Split', 'Merge', 'FadeOut', 'CountUp', 'Shake', 'Glow', 'ConnectLine', 'RevealGap']),
+}
+
+function inferLayoutFromAnalysis(analysisJson, typeContext) {
+  const rules = safeJsonParse(typeContext.componentRules, {})
+  const hint = [
+    typeContext.layoutComponent,
+    rules.layout_component,
+    analysisJson?.scene?.layout,
+    analysisJson?.scene?.type,
+  ].find(Boolean)
+  if (hint) return String(hint)
+  if (analysisJson?.thinking_steps?.length) return 'SingleColumnLayout'
+  if (analysisJson?.scene && analysisJson?.objects) return 'SceneFrame'
+  if (analysisJson?.known_data && analysisJson?.discoveries) return 'ThreeZoneLayout'
+  return 'TwoColumnLayout'
+}
+
+function inferControlComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.controlComponent),
+    ...normalizeComponentList(typeContext.componentRules?.control_components),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+
+  const controls = Array.isArray(analysisJson?.controls) ? analysisJson.controls : []
+  if (controls.length > 0) {
+    const mapped = controls.map((item) => {
+      const text = String(item?.action || item?.type || item?.label || '').toLowerCase()
+      if (text.includes('drag') || text.includes('拖')) return 'DragControl'
+      if (text.includes('slide') || text.includes('滑')) return 'SliderControl'
+      if (text.includes('choice') || text.includes('选') || text.includes('单选')) return 'ChoiceControl'
+      if (text.includes('input') || text.includes('填') || text.includes('答')) return 'AnswerInput'
+      return 'ClickControl'
+    })
+    return [...new Set(mapped)]
+  }
+
+  return ['ClickControl']
+}
+
+function inferVisualComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.visualComponent),
+    ...normalizeComponentList(typeContext.componentRules?.visual_components),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+
+  if (analysisJson?.known_data || analysisJson?.discoveries) return ['Counter', 'Bar']
+  if (analysisJson?.scene?.objects) return ['ItemGroup']
+  return ['Box']
+}
+
+function inferAnimationComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.animationComponent),
+    ...normalizeComponentList(typeContext.componentRules?.animation_components),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+
+  if (analysisJson?.thinking_steps?.length) return ['RevealGap']
+  return ['FadeOut']
+}
+
+function inferDefaultAssets(typeContext, analysisJson) {
+  const assets = Array.isArray(typeContext.defaultAssets) ? typeContext.defaultAssets : []
+  if (assets.length > 0) return assets
+  if (analysisJson?.scene?.objects?.length) return analysisJson.scene.objects
+  return []
+}
+
+function buildRenderPlan(typeContext, analysisJson, questionText) {
+  const componentRules = safeJsonParse(typeContext.componentRules, {})
+  const fallbackStrategy = safeJsonParse(typeContext.fallbackStrategy, {})
+  const missingComponents = []
+  const missingCapabilities = []
+
+  const layoutName = pickFirstString(
+    typeContext.layoutComponent,
+    componentRules.layout_component,
+    inferLayoutFromAnalysis(analysisJson, typeContext),
+  )
+  if (!KNOWN_COMPONENT_LIBRARY.layout.has(layoutName)) {
+    missingComponents.push({
+      category: 'layout',
+      name: layoutName || 'UnknownLayout',
+      reason: typeContext.layoutComponent
+        ? `question_types.layout_component=${typeContext.layoutComponent} 不在布局组件库`
+        : '未配置 layout_component，使用推断布局',
+      fallback: fallbackStrategy.layout || 'TwoColumnLayout',
+    })
+  }
+
+  const controlComponents = inferControlComponents(analysisJson, typeContext)
+  controlComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.control.has(name)) {
+      missingComponents.push({
+        category: 'control',
+        name,
+        reason: '控制组件不在已知组件库中',
+        fallback: fallbackStrategy.control || 'ClickControl',
+      })
+    }
+  })
+
+  const visualComponents = inferVisualComponents(analysisJson, typeContext)
+  visualComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.visual.has(name)) {
+      missingComponents.push({
+        category: 'visual',
+        name,
+        reason: '视觉组件不在已知组件库中',
+        fallback: fallbackStrategy.visual || 'ItemGroup',
+      })
+    }
+  })
+
+  const animationComponents = inferAnimationComponents(analysisJson, typeContext)
+  animationComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
+      missingComponents.push({
+        category: 'animation',
+        name,
+        reason: '动画组件不在已知组件库中',
+        fallback: fallbackStrategy.animation || 'FadeOut',
+      })
+    }
+  })
+
+  const defaultAssets = inferDefaultAssets(typeContext, analysisJson)
+  defaultAssets.forEach((asset) => {
+    const assetName = String(asset?.name || asset?.label || asset || '').trim()
+    if (!assetName) return
+    if (/Icon$/.test(assetName) && !KNOWN_COMPONENT_LIBRARY.asset.has(assetName)) {
+      missingComponents.push({
+        category: 'asset',
+        name: assetName,
+        reason: '素材组件不在已知素材库中',
+        fallback: fallbackStrategy.asset || 'PersonIcon',
+      })
+    }
+  })
+
+  if (!Array.isArray(analysisJson?.controls) || analysisJson.controls.length === 0) {
+    missingCapabilities.push({
+      category: 'control',
+      name: 'controls',
+      reason: 'analysis_json 未产出 controls 字段，交互层只能使用默认控件',
+      fallback: fallbackStrategy.control || 'ClickControl',
+    })
+  }
+
+  if (!analysisJson?.scene && !analysisJson?.thinking_steps) {
+    missingCapabilities.push({
+      category: 'layout',
+      name: 'scene',
+      reason: 'analysis_json 缺少 scene / thinking_steps，页面骨架只能使用默认布局',
+      fallback: fallbackStrategy.layout || 'TwoColumnLayout',
+    })
+  }
+
+  const fallbackUsed = missingComponents.length > 0 || missingCapabilities.length > 0
+
+  return {
+    version: typeContext.pageSchemaVersion || 1,
+    questionText,
+    coreDiscovery: typeContext.coreDiscovery || '',
+    layout: {
+      name: layoutName,
+      source: typeContext.layoutComponent ? 'question_types.layout_component' : 'inferred',
+    },
+    controls: controlComponents,
+    visuals: visualComponents,
+    animations: animationComponents,
+    assets: defaultAssets,
+    rules: componentRules,
+    fallbackStrategy,
+    matchedComponents: {
+      layout: layoutName ? [layoutName] : [],
+      controls: controlComponents,
+      visuals: visualComponents,
+      animations: animationComponents,
+      assets: defaultAssets,
+    },
+    missingComponents,
+    missingCapabilities,
+    fallbackUsed,
+  }
+}
+
+function buildTypeContextSummary(typeContext) {
+  return [
+    `core_discovery：${typeContext.coreDiscovery || ''}`,
+    `name：${typeContext.name || ''}`,
+    typeContext.layoutComponent ? `layout_component：${typeContext.layoutComponent}` : '',
+    typeContext.controlComponent ? `control_component：${typeContext.controlComponent}` : '',
+    typeContext.visualComponent ? `visual_component：${typeContext.visualComponent}` : '',
+    typeContext.animationComponent ? `animation_component：${typeContext.animationComponent}` : '',
+    typeContext.discoveryFlow ? `discovery_flow：${typeContext.discoveryFlow}` : '',
+    typeContext.interactionFlow ? `interaction_flow：${typeContext.interactionFlow}` : '',
+    typeContext.animationFlow ? `animation_flow：${typeContext.animationFlow}` : '',
+    typeContext.analysisPrompt ? `analysis_prompt：${typeContext.analysisPrompt}` : '',
+    typeContext.htmlPrompt ? `html_prompt：${typeContext.htmlPrompt}` : '',
+    typeContext.componentRules ? `component_rules：${JSON.stringify(typeContext.componentRules)}` : '',
+    typeContext.fallbackStrategy ? `fallback_strategy：${JSON.stringify(typeContext.fallbackStrategy)}` : '',
+  ].filter(Boolean).join('\n')
+}
+
+async function postJsonRow(url, headers, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) {
+    const text = await r.text().catch(() => '')
+    throw new Error(`POST ${url} failed: ${r.status} ${text}`)
+  }
+  return r.json()
+}
+
+async function recordGenerationArtifacts({ headers, supabaseUrl, runId, questionId, typeContext, analysisJson, renderPlan, status }) {
+  try {
+    await postJsonRow(`${supabaseUrl}/rest/v1/generation_runs`, headers, {
+      id: runId,
+      user_question_id: questionId,
+      core_discovery: typeContext?.coreDiscovery || '',
+      layout_key: renderPlan?.layout?.name || typeContext?.layoutComponent || '',
+      matched_components: renderPlan?.matchedComponents || {},
+      missing_components: renderPlan?.missingComponents || [],
+      missing_capabilities: renderPlan?.missingCapabilities || [],
+      fallback_used: !!renderPlan?.fallbackUsed,
+      status,
+      analysis_json: analysisJson || {},
+      render_json: renderPlan || {},
+    })
+  } catch (e) {
+    console.warn('[generate/demo] recordGenerationArtifacts(run) failed', e.message)
+  }
+
+  const gaps = [
+    ...(renderPlan?.missingComponents || []).map((gap) => ({
+      gap_type: gap.category || 'component',
+      gap_name: gap.name || '',
+      gap_reason: gap.reason || '',
+    })),
+    ...(renderPlan?.missingCapabilities || []).map((gap) => ({
+      gap_type: gap.category || 'capability',
+      gap_name: gap.name || '',
+      gap_reason: gap.reason || '',
+    })),
+  ].filter((gap) => gap.gap_name)
+
+  for (const gap of gaps) {
+    try {
+      await postJsonRow(`${supabaseUrl}/rest/v1/component_gap_logs`, headers, {
+        generation_run_id: runId,
+        user_question_id: questionId,
+        core_discovery: typeContext?.coreDiscovery || '',
+        layout_key: renderPlan?.layout?.name || typeContext?.layoutComponent || '',
+        gap_type: gap.gap_type,
+        gap_name: gap.gap_name,
+        gap_reason: gap.gap_reason,
+        severity: 3,
+        fallback_used: !!renderPlan?.fallbackUsed,
+        review_status: 'new',
+      })
+    } catch (e) {
+      console.warn('[generate/demo] recordGenerationArtifacts(gap) failed', e.message)
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -208,10 +557,27 @@ export default async function handler(req, res) {
     let questionTypeName = question.question_type || ''
     let questionCoreDiscovery = question.core_discovery || ''
     let analysisJson = question.analysis_json || {}
-    let htmlTemplate = ''  // 将从 question_types.html_prompt 加载
+    let htmlTemplate = ''
+    let typeContext = null
+    let renderPlan = null
+    const generationRunId = crypto.randomUUID()
+
+    if (questionTypeId) {
+      const typeRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/question_types?id=eq.${questionTypeId}`,
+        { headers: { ...headers, Prefer: undefined } }
+      )
+      if (typeRes.ok) {
+        const typeRows = await typeRes.json()
+        typeContext = normalizeQuestionTypeRow(typeRows?.[0] || {})
+        questionTypeName = typeContext.name || questionTypeName
+        questionCoreDiscovery = typeContext.coreDiscovery || questionCoreDiscovery
+        htmlTemplate = typeContext.htmlPrompt || ''
+      }
+    }
 
     // ════════════════════════════════════════════════════════════
-    // Step 2-3: AI 识别题型 + 结构化分析
+    // Step 2: AI 识别题型
     //
     // 已有题型数据 → 跳过识别和分析（regenerate 也直接复用）
     //   因为 Vercel Hobby 10s 限制，最多只够跑 1 次 AI 调用
@@ -235,6 +601,42 @@ export default async function handler(req, res) {
       })
       if (!identifyResult.success) {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })
+        await recordGenerationArtifacts({
+          headers,
+          supabaseUrl: SUPABASE_URL,
+          runId: generationRunId,
+          questionId: actualQuestionId,
+          typeContext: normalizeQuestionTypeRow({
+            name: 'unmatched',
+            core_discovery: '',
+            layout_component: '',
+            control_component: '',
+            visual_component: '',
+            animation_component: '',
+            default_assets: [],
+            page_schema_version: 1,
+            component_rules: {},
+            fallback_strategy: {},
+          }),
+          analysisJson: {},
+          renderPlan: {
+            version: 1,
+            questionText: question.question_text,
+            coreDiscovery: '',
+            layout: { name: 'unknown', source: 'identify_failed' },
+            controls: [],
+            visuals: [],
+            animations: [],
+            assets: [],
+            rules: {},
+            fallbackStrategy: {},
+            matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
+            missingComponents: [{ category: 'layout', name: 'unknown', reason: 'AI 识别题型失败', fallback: 'TwoColumnLayout' }],
+            missingCapabilities: [],
+            fallbackUsed: true,
+          },
+          status: 'failed',
+        })
         return res.status(200).json({
           success: false,
           error: `AI 识别失败: ${identifyResult.error}`,
@@ -285,6 +687,45 @@ export default async function handler(req, res) {
         } catch { /* best effort */ }
 
         if (fallbackPrompt) {
+          const fallbackTypeContext = normalizeQuestionTypeRow({
+            name: 'temp-fallback',
+            core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
+            layout_component: 'temp_fallback',
+            control_component: '',
+            visual_component: '',
+            animation_component: '',
+            default_assets: [],
+            page_schema_version: 1,
+            component_rules: {},
+            fallback_strategy: { html: 'configs.temp' },
+          })
+          const fallbackRenderPlan = {
+            version: fallbackTypeContext.pageSchemaVersion || 1,
+            questionText: question.question_text,
+            coreDiscovery: fallbackTypeContext.coreDiscovery || '',
+            layout: { name: 'temp_fallback', source: 'configs.temp' },
+            controls: [],
+            visuals: [],
+            animations: [],
+            assets: [],
+            rules: {},
+            fallbackStrategy: { html: 'configs.temp' },
+            matchedComponents: {
+              layout: [],
+              controls: [],
+              visuals: [],
+              animations: [],
+              assets: [],
+            },
+            missingComponents: [{
+              category: 'layout',
+              name: 'temp_fallback',
+              reason: '未匹配到 question_types，使用 configs.temp 兜底',
+              fallback: 'configs.temp',
+            }],
+            missingCapabilities: [],
+            fallbackUsed: true,
+          }
           // temp 是一个综合 prompt → AI 直接生成完整 HTML
           const htmlResult = await callAI({
             systemPrompt: fallbackPrompt,
@@ -295,6 +736,16 @@ export default async function handler(req, res) {
           })
           if (!htmlResult.success || !htmlResult.content) {
             await patchQuestionFull(actualQuestionId, { status: 'pending' })
+            await recordGenerationArtifacts({
+              headers,
+              supabaseUrl: SUPABASE_URL,
+              runId: generationRunId,
+              questionId: actualQuestionId,
+              typeContext: fallbackTypeContext,
+              analysisJson: {},
+              renderPlan: fallbackRenderPlan,
+              status: 'failed',
+            })
             return res.status(200).json({
               success: false,
               error: 'AI 生成暂时不可用，请到「我的互动列表」中重新生成',
@@ -326,6 +777,18 @@ export default async function handler(req, res) {
           if (!demoRes.ok) throw new Error('保存演示失败')
           const demos = await demoRes.json()
           const demo = demos?.[0] || {}
+          await recordGenerationArtifacts({
+            headers,
+            supabaseUrl: SUPABASE_URL,
+            runId: generationRunId,
+            questionId: actualQuestionId,
+            typeContext: fallbackTypeContext,
+            analysisJson: {},
+            renderPlan: fallbackRenderPlan,
+            status: 'partial',
+            htmlUrl: dataUrl,
+            demoId: demo.id,
+          })
           return res.status(200).json({
             success: true,
             demoId: demo.id,
@@ -334,6 +797,42 @@ export default async function handler(req, res) {
           })
         } else {
           await patchQuestionFull(actualQuestionId, { status: 'pending' })
+          await recordGenerationArtifacts({
+            headers,
+            supabaseUrl: SUPABASE_URL,
+            runId: generationRunId,
+            questionId: actualQuestionId,
+            typeContext: normalizeQuestionTypeRow({
+              name: 'unmatched',
+              core_discovery: questionCoreDiscovery || questionTypeName || '',
+              layout_component: '',
+              control_component: '',
+              visual_component: '',
+              animation_component: '',
+              default_assets: [],
+              page_schema_version: 1,
+              component_rules: {},
+              fallback_strategy: {},
+            }),
+            analysisJson: {},
+            renderPlan: {
+              version: 1,
+              questionText: question.question_text,
+              coreDiscovery: questionCoreDiscovery || questionTypeName || '',
+              layout: { name: 'unknown', source: 'no_fallback_prompt' },
+              controls: [],
+              visuals: [],
+              animations: [],
+              assets: [],
+              rules: {},
+              fallbackStrategy: {},
+              matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
+              missingComponents: [{ category: 'layout', name: 'unknown', reason: '未找到配置 temp 兜底 prompt', fallback: 'TwoColumnLayout' }],
+              missingCapabilities: [],
+              fallbackUsed: true,
+            },
+            status: 'failed',
+          })
           return res.status(200).json({
             success: false,
             error: questionTypeName === '不匹配'
@@ -361,13 +860,13 @@ export default async function handler(req, res) {
       // ── 正常 matchedType 路径 ──
       if (matchedType) {
         questionTypeId = matchedType.id
-        htmlTemplate = matchedType.html_prompt || ''
-        // 收集题型所有字段（包括三个 flow）
-        const typeName = matchedType.name || ''
-        const typeCoreDiscovery = matchedType.core_discovery || ''
-        const typeDiscoveryFlow = matchedType.discovery_flow || ''
-        const typeInteractionFlow = matchedType.interaction_flow || ''
-        const typeAnimationFlow = matchedType.animation_flow || ''
+        typeContext = normalizeQuestionTypeRow(matchedType)
+        htmlTemplate = typeContext.htmlPrompt || ''
+        const typeName = typeContext.name || ''
+        const typeCoreDiscovery = typeContext.coreDiscovery || ''
+        const typeDiscoveryFlow = typeContext.discoveryFlow || ''
+        const typeInteractionFlow = typeContext.interactionFlow || ''
+        const typeAnimationFlow = typeContext.animationFlow || ''
 
         // 先保存题型信息（即使后续超时，至少题型已记录）
         await fetch(`${SUPABASE_URL}/rest/v1/user_questions?id=eq.${actualQuestionId}`, {
@@ -382,22 +881,22 @@ export default async function handler(req, res) {
         })
 
         // ── Step 3: 结构化分析（使用 analysis_prompt）──
-        if (matchedType.analysis_prompt) {
+        if (typeContext.analysisPrompt) {
           const flowInfo = [
             typeDiscoveryFlow && `🧠 思维引导流程：\n${typeDiscoveryFlow}`,
             typeInteractionFlow && `👆 交互操作流程：\n${typeInteractionFlow}`,
             typeAnimationFlow && `👀 视觉呈现流程：\n${typeAnimationFlow}`,
           ].filter(Boolean).join('\n\n')
+          const typeContextSummary = buildTypeContextSummary(typeContext)
 
           const analysisResult = await callAI({
-            systemPrompt: matchedType.analysis_prompt,
+            systemPrompt: typeContext.analysisPrompt,
             prompt: [
               `请分析以下数学题：`,
               `题目原文：\n${question.question_text}`,
               ``,
               `--- 题型信息 ---`,
-              `core_discovery：${typeCoreDiscovery}`,
-              `题型名称：${typeName}`,
+              typeContextSummary,
               flowInfo ? `\n${flowInfo}` : '',
               ``,
               `请结合上述题型信息和流程指导，对题目进行结构化分析，输出符合要求的 JSON。`,
@@ -425,6 +924,25 @@ export default async function handler(req, res) {
           }),
         })
       }
+
+      if (matchedType && typeContext) {
+        renderPlan = buildRenderPlan(typeContext, analysisJson, question.question_text)
+      }
+    }
+
+    if (!typeContext) {
+      typeContext = normalizeQuestionTypeRow({
+        name: questionTypeName || '暂未分类',
+        core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
+        layout_component: '',
+        control_component: '',
+        visual_component: '',
+        animation_component: '',
+        default_assets: [],
+        page_schema_version: 1,
+        component_rules: {},
+        fallback_strategy: {},
+      })
     }
 
     // ════════════════════════════════════════════════════════════
@@ -442,6 +960,10 @@ export default async function handler(req, res) {
           htmlTemplate = pt?.[0]?.html_prompt || ''
         }
       }
+    }
+
+    if (!renderPlan) {
+      renderPlan = buildRenderPlan(typeContext, analysisJson, question.question_text)
     }
 
     // 没有题型模板 → 使用内置通用模板（自适应多种 JSON 结构）
@@ -530,16 +1052,19 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 
     // ── 执行模板替换 / AI 生成 ──
     const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
+    const renderPlanStr = JSON.stringify(renderPlan, null, 2)
     let htmlContent
 
-    // 判断 htmlTemplate 中是否含有 ${analysis_json} 或 ${question_text} 占位符
-    const hasPlaceholders = htmlTemplate.includes('\${analysis_json}') || htmlTemplate.includes('\${question_text}')
+    // 判断 htmlTemplate 中是否含有 ${analysis_json} / ${render_json} / ${question_text} 占位符
+    const hasPlaceholders = htmlTemplate.includes('\${analysis_json}')
+      || htmlTemplate.includes('\${render_json}')
+      || htmlTemplate.includes('\${question_text}')
 
     if (!hasPlaceholders && htmlTemplate.trim()) {
       // 没有占位符 → html_prompt 是 AI 提示词 → 调 AI 生成 HTML
       const htmlResult = await callAI({
         systemPrompt: htmlTemplate,
-        prompt: `以下是题目的结构化分析数据，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
+        prompt: `以下是题目的结构化分析数据、渲染计划，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n渲染计划：\n\`\`\`json\n${renderPlanStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
         temperature: 0.6,
         maxTokens: 16384,
         timeoutSeconds: 9,
@@ -562,6 +1087,7 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
       // 含占位符 → 字符串替换（兼容旧版或内置模板）
       htmlContent = htmlTemplate
         .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
+        .replace(/\$\{render_json\}/g, () => renderPlanStr)
         .replace(/\$\{question_text\}/g, () => question.question_text)
     }
 
@@ -585,6 +1111,18 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 
     const generationResult = await consumeGeneration(question.user_id)
     if (!generationResult.success) {
+      await recordGenerationArtifacts({
+        headers,
+        supabaseUrl: SUPABASE_URL,
+        runId: generationRunId,
+        questionId: actualQuestionId,
+        typeContext,
+        analysisJson,
+        renderPlan,
+        status: 'failed',
+        htmlUrl: dataUrl,
+        demoId: demo.id,
+      })
       await fetch(`${SUPABASE_URL}/rest/v1/question_demos?id=eq.${demo.id}`, {
         method: 'DELETE',
         headers,
@@ -601,6 +1139,18 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
 
     // 全部流程成功 → 标记为 completed（使用完整 headers，非 best effort）
     await patchQuestionFull(actualQuestionId, { status: 'completed' })
+    await recordGenerationArtifacts({
+      headers,
+      supabaseUrl: SUPABASE_URL,
+      runId: generationRunId,
+      questionId: actualQuestionId,
+      typeContext,
+      analysisJson,
+      renderPlan,
+      status: renderPlan?.fallbackUsed ? 'partial' : 'success',
+      htmlUrl: dataUrl,
+      demoId: demo.id,
+    })
 
     return res.status(200).json({
       success: true,
@@ -614,6 +1164,18 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
     if (actualQuestionId) {
       try {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })
+      } catch { /* 静默处理 */ }
+      try {
+        await recordGenerationArtifacts({
+          headers,
+          supabaseUrl: SUPABASE_URL,
+          runId: generationRunId,
+          questionId: actualQuestionId,
+          typeContext,
+          analysisJson,
+          renderPlan,
+          status: 'failed',
+        })
       } catch { /* 静默处理 */ }
     }
     return res.status(200).json({

@@ -48,6 +48,30 @@ function normalizeCoreDiscovery(value) {
   return normalizeTypeName(value)
 }
 
+function looksLikeMathQuestion(text) {
+  const normalized = String(text || '').replace(/\s+/g, '')
+  if (!normalized) return false
+
+  const numberMatches = normalized.match(/\d+(?:\.\d+)?/g) || []
+  const hasNumber = numberMatches.length > 0
+  const hasMultipleNumbers = numberMatches.length >= 2
+  const hasEquationOrArithmetic = /[+\-×xX*/=()（）]/.test(normalized)
+  const mathKeywords = [
+    '数学', '算', '计算', '求', '求出', '多少', '几', '平均', '平均每天', '一共', '总共',
+    '合计', '还剩', '相差', '比', '完成', '分成', '分配', '倍', '倍数', '工程', '铺设',
+    '路程', '速度', '时间', '单价', '总价', '每米', '每天', '每份', '每个', '米', '厘米',
+    '毫米', '分米', '千米', '元', '角', '分', '吨', '千克', '公斤', '克', '小时', '分钟',
+    '秒', '人', '只', '个', '箱', '张', '本', '棵', '条', '辆', '块', '枚', '支',
+  ]
+  const hasMathKeyword = mathKeywords.some((keyword) => normalized.includes(keyword))
+  const hasQuestionForm = /(?=.*(如果|已知|要求|求|平均|每|还剩|相差|完成|多少|几))/.test(normalized)
+
+  if (hasEquationOrArithmetic) return true
+  if (hasMultipleNumbers && (hasMathKeyword || hasQuestionForm)) return true
+  if (hasNumber && /多少|几|求|平均|完成|相差|还剩|每/.test(normalized) && hasMathKeyword) return true
+  return false
+}
+
 function findMatchedTypeByCoreDiscoveryOrName(allTypes, rawValue) {
   const normalizedValue = normalizeCoreDiscovery(rawValue)
   if (!normalizedValue) return { type: null, matchedBy: null }
@@ -500,22 +524,38 @@ export default async function handler(req, res) {
     // Step 0: 验证是否为数学题（仅新提交）
     // ════════════════════════════════════════════════════════════
     if (isNewSubmit) {
-      const mathCheck = await callAI({
-        prompt: `请判断以下内容是否为一道数学题，只回答「是」或「否」，不要任何其他文字。\n\n内容：${questionText}`,
-        temperature: 0,
-        maxTokens: 10,
-        timeoutSeconds: 5,
-      })
+      const mathHint = looksLikeMathQuestion(questionText)
 
-      if (!mathCheck.success) {
-        return res.status(200).json({
-          success: false,
-          error: `AI 验证失败: ${mathCheck.error}`,
-          notMath: false,
+      let isMathQuestion = mathHint
+      if (!isMathQuestion) {
+        const mathCheck = await callAI({
+          prompt: `请判断下面这道题是不是数学题。只要是需要进行数量计算、比较、单位换算、平均分、倍数、路程、时间、工程、图形、规律、统计、应用题的，都算数学题。即使题目是文字题、应用题，没有算式，也仍然算数学题。
+
+请只回答「是」或「否」，不要任何其他文字。
+
+示例：
+1. 一道应用题："如果每天铺60米，15天完成任务，如果要求12天完工，那么平均每天要铺多少米？" -> 是
+2. 一道换算题："3米等于多少厘米？" -> 是
+3. 一道纯语文题："请把这段话改写得更生动" -> 否
+
+内容：${questionText}`,
+          temperature: 0,
+          maxTokens: 10,
+          timeoutSeconds: 5,
         })
+
+        if (!mathCheck.success) {
+          return res.status(200).json({
+            success: false,
+            error: `AI 验证失败: ${mathCheck.error}`,
+            notMath: false,
+          })
+        }
+
+        isMathQuestion = mathCheck.content.trim() === '是'
       }
 
-      if (mathCheck.content.trim() !== '是') {
+      if (!isMathQuestion) {
         return res.status(200).json({
           success: false,
           error: '请输入正确的内容',

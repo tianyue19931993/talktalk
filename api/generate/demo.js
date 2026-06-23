@@ -571,15 +571,44 @@ function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
   const answerUnit = analysis.answer && typeof analysis.answer === 'object'
     ? String(analysis.answer.unit ?? '')
     : ''
-  const answerNumber = extractFirstNumber(answerValue, verificationTarget, answerText, ...challengeSteps, ...knownConditions, questionText)
-  const startNumber = extractFirstNumber(...knownConditions, questionText) ?? 0
-  const targetNumber = answerNumber ?? (startNumber + 1)
+  const allNumericSource = [
+    questionText,
+    verificationTarget,
+    ...knownConditions,
+    ...hiddenConditions,
+    ...challengeSteps,
+    ...discoveryFlow,
+    answerText,
+  ].join(' ')
+  const totalValue = extractFirstNumber(questionText, knownConditions[0], allNumericSource) ?? 0
+  const usedValue = extractFirstNumber(knownConditions[1], challengeSteps[0], allNumericSource)
+  const daysValue = extractFirstNumber(knownConditions[2], challengeSteps[1], allNumericSource)
+  const remainingValue =
+    Number.isFinite(totalValue) && Number.isFinite(usedValue)
+      ? Math.max(0, totalValue - usedValue)
+      : extractFirstNumber(challengeSteps[0], challengeSteps[1], allNumericSource)
+  const averageValue =
+    Number.isFinite(remainingValue) && Number.isFinite(daysValue) && Number(daysValue) > 0
+      ? Number((remainingValue / Number(daysValue)).toFixed(2))
+      : extractFirstNumber(answerValue, verificationTarget, answerText, challengeSteps[2], allNumericSource)
+  const derivedAnswerText = averageValue != null
+    ? `${averageValue}${answerUnit || '千克'}`
+    : (answerText || verificationTarget || '')
+  const startNumber = Number.isFinite(totalValue) ? totalValue : (extractFirstNumber(...knownConditions, questionText) ?? 0)
+  const targetNumber = Number.isFinite(remainingValue) ? remainingValue : (Number.isFinite(averageValue) ? averageValue : (startNumber + 1))
   const maxNumber = Math.max(startNumber, targetNumber, 1)
   const feedbackItems = normalizeList(interactionFlow.feedback)
   const discoveryHints = feedbackItems.length > 0
     ? feedbackItems
     : ['拖动滑块观察变化', '点击按钮推进步骤', '输入答案后验证']
-  const hasAnswer = Boolean(answerText || verificationTarget)
+  const hasAnswer = Boolean(derivedAnswerText || verificationTarget)
+  const derivedSummaryItems = [
+    Number.isFinite(totalValue) ? `总量：${totalValue}千克` : '',
+    Number.isFinite(usedValue) ? `已吃：${usedValue}千克` : '',
+    Number.isFinite(remainingValue) ? `剩余：${remainingValue}千克` : '',
+    Number.isFinite(daysValue) ? `天数：${daysValue}天` : '',
+    Number.isFinite(averageValue) ? `平均每天：${averageValue}${answerUnit || '千克'}` : '',
+  ].filter(Boolean)
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -659,20 +688,20 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
         <div class="kv">互动控制</div>
         <div class="stage">
           <div class="chip-row">
-            <span class="stage-pill active" id="mode-pill">拖动滑块</span>
+            <span class="stage-pill active" id="mode-pill">先算剩余</span>
             <span class="stage-pill" id="step-pill">第 1 步</span>
             <span class="stage-pill" id="progress-pill">探索中</span>
           </div>
           <input id="discovery-slider" class="slider" type="range" min="0" max="100" value="0" step="1" aria-label="发现滑块">
           <div class="btn-row">
-            <button class="btn" id="step-back" type="button">上一步</button>
-            <button class="btn" id="step-next" type="button">下一步</button>
-            <button class="btn secondary" id="jump-half" type="button">走一半</button>
+            <button class="btn" id="step-back" type="button">算剩余</button>
+            <button class="btn" id="step-next" type="button">算平均</button>
+            <button class="btn secondary" id="jump-half" type="button">看结果</button>
             <button class="btn ghost" id="reset-all" type="button">重置</button>
           </div>
           <div class="meter">
-            <div class="meter-num" id="discovery-number">0</div>
-            <div class="meter-sub" id="discovery-summary">拖动滑块看数值变化</div>
+            <div class="meter-num" id="discovery-number">${Number.isFinite(totalValue) ? `${totalValue} 千克` : '0'}</div>
+            <div class="meter-sub" id="discovery-summary">先看总量，再减去已吃，再平均分配</div>
           </div>
         </div>
       </div>
@@ -681,6 +710,12 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
           <div class="kv">变化画面</div>
           <div class="progress"><span id="progress-bar"></span></div>
           <div class="meter-sub" id="progress-text">当前进度 0%</div>
+        </div>
+        <div class="box">
+          <div class="kv">关键数据</div>
+          <div class="chip-row">
+            ${derivedSummaryItems.length ? derivedSummaryItems.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : '<span class="chip">请先看题目中的数量关系</span>'}
+          </div>
         </div>
         <div class="box">
           <div class="kv">发现线索</div>
@@ -747,31 +782,38 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
   var answerBox = document.getElementById('answer-box');
   var coreVisible = false;
   var steps = [
-    '观察题目条件',
-    '拖动滑块试一试',
-    '发现变化规律',
-    '进入验证阶段'
+    '先看总量和已吃数量',
+    '算出剩余大米',
+    '平均分到 15 天',
+    '验证每天吃多少'
   ];
   var startNumber = ${JSON.stringify(startNumber)};
   var targetNumber = ${JSON.stringify(targetNumber)};
   var maxNumber = ${JSON.stringify(maxNumber)};
-  var answerText = ${JSON.stringify(answerText)};
+  var answerText = ${JSON.stringify(derivedAnswerText)};
   var answerValue = ${JSON.stringify(answerValue)};
   var answerUnit = ${JSON.stringify(answerUnit)};
   var verificationTarget = ${JSON.stringify(verificationTarget)};
+  var remainingValue = ${JSON.stringify(remainingValue)};
+  var averageValue = ${JSON.stringify(averageValue)};
   function esc(text){
     return String(text || '').replace(/[&<>"']/g, function(s){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s];
     });
   }
   function compact(text){
-    return String(text || '').replace(/\s+/g, '').toLowerCase();
+    return String(text || '').replace(/\\s+/g, '').toLowerCase();
   }
   function currentStepIndex(){
     return Math.min(3, Math.floor((Number(slider.value || 0) / 100) * 4));
   }
   function currentValue(){
     var percent = Number(slider.value || 0) / 100;
+    if (Number.isFinite(remainingValue) && Number.isFinite(averageValue)) {
+      if (percent < 0.45) return startNumber
+      if (percent < 0.8) return remainingValue
+      return averageValue
+    }
     return Math.round(startNumber + (targetNumber - startNumber) * percent);
   }
   function render(){
@@ -782,13 +824,13 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
     progressText.textContent = '当前进度 ' + percent + '%';
     discoveryNumber.textContent = String(value) + (answerUnit ? (' ' + answerUnit) : '');
     discoverySummary.textContent = percent < 25
-      ? '先观察题目里的已知条件'
+      ? '先观察总量和已吃数量'
       : percent < 50
-        ? '继续拖动，关系开始变化'
-        : percent < 75
-          ? '数值正在逼近目标'
-          : '可以去挑战区验证答案了';
-    modePill.textContent = percent === 0 ? '拖动滑块' : percent === 100 ? '已经到位' : '继续探索';
+        ? '先减去已吃部分，得到剩余量'
+      : percent < 75
+          ? '把剩余量平均分到 15 天'
+          : '已经可以验证最终答案';
+    modePill.textContent = percent < 45 ? '先算剩余' : percent < 80 ? '再平均分' : '看答案';
     stepPill.textContent = '第 ' + (stageIndex + 1) + ' 步';
     progressPill.textContent = percent >= 75 ? '接近答案' : '探索中';
     progressPill.className = percent >= 75 ? 'stage-pill active' : 'stage-pill';
@@ -807,8 +849,8 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
     var expected = compact(answerText || verificationTarget || answerValue);
     if (!expected) return value.length > 0;
     if (value === expected || value.includes(expected) || expected.includes(value)) return true;
-    var inputNums = value.match(/-?\d+(?:\.\d+)?/g) || [];
-    var expectedNums = expected.match(/-?\d+(?:\.\d+)?/g) || [];
+    var inputNums = value.match(/-?\\d+(?:\\.\\d+)?/g) || [];
+    var expectedNums = expected.match(/-?\\d+(?:\\.\\d+)?/g) || [];
     if (inputNums.length && expectedNums.length) {
       return inputNums.join(',') === expectedNums.join(',');
     }
@@ -843,7 +885,7 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
       toggleCore.textContent = '隐藏核心发现';
       if (answerBox) {
         answerBox.style.display = 'block';
-        answerBox.textContent = '答案：' + (answerValue ? (answerValue + (answerUnit ? (' ' + answerUnit) : '')) : (answerText || verificationTarget || ''));
+        answerBox.textContent = '答案：' + (answerText || answerValue || verificationTarget || '');
       }
       render();
       return;
@@ -853,7 +895,7 @@ body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;displa
   showAnswerBtn.addEventListener('click', function(){
     if (answerBox) {
       answerBox.style.display = 'block';
-      answerBox.textContent = '答案：' + (answerValue ? (answerValue + (answerUnit ? (' ' + answerUnit) : '')) : (answerText || verificationTarget || '暂无'));
+      answerBox.textContent = '答案：' + (answerText || answerValue || verificationTarget || '暂无');
     }
     setFeedback('标准答案已经显示。', 'good');
     coreVisible = true;

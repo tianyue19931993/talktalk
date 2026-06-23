@@ -739,42 +739,41 @@ export default async function handler(req, res) {
             component_rules: {},
             fallback_strategy: { html: 'configs.temp' },
           })
-          const fallbackRenderPlan = {
-            version: fallbackTypeContext.pageSchemaVersion || 1,
-            questionText: question.question_text,
-            coreDiscovery: fallbackTypeContext.coreDiscovery || '',
-            layout: { name: 'temp_fallback', source: 'configs.temp' },
-            controls: [],
-            visuals: [],
-            animations: [],
-            assets: [],
-            rules: {},
-            fallbackStrategy: { html: 'configs.temp' },
-            matchedComponents: {
-              layout: [],
-              controls: [],
-              visuals: [],
-              animations: [],
-              assets: [],
-            },
-            missingComponents: [{
-              category: 'layout',
-              name: 'temp_fallback',
-              reason: '未匹配到 question_types，使用 configs.temp 兜底',
-              fallback: 'configs.temp',
-            }],
-            missingCapabilities: [],
-            fallbackUsed: true,
-          }
-          // temp 是一个综合 prompt → AI 直接生成完整 HTML
-          const htmlResult = await callAI({
+          const fallbackAnalysis = await callAI({
             systemPrompt: fallbackPrompt,
-            prompt: `题目原文：\n\n${question.question_text}`,
-            temperature: 0.6,
-            maxTokens: 16384,
-            timeoutSeconds: 9,
+            prompt: `请只执行“第一阶段：分析题目，生成 analysis_json”。
+不要输出 HTML，不要输出多余解释，不要进入第二阶段。
+请严格输出一个 JSON 对象，字段尽量完整，结构如下：
+{
+  "question_type": "",
+  "known_conditions": [],
+  "hidden_conditions": [],
+  "verification_target": "",
+  "core_discovery": "",
+  "discovery_flow": [],
+  "challenge_steps": [],
+  "interaction_flow": {
+    "trigger": "",
+    "action": "",
+    "feedback": [],
+    "reset": ""
+  },
+  "animation_flow": {
+    "type": "",
+    "description": "",
+    "visual_effect": [],
+    "duration": ""
+  }
+}
+
+题目原文：
+${question.question_text}`,
+            responseFormat: 'json_object',
+            temperature: 0.3,
+            maxTokens: 1200,
+            timeoutSeconds: 6,
           })
-          if (!htmlResult.success || !htmlResult.content) {
+          if (!fallbackAnalysis.success || !fallbackAnalysis.content) {
             await patchQuestionFull(actualQuestionId, { status: 'pending' })
             await recordGenerationArtifacts({
               headers,
@@ -783,23 +782,132 @@ export default async function handler(req, res) {
               questionId: actualQuestionId,
               typeContext: fallbackTypeContext,
               analysisJson: {},
-              renderPlan: fallbackRenderPlan,
+              renderPlan: {
+                version: fallbackTypeContext.pageSchemaVersion || 1,
+                questionText: question.question_text,
+                coreDiscovery: fallbackTypeContext.coreDiscovery || '',
+                layout: { name: 'temp_fallback', source: 'configs.temp' },
+                controls: [],
+                visuals: [],
+                animations: [],
+                assets: [],
+                rules: {},
+                fallbackStrategy: { html: 'configs.temp' },
+                matchedComponents: {
+                  layout: [],
+                  controls: [],
+                  visuals: [],
+                  animations: [],
+                  assets: [],
+                },
+                missingComponents: [{
+                  category: 'layout',
+                  name: 'temp_fallback',
+                  reason: '未匹配到 question_types，使用 configs.temp 兜底',
+                  fallback: 'configs.temp',
+                }],
+                missingCapabilities: [],
+                fallbackUsed: true,
+              },
               status: 'failed',
             })
             return res.status(200).json({
               success: false,
-              error: 'AI 生成暂时不可用，请到「我的互动列表」中重新生成',
+              error: 'AI 分析暂时不可用，请到「我的互动列表」中重新生成',
               questionId: actualQuestionId,
             })
           }
-          // 清理 HTML：只保留 DOCTYPE~html 之间的内容
-          const startIdx = htmlResult.content.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
-          const fallbackHtmlRaw = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
-          const htmlEnd = fallbackHtmlRaw.search(/<\/html>\s*/i)
-          const fallbackHtml = htmlEnd !== -1 ? fallbackHtmlRaw.slice(0, htmlEnd + '<\/html>'.length) : fallbackHtmlRaw
+          let analysisJson = {}
+          try {
+            analysisJson = JSON.parse(fallbackAnalysis.content)
+          } catch {
+            analysisJson = { raw: fallbackAnalysis.content }
+          }
+
+          const renderPlan = buildRenderPlan(fallbackTypeContext, analysisJson, question.question_text)
+          await patchQuestionFull(actualQuestionId, {
+            core_discovery: fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || '暂未分类',
+            analysis_json: analysisJson,
+            status: 'pending',
+          })
+
+          // 使用本地通用模板渲染，避免 temp 分支再多走一次 HTML 生成 AI
+          const d = JSON.stringify(analysisJson, null, 2)
+          const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
+          const renderPlanStr = JSON.stringify(renderPlan, null, 2)
+          let fallbackHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>互动演示</title>
+<style>
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
+.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px;margin-bottom:16px}
+.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}
+h2{font-size:13px;color:var(--mute);margin-bottom:12px}
+.section-label{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-box{padding:16px;background:var(--bg);border-radius:16px;text-align:center}
+.stat-value{font-size:20px;font-weight:700;color:var(--purple);margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--mute)}
+.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}
+.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}
+.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}
+.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}
+.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}
+.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}
+.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}
+.obj-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--bg);border-radius:24px;font-size:13px;margin:0 4px 8px 0}
+.ctrl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:500;border:1px solid #ddd;background:var(--card);color:var(--ink);margin:0 4px 8px 0}
+.disc-card{padding:12px 16px;background:#f0fdf4;border-radius:12px;color:#16a34a;font-size:13px;margin-bottom:8px;border-left:4px solid #16a34a}
+.obs-card{padding:12px 16px;background:var(--bg);border-radius:12px;font-size:12px;color:var(--body);margin-bottom:8px;border-left:4px solid var(--blue)}
+.raw-json{font-size:11px;font-family:monospace;background:var(--bg);padding:16px;border-radius:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:var(--body);line-height:1.5}
+.equation{text-align:center;padding:16px;background:linear-gradient(135deg,rgba(121,40,202,.06),rgba(0,112,243,.06));border-radius:16px;font-size:16px;font-weight:600;color:var(--purple);margin:8px 0}
+</style>
+</head>
+<body>
+<div class="container" id="app-root">
+<div class="card"><h2>📝 题目</h2><p class="q-text">${question.question_text}</p></div>
+<div id="dynamic-content"><p style="font-size:13px;color:var(--mute);text-align:center;padding:20px">加载中...</p></div>
+</div>
+<script>
+var data = ${d};
+(function(){try{var el=document.getElementById('dynamic-content');if(!el)return;if(!data){el.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">暂无分析数据</p></div>';return;}
+
+if(data.scene&&data.objects){var s=data.scene,o=data.objects,c=data.controls,k=data.known_data,di=data.discoveries,ob=data.observations,h=data.hidden_data;var h2='<div class="card">';
+h2+='<div class="section-label">🧪 实验场景</div>';
+h2+='<p style="font-size:14px;color:var(--body);line-height:1.6;margin-bottom:16px">'+esc(s.description)+'</p>';
+if(o&&o.length){h2+='<div style="margin-bottom:12px">';o.forEach(function(x){h2+='<span class="obj-tag">'+esc(x.icon||'')+' '+esc(x.name||'')+'</span>'});h2+='</div>'}
+if(c&&c.length){h2+='<div class="section-label" style="margin-top:12px">🎮 操作</div><div>';c.forEach(function(x){h2+='<span class="ctrl-btn">'+esc(x.action)+'</span>'});h2+='</div>'}
+h2+='</div>';
+if(k&&k.length){h2+='<div class="card"><div class="section-label">📊 已知数据</div><div class="grid-2">';k.forEach(function(x){h2+='<div class="stat-box"><div class="stat-value">'+esc(x.total_value)+'<span style="font-size:13px;font-weight:400;color:var(--mute);margin-left:4px">'+esc(x.unit||'')+'</span></div><div class="stat-label">'+esc(x.label||'')+'</div></div>'});h2+='</div></div>'}
+if(di&&di.length){h2+='<div class="card"><div class="section-label">💡 思考发现</div>';di.forEach(function(x){h2+='<div class="disc-card">✨ '+esc(x.rule||'')+'</div>'});h2+='</div>'}
+if(ob&&ob.length){h2+='<div class="card"><div class="section-label">🔍 观察</div>';ob.forEach(function(x){h2+='<div class="obs-card">👁️ '+esc(x.phenomenon||'')+'</div>'});h2+='</div>'}
+if(h&&h.length){h2+='<div class="card" id="answer-section"><div class="section-label">🎯 隐藏发现</div>';h.forEach(function(x){h2+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-label" style="font-size:13px">'+esc(x.label||'')+'</div><div class="stat-value" style="color:var(--mute);font-size:16px">点击按钮显示答案</div></div>'});h2+='<div style="text-align:center;margin-top:12px"><button onclick="document.querySelectorAll(\'#answer-section .stat-value\').forEach(function(e,i){e.textContent=answers[i]||\'?\';e.style.color=\'var(--purple)\'})" style="padding:8px 20px;border:none;border-radius:24px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:13px;font-weight:500;cursor:pointer">🎯 显示答案</button></div></div>'}
+el.innerHTML=h2;return}
+
+if(data.thinking_steps&&data.thinking_steps.length){var h3='<div class="card" id="steps-container"><div class="section-label">🔍 思维引导</div>';data.thinking_steps.forEach(function(s,i){h3+='<div class="step"><div class="step-num">步骤 '+(i+1)+'</div><div class="step-q">'+esc(s.teacher_question||s.title||'')+'</div><div class="step-ans">✅ 答案：'+(s.correct_answer!=null?s.correct_answer:'')+'</div>';if(s.hint)h3+='<div class="step-hint">💡 提示：'+esc(s.hint)+'</div>';if(s.conclusion)h3+='<div class="step-concl">📌 '+esc(s.conclusion)+'</div>';h3+='</div>'});if(data.answer)h3+='<div class="answer-box">🎉 最终答案：'+JSON.stringify(data.answer)+'</div>';h3+='</div>';el.innerHTML=h3;return}
+
+if(data.known_data){var h4='<div class="card"><div class="section-label">📊 分析数据</div>';if(Array.isArray(data.known_data)){data.known_data.forEach(function(x){h4+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-value">'+esc(x.total_value||x.value||'')+'</div><div class="stat-label">'+esc(x.label||'')+'</div></div>'})}else{h4+='<pre class="raw-json">'+esc(JSON.stringify(data.known_data,null,2))+'</pre>'}h4+='</div>';el.innerHTML=h4;return}
+
+el.innerHTML='<div class="card"><div class="section-label">📊 分析结果</div><pre class="raw-json">'+esc(JSON.stringify(data,null,2))+'</pre></div>';}catch(e){var errEl=document.getElementById('dynamic-content');if(errEl)errEl.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">无法加载分析内容</p></div>'}})()
+function esc(s){if(typeof s!=='string')return String(s||'');return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+var answers=[];
+try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.label||'?'});if(r.discoveries&&answers.length===0)answers=r.discoveries.map(function(x,i){return r.known_data&&r.known_data.length>i?'\u89e3\u51b3\u65b9\u6848 '+(i+1):''})}catch(e){}
+<\/script>
+</body>
+</html>`
+          fallbackHtml = fallbackHtml
+            .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
+            .replace(/\$\{render_json\}/g, () => renderPlanStr)
+            .replace(/\$\{question_text\}/g, () => question.question_text)
           const dataUrl = await saveHtmlToStorage(fallbackHtml, actualQuestionId)
 
-          // 标记为 completed（走 temp 不经过 analysis_json 流程）
+          // 标记为 completed（兜底也走分析 JSON + 本地模板）
           await patchQuestionFull(actualQuestionId, {
             question_type: '暂未分类',
             status: 'completed',

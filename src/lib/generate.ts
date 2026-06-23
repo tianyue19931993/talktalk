@@ -32,14 +32,34 @@ function getApiBaseUrl() {
 
   if (trimmed) {
     if (typeof window !== 'undefined') {
+      const normalizeHost = (value: string) => value.replace(/^www\./i, '').toLowerCase()
+      const configuredUrl = (() => {
+        try {
+          return new URL(trimmed)
+        } catch {
+          return null
+        }
+      })()
+      const currentOrigin = window.location.origin
+      const currentHost = normalizeHost(window.location.hostname)
+      const configuredHost = normalizeHost(configuredUrl?.hostname || '')
       const isLocalhostLike = /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(trimmed)
       const isCurrentPageLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i.test(window.location.hostname)
+      const isSameSiteHost =
+        configuredUrl &&
+        configuredUrl.protocol === window.location.protocol &&
+        configuredHost === currentHost
       const isDifferentOrigin = !trimmed.startsWith(window.location.origin)
 
       // 生产环境如果误配了本地地址，直接回退到当前站点同源地址，避免 Failed to fetch
       if (isLocalhostLike && !isCurrentPageLocal) {
         console.warn('[generate] 忽略本地 VITE_API_BASE_URL，回退到同源地址：', trimmed)
-        return window.location.origin
+        return currentOrigin
+      }
+
+      // 裸域 / www 域只是同一个站点时，优先走当前页面 origin，避免打到错误的域名
+      if (isSameSiteHost) {
+        return currentOrigin
       }
 
       // 如果显式配置了一个跨域但可访问的地址，仍然允许使用

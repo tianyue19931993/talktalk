@@ -1,8 +1,9 @@
 /**
  * Supabase 服务端客户端（使用 service_role key）- ESM 版
  */
-const SUPABASE_URL = process.env.SUPABASE_URL || ''
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+import { getSupabaseEnv } from './supabase-env.js'
+
+const { url: SUPABASE_URL, serviceRoleKey: SERVICE_ROLE_KEY } = getSupabaseEnv()
 const BASE = SUPABASE_URL ? `${SUPABASE_URL}/rest/v1` : ''
 
 async function request(path, options = {}) {

@@ -1,33 +1,16 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
 import {
-  ArrowRight,
-  Activity,
-  Boxes,
-  CircleDot,
-  MoveRight,
-  MousePointer2,
   WandSparkles,
-  Plus,
-  Layers3,
-  TimerReset,
-  Grid3x3,
-  SplitSquareVertical,
-  Link2,
-  Sparkles,
-  Hash,
-  Waypoints,
-  SquareDashedMousePointer,
-  Columns3,
-  NotebookTabs,
 } from 'lucide-react'
 import {
   MButton,
   MCard,
   MHint,
+  MInput,
   MProgress,
   MResult,
   MTitle,
-  PreviewCard,
   ItemIcon,
   ItemGroup,
   Counter,
@@ -57,7 +40,7 @@ export type ComponentChoice = {
 }
 
 export type ComponentGroup = {
-  id: 'layout' | 'control' | 'visual' | 'animation' | 'asset'
+  id: 'scene' | 'observation' | 'discovery' | 'challenge'
   label: string
   helper: string
   choices: ComponentChoice[]
@@ -83,120 +66,57 @@ function animationPill(label: string, className: string) {
 
 export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
-    id: 'layout',
+    id: 'scene',
     label: 'Layout / Scene',
-    helper: '页面骨架。推荐先选它，再选交互和视觉。',
+    helper: '唯一的页面骨架，先把观察 - 发现 - 挑战三段切好。',
     choices: [
-      {
-        key: 'SceneFrame',
-        zh: '场景外框',
-        en: 'SceneFrame',
-        description: '统一标题、题干、工作区和结果区的基础框架。',
-        preview: miniCard('场景外框', 'SceneFrame', <div className="space-y-2"><div className="h-2 rounded-full bg-[var(--color-canvas-soft)]" /><div className="grid grid-cols-2 gap-2"><div className="h-10 rounded-[10px] bg-[var(--color-link-bg-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /></div></div>),
-      },
-      {
-        key: 'TwoColumnLayout',
-        zh: '双栏骨架',
-        en: 'TwoColumnLayout',
-        description: '左题干右操作，适合大多数比较和分析题。',
-        preview: miniCard('双栏骨架', 'TwoColumnLayout', <div className="grid grid-cols-2 gap-2"><div className="h-12 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-12 rounded-[10px] bg-[var(--color-link-bg-soft)]" /></div>),
-      },
-      {
-        key: 'SingleColumnLayout',
-        zh: '单列流程',
-        en: 'SingleColumnLayout',
-        description: '适合逐步讲解、时间推进、规则生长。',
-        preview: miniCard('单列流程', 'SingleColumnLayout', <div className="space-y-2"><div className="h-4 rounded-full bg-[var(--color-canvas-soft)]" /><div className="h-4 rounded-full bg-[var(--color-canvas-soft)]" /><div className="h-4 rounded-full bg-[var(--color-link-bg-soft)]" /></div>),
-      },
       {
         key: 'ThreeZoneLayout',
-        zh: '三段布局',
+        zh: '三区布局',
         en: 'ThreeZoneLayout',
-        description: '导入、操作、总结三段式。',
-        preview: miniCard('三段布局', 'ThreeZoneLayout', <div className="grid grid-cols-3 gap-2"><div className="h-12 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-12 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-12 rounded-[10px] bg-[var(--color-link-bg-soft)]" /></div>),
-      },
-      {
-        key: 'StickyAsideLayout',
-        zh: '侧栏骨架',
-        en: 'StickyAsideLayout',
-        description: '左侧说明固定，右侧主区持续操作。',
-        preview: miniCard('侧栏骨架', 'StickyAsideLayout', <div className="grid grid-cols-[0.7fr_1.3fr] gap-2"><div className="h-14 rounded-[10px] bg-[var(--color-link-bg-soft)]" /><div className="h-14 rounded-[10px] bg-[var(--color-canvas-soft)]" /></div>),
+        description: '把一张页面固定切成观察区、发现区和挑战区。',
+        preview: miniCard('三区布局', 'ThreeZoneLayout', <div className="space-y-2"><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-link-bg-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /></div>),
       },
     ],
   },
   {
-    id: 'control',
-    label: '操作控件',
-    helper: '孩子怎么点、拖、选、填。',
+    id: 'observation',
+    label: '观察区',
+    helper: '负责题干、提示、数量和关系的可视化。',
     choices: [
-      {
-        key: 'ClickControl',
-        zh: '点击按钮',
-        en: 'ClickControl',
-        description: '一步一步点，适合简单推进。',
-        preview: <ClickControl label="点一下" helper="点击后继续" />,
-      },
-      {
-        key: 'DragControl',
-        zh: '拖拽控制',
-        en: 'DragControl',
-        description: '拖动到目标位置，适合分组、匹配、移动。',
-        preview: <DragControl from="🍎" to="📦" />,
-      },
-      {
-        key: 'SliderControl',
-        zh: '滑块控制',
-        en: 'SliderControl',
-        description: '拖动滑块选择数值。',
-        preview: <SliderControl value={65} />,
-      },
-      {
-        key: 'StepButton',
-        zh: '步骤按钮',
-        en: 'StepButton',
-        description: '按步骤推进，适合流程题。',
-        preview: <StepButton label="下一步" />,
-      },
-      {
-        key: 'ChoiceControl',
-        zh: '选项控制',
-        en: 'ChoiceControl',
-        description: '单选/多选，适合判断和选择。',
-        preview: <ChoiceControl options={['A', 'B', 'C']} activeIndex={1} />,
-      },
-      {
-        key: 'AnswerInput',
-        zh: '答案输入',
-        en: 'AnswerInput',
-        description: '孩子自己输入答案。',
-        preview: <AnswerInput value="4" />,
-      },
-    ],
-  },
-  {
-    id: 'visual',
-    label: '数学视觉',
-    helper: '数量、关系、比较、段、线、图怎么画。',
-    choices: [
-      { key: 'Counter', zh: '数字计数', en: 'Counter', description: '大数字显示。', preview: <Counter value={12} unit="个" /> },
+      { key: 'MTitle', zh: '标题组件', en: 'MTitle', description: '观察区的标题与题目氛围。', preview: <MTitle>成长表达实验室 M</MTitle> },
+      { key: 'MHint', zh: '提示标签', en: 'MHint', description: '给孩子看的观察提示。', preview: <MHint>先看条件</MHint> },
+      { key: 'MCard', zh: '内容卡片', en: 'MCard', description: '承载题干、图片和提示。', preview: <MCard title="观察区" hint="把题目条件放在这里"><div className="text-xs text-[var(--color-body)]">示例内容</div></MCard> },
+      { key: 'MInput', zh: '输入框', en: 'MInput', description: '题目文字或观察信息输入。', preview: <MInput value="在此输入文字..." /> },
+      { key: 'Counter', zh: '数字计数', en: 'Counter', description: '数量一眼可见。', preview: <Counter value={12} unit="个" /> },
+      { key: 'ItemGroup', zh: '物体分组', en: 'ItemGroup', description: '把多个对象展示成组。', preview: <ItemGroup emoji="🍎" count={6} /> },
+      { key: 'Bar', zh: '条形关系', en: 'Bar', description: '数量转长度。', preview: <Bar value={7} max={10} /> },
+      { key: 'Balance', zh: '平衡关系', en: 'Balance', description: '比较差额与移多补少。', preview: <Balance left={3} right={5} /> },
       { key: 'Box', zh: '基础盒子', en: 'Box', description: '普通容器。', preview: <Box label="Box" /> },
-      { key: 'DashedBox', zh: '虚线盒子', en: 'DashedBox', description: '可拖入/可标记区域。', preview: <DashedBox label="可拖入" /> },
-      { key: 'SolidBox', zh: '实线盒子', en: 'SolidBox', description: '目标区域/结果框。', preview: <SolidBox label="目标区" /> },
-      { key: 'Arrow', zh: '箭头关系', en: 'Arrow', description: '表达移动/指向。', preview: <Arrow label="指向" /> },
-      { key: 'Balance', zh: '平衡秤', en: 'Balance', description: '比较差额/移多补少。', preview: <Balance left={3} right={5} /> },
-      { key: 'Bar', zh: '条形图', en: 'Bar', description: '数量关系转为长度。', preview: <Bar value={7} max={10} /> },
-      { key: 'Timeline', zh: '时间线', en: 'Timeline', description: '时间推进。', preview: <Timeline activeIndex={1} /> },
+      { key: 'DashedBox', zh: '虚线盒子', en: 'DashedBox', description: '可观察的空位区域。', preview: <DashedBox label="可拖入" /> },
+      { key: 'SolidBox', zh: '实线盒子', en: 'SolidBox', description: '目标区域 / 结果框。', preview: <SolidBox label="目标区" /> },
+      { key: 'Arrow', zh: '箭头关系', en: 'Arrow', description: '表达移动和指向。', preview: <Arrow label="指向" /> },
+      { key: 'Timeline', zh: '时间线', en: 'Timeline', description: '时间推进观察。', preview: <Timeline activeIndex={1} /> },
       { key: 'NumberLine', zh: '数轴', en: 'NumberLine', description: '数轴比较和定位。', preview: <NumberLine marker={4} /> },
       { key: 'PointSegment', zh: '点段图', en: 'PointSegment', description: '点数和段数关系。', preview: <PointSegment start={2} end={7} /> },
-      { key: 'ItemGroup', zh: '物体分组', en: 'ItemGroup', description: '多个对象成组。', preview: <ItemGroup emoji="🍎" count={6} /> },
-      { key: 'MCard', zh: '统一卡片', en: 'MCard', description: '统一内容承载卡。', preview: <MCard title="标题" hint="副标题"><div className="text-xs text-[var(--color-body)]">示例内容</div></MCard> },
+      { key: 'PersonIcon', zh: '人物', en: 'PersonIcon', description: '小朋友 / 角色素材。', preview: <ItemIcon emoji="🧒" label="PersonIcon" tone="blue" /> },
+      { key: 'AppleIcon', zh: '苹果', en: 'AppleIcon', description: '常见数量对象。', preview: <ItemIcon emoji="🍎" label="AppleIcon" tone="pink" /> },
+      { key: 'TreeIcon', zh: '树', en: 'TreeIcon', description: '生长和规律场景。', preview: <ItemIcon emoji="🌳" label="TreeIcon" tone="green" /> },
+      { key: 'RoadIcon', zh: '道路', en: 'RoadIcon', description: '路径 / 时间 / 移动。', preview: <ItemIcon emoji="🛣️" label="RoadIcon" tone="blue" /> },
+      { key: 'MachineIcon', zh: '机器', en: 'MachineIcon', description: '变化与操作场景。', preview: <ItemIcon emoji="⚙️" label="MachineIcon" tone="purple" /> },
     ],
   },
   {
-    id: 'animation',
-    label: '动画积木',
-    helper: '页面怎么演、怎么提示、怎么反馈。',
+    id: 'discovery',
+    label: '发现区',
+    helper: '负责点击、拖拽、滑动和逐步发现规律。',
     choices: [
+      { key: 'ClickControl', zh: '点击按钮', en: 'ClickControl', description: '一步一步点，适合简单推进。', preview: <ClickControl label="点一下" helper="点击后继续" /> },
+      { key: 'DragControl', zh: '拖拽控制', en: 'DragControl', description: '拖动到目标位置，适合分组、匹配、移动。', preview: <DragControl from="🍎" to="📦" /> },
+      { key: 'SliderControl', zh: '滑块控制', en: 'SliderControl', description: '拖动滑块选择数值。', preview: <SliderControl value={65} /> },
+      { key: 'StepButton', zh: '步骤按钮', en: 'StepButton', description: '按步骤推进，适合流程题。', preview: <StepButton label="下一步" /> },
+      { key: 'ChoiceControl', zh: '选项控制', en: 'ChoiceControl', description: '单选 / 多选，适合判断和选择。', preview: <ChoiceControl options={['A', 'B', 'C']} activeIndex={1} /> },
+      { key: 'MButton', zh: '操作按钮', en: 'MButton', description: '统一风格的操作按钮。', preview: <div className="flex flex-wrap gap-2"><MButton>开始探索</MButton><MButton variant="secondary">重置</MButton></div> },
       { key: 'Highlight', zh: '高亮', en: 'Highlight', description: '强调关键位置。', preview: animationPill('Highlight', 'bg-[var(--color-link)]') },
       { key: 'Move', zh: '移动', en: 'Move', description: '元素位移。', preview: animationPill('Move', 'bg-[var(--color-gradient-start)]') },
       { key: 'Split', zh: '拆分', en: 'Split', description: '一个变多个。', preview: animationPill('Split', 'bg-[var(--color-highlight-pink)]') },
@@ -210,20 +130,17 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
     ],
   },
   {
-    id: 'asset',
-    label: '素材积木',
-    helper: '题目故事里出现的物件。',
+    id: 'challenge',
+    label: '挑战区',
+    helper: '负责答案输入、验证结果和回收结论。',
     choices: [
-      { key: 'PersonIcon', zh: '人物', en: 'PersonIcon', description: '小朋友/角色。', preview: <ItemIcon emoji="🧒" label="PersonIcon" tone="blue" /> },
-      { key: 'BoxIcon', zh: '盒子', en: 'BoxIcon', description: '容器/箱子。', preview: <ItemIcon emoji="📦" label="BoxIcon" tone="purple" /> },
-      { key: 'CupIcon', zh: '杯子', en: 'CupIcon', description: '杯、碗、容器。', preview: <ItemIcon emoji="☕" label="CupIcon" tone="amber" /> },
-      { key: 'TreeIcon', zh: '树', en: 'TreeIcon', description: '生长/规律场景。', preview: <ItemIcon emoji="🌳" label="TreeIcon" tone="green" /> },
-      { key: 'CherryIcon', zh: '樱桃', en: 'CherryIcon', description: '成组物体。', preview: <ItemIcon emoji="🍒" label="CherryIcon" tone="pink" /> },
-      { key: 'AppleIcon', zh: '苹果', en: 'AppleIcon', description: '常见数量对象。', preview: <ItemIcon emoji="🍎" label="AppleIcon" tone="pink" /> },
-      { key: 'RoadIcon', zh: '道路', en: 'RoadIcon', description: '路径/时间/移动。', preview: <ItemIcon emoji="🛣️" label="RoadIcon" tone="blue" /> },
-      { key: 'CoinIcon', zh: '硬币', en: 'CoinIcon', description: '钱币/计数对象。', preview: <ItemIcon emoji="🪙" label="CoinIcon" tone="amber" /> },
-      { key: 'MachineIcon', zh: '机器', en: 'MachineIcon', description: '假设、变化、操作。', preview: <ItemIcon emoji="⚙️" label="MachineIcon" tone="purple" /> },
-      { key: 'AnimalIcon', zh: '动物', en: 'AnimalIcon', description: '故事化对象。', preview: <ItemIcon emoji="🐯" label="AnimalIcon" tone="green" /> },
+      { key: 'AnswerInput', zh: '答案输入', en: 'AnswerInput', description: '孩子自己输入最终答案。', preview: <AnswerInput value="4" /> },
+      { key: 'MResult', zh: '结果卡', en: 'MResult', description: '把结果突出展示。', preview: <MResult label="最终答案" value="4" unit="个" note="验证正确后显示" /> },
+      { key: 'MProgress', zh: '进度条', en: 'MProgress', description: '挑战完成度。', preview: <MProgress value={86} /> },
+      { key: 'MCard', zh: '结果容器', en: 'MCard', description: '挑战区统一容器。', preview: <MCard title="验证结果" hint="输入答案后给出反馈"><div className="text-xs text-[var(--color-body)]">再看一遍条件</div></MCard> },
+      { key: 'StepButton', zh: '提交按钮', en: 'StepButton', description: '最后一步推进。', preview: <StepButton label="提交答案" /> },
+      { key: 'ChoiceControl', zh: '最终选择', en: 'ChoiceControl', description: '也可用于最终判定。', preview: <ChoiceControl options={['正确', '再想想', '看提示']} activeIndex={0} /> },
+      { key: 'MButton', zh: '反馈按钮', en: 'MButton', description: '提交 / 查看答案 / 再试一次。', preview: <div className="flex flex-wrap gap-2"><MButton>提交</MButton><MButton variant="secondary">查看答案</MButton></div> },
     ],
   },
 ]
@@ -244,10 +161,10 @@ export function ComponentPickerPreviewHelp() {
     <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-ink)]">
         <WandSparkles className="h-4 w-4 text-[var(--color-link)]" />
-        选择组件后，右侧会显示中文名 / 英文名 / 预览
+        先按“观察 / 发现 / 挑战”分区，再在区内选择组件
       </div>
       <div className="mt-2 text-xs leading-5 text-[var(--color-body)]">
-        组件字段支持多选，多个值会用英文逗号保存。你可以先按推荐搭一版，后面再继续微调。
+        每个分区都支持多选，多个值会用英文逗号保存。你可以先按推荐搭一版，后面再继续微调。
       </div>
     </div>
   )

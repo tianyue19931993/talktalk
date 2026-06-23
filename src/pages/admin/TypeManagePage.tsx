@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getTypes, addType, updateType, deleteType, subscribe, refreshStore } from '../../stores/appStore'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { Plus, Pencil, Trash2, Check, X, BookType, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, BookType, FileText } from 'lucide-react'
 import type { QuestionType } from '../../types'
 import {
   COMPONENT_GROUPS,
@@ -11,6 +11,101 @@ import {
   joinComponentValue,
   ComponentMultiSelectPill,
 } from '../../components/admin/questionTypeComponentCatalog'
+
+type ComponentMultiSelectProps = {
+  label: string
+  helper: string
+  value: string
+  onChange: (value: string) => void
+  groupIndex: number
+}
+
+function selectedLabelMap(groupIndex: number) {
+  return new Map(COMPONENT_GROUPS[groupIndex].choices.map((item) => [item.key, item]))
+}
+
+function ComponentMultiSelect({
+  label,
+  helper,
+  value,
+  onChange,
+  groupIndex,
+}: ComponentMultiSelectProps) {
+  const group = COMPONENT_GROUPS[groupIndex]
+  const selected = splitComponentValue(value)
+  const selectedMap = selectedLabelMap(groupIndex)
+  const toggle = (key: string) => {
+    const next = selected.includes(key)
+      ? selected.filter((item) => item !== key)
+      : [...selected, key]
+    onChange(joinComponentValue(next))
+  }
+
+  return (
+    <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-medium text-[var(--color-body)]">{label}</div>
+          <div className="text-[11px] text-[var(--color-mute)]">{helper}</div>
+        </div>
+        <div className="rounded-full bg-white px-2 py-0.5 text-[10px] text-[var(--color-body)]">
+          {selected.length > 0 ? `${selected.length} 选中` : '未选'}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {selected.length === 0 ? (
+          <span className="text-[11px] text-[var(--color-mute)]">点击选择，支持多选</span>
+        ) : (
+          selected.map((key) => {
+            const item = selectedMap.get(key)
+            return (
+              <ComponentMultiSelectPill
+                key={key}
+                value={key}
+                label={item ? `${item.zh} / ${item.en}` : key}
+                onRemove={() => {
+                  const next = selected.filter((itemKey) => itemKey !== key)
+                  onChange(joinComponentValue(next))
+                }}
+              />
+            )
+          })
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {group.choices.map((choice) => {
+          const active = selected.includes(choice.key)
+          return (
+            <button
+              key={choice.key}
+              type="button"
+              onClick={() => toggle(choice.key)}
+              className={`rounded-[18px] border p-3 text-left transition-all ${
+                active
+                  ? 'border-[var(--color-link)] bg-[var(--color-link-bg-soft)] shadow-[0_10px_24px_rgba(0,112,243,0.08)]'
+                  : 'border-[var(--color-hairline)] bg-white hover:border-[var(--color-link)]/50'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--color-ink)]">{choice.zh}</div>
+                  <div className="text-[11px] text-[var(--color-mute)]">{choice.en}</div>
+                </div>
+                <span className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-0.5 text-[10px] text-[var(--color-body)]">
+                  {active ? '已选' : '可选'}
+                </span>
+              </div>
+              <div className="mt-2 text-[11px] leading-5 text-[var(--color-body)]">{choice.description}</div>
+              <div className="mt-2 overflow-hidden rounded-[14px] border border-[var(--color-hairline)] bg-white p-1">
+                {choice.preview}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function TypeManagePage() {
   const [, setTick] = useState(0)
@@ -54,107 +149,14 @@ export default function TypeManagePage() {
   const [showBatchForm, setShowBatchForm] = useState(false)
   const [batchText, setBatchText] = useState('')
 
-  const parseJsonField = (value: string, fallback: any) => {
+  const parseJsonField = <T,>(value: string, fallback: T): T => {
     const trimmed = value.trim()
     if (!trimmed) return fallback
     try {
-      return JSON.parse(trimmed)
+      return JSON.parse(trimmed) as T
     } catch {
       return fallback
     }
-  }
-
-  const selectedLabelMap = (groupIndex: number) => {
-    return new Map(COMPONENT_GROUPS[groupIndex].choices.map((item) => [item.key, item]))
-  }
-
-  function ComponentMultiSelect({
-    label,
-    helper,
-    value,
-    onChange,
-    groupIndex,
-  }: {
-    label: string
-    helper: string
-    value: string
-    onChange: (value: string) => void
-    groupIndex: number
-  }) {
-    const group = COMPONENT_GROUPS[groupIndex]
-    const selected = splitComponentValue(value)
-    const selectedMap = selectedLabelMap(groupIndex)
-    const toggle = (key: string) => {
-      const next = selected.includes(key)
-        ? selected.filter((item) => item !== key)
-        : [...selected, key]
-      onChange(joinComponentValue(next))
-    }
-
-    return (
-      <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-medium text-[var(--color-body)]">{label}</div>
-            <div className="text-[11px] text-[var(--color-mute)]">{helper}</div>
-          </div>
-          <div className="rounded-full bg-white px-2 py-0.5 text-[10px] text-[var(--color-body)]">
-            {selected.length > 0 ? `${selected.length} 选中` : '未选'}
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {selected.length === 0 ? (
-            <span className="text-[11px] text-[var(--color-mute)]">点击选择，支持多选</span>
-          ) : (
-            selected.map((key) => {
-              const item = selectedMap.get(key)
-              return (
-                <ComponentMultiSelectPill
-                  key={key}
-                  value={key}
-                  label={item ? `${item.zh} / ${item.en}` : key}
-                  onRemove={() => {
-                    const next = selected.filter((itemKey) => itemKey !== key)
-                    onChange(joinComponentValue(next))
-                  }}
-                />
-              )
-            })
-          )}
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {group.choices.map((choice) => {
-            const active = selected.includes(choice.key)
-            return (
-              <button
-                key={choice.key}
-                type="button"
-                onClick={() => toggle(choice.key)}
-                className={`rounded-[18px] border p-3 text-left transition-all ${
-                  active
-                    ? 'border-[var(--color-link)] bg-[var(--color-link-bg-soft)] shadow-[0_10px_24px_rgba(0,112,243,0.08)]'
-                    : 'border-[var(--color-hairline)] bg-white hover:border-[var(--color-link)]/50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-[var(--color-ink)]">{choice.zh}</div>
-                    <div className="text-[11px] text-[var(--color-mute)]">{choice.en}</div>
-                  </div>
-                  <span className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-0.5 text-[10px] text-[var(--color-body)]">
-                    {active ? '已选' : '可选'}
-                  </span>
-                </div>
-                <div className="mt-2 text-[11px] leading-5 text-[var(--color-body)]">{choice.description}</div>
-                <div className="mt-2 overflow-hidden rounded-[14px] border border-[var(--color-hairline)] bg-white p-1">
-                  {choice.preview}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    )
   }
 
   useEffect(() => {
@@ -368,28 +370,28 @@ export default function TypeManagePage() {
           <div className="grid gap-3 lg:grid-cols-2">
             <ComponentMultiSelect
               label="Layout / Scene"
-              helper="页面骨架"
+              helper="唯一的三段式页面骨架"
               value={newLayoutComponent}
               onChange={setNewLayoutComponent}
               groupIndex={0}
             />
             <ComponentMultiSelect
-              label="操作控件"
-              helper="孩子怎么操作"
+              label="观察区"
+              helper="题干、提示、数量和关系"
               value={newControlComponent}
               onChange={setNewControlComponent}
               groupIndex={1}
             />
             <ComponentMultiSelect
-              label="数学视觉"
-              helper="怎么表达数量和关系"
+              label="发现区"
+              helper="点击、拖拽、滑动、选择"
               value={newVisualComponent}
               onChange={setNewVisualComponent}
               groupIndex={2}
             />
             <ComponentMultiSelect
-              label="动画积木"
-              helper="页面怎么演"
+              label="挑战区"
+              helper="输入、验证、反馈"
               value={newAnimationComponent}
               onChange={setNewAnimationComponent}
               groupIndex={3}
@@ -422,9 +424,9 @@ export default function TypeManagePage() {
               />
             </div>
             <div className="mt-3 flex flex-col gap-2">
-              <label className="text-xs font-medium text-[var(--color-body)]">component_rules（JSON）</label>
+              <label className="text-xs font-medium text-[var(--color-body)]">component_rules（JSON，支持 scene / observation / discovery / challenge）</label>
               <textarea
-                placeholder='{"required_components":["MCard"]}'
+                placeholder='{"scene_components":["ThreeZoneLayout"],"observation_components":["MCard"],"discovery_components":["ClickControl"],"challenge_components":["AnswerInput"]}'
                 value={newComponentRules}
                 onChange={(e) => setNewComponentRules(e.target.value)}
                 rows={3}
@@ -478,10 +480,10 @@ export default function TypeManagePage() {
               </tr>
             ) : (
               types.map((t) => {
-                const layoutTags = splitComponentValue(t.layoutComponent || '')
-                const controlTags = splitComponentValue(t.controlComponent || '')
-                const visualTags = splitComponentValue(t.visualComponent || '')
-                const animationTags = splitComponentValue(t.animationComponent || '')
+                const sceneTags = splitComponentValue(t.layoutComponent || '')
+                const observationTags = splitComponentValue(t.controlComponent || '')
+                const discoveryTags = splitComponentValue(t.visualComponent || '')
+                const challengeTags = splitComponentValue(t.animationComponent || '')
 
                 return (
                   <tr key={t.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors align-top">
@@ -503,19 +505,19 @@ export default function TypeManagePage() {
                     </td>
                     <td className="px-4 py-3 min-w-[260px]">
                       <div className="flex flex-wrap gap-2 text-[10px]">
-                        {layoutTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-link-bg-soft)] px-2 py-1 text-[var(--color-link)]">Layout: {item}</span>
+                        {sceneTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-link-bg-soft)] px-2 py-1 text-[var(--color-link)]">Scene: {item}</span>
                         ))}
-                        {controlTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">Control: {item}</span>
+                        {observationTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">观察区: {item}</span>
                         ))}
-                        {visualTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">Visual: {item}</span>
+                        {discoveryTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区: {item}</span>
                         ))}
-                        {animationTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">Animation: {item}</span>
+                        {challengeTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">挑战区: {item}</span>
                         ))}
-                        {!layoutTags.length && !controlTags.length && !visualTags.length && !animationTags.length && (
+                        {!sceneTags.length && !observationTags.length && !discoveryTags.length && !challengeTags.length && (
                           <span className="text-[var(--color-mute)]">暂无组件配置</span>
                         )}
                       </div>
@@ -614,28 +616,28 @@ export default function TypeManagePage() {
               <div className="space-y-3">
                 <ComponentMultiSelect
                   label="Layout / Scene"
-                  helper="页面骨架"
+                  helper="唯一的三段式页面骨架"
                   value={editLayoutComponent}
                   onChange={setEditLayoutComponent}
                   groupIndex={0}
                 />
                 <ComponentMultiSelect
-                  label="操作控件"
-                  helper="操作方式"
+                  label="观察区"
+                  helper="题干、提示、数量和关系"
                   value={editControlComponent}
                   onChange={setEditControlComponent}
                   groupIndex={1}
                 />
                 <ComponentMultiSelect
-                  label="数学视觉"
-                  helper="数学对象展示"
+                  label="发现区"
+                  helper="点击、拖拽、滑动、选择"
                   value={editVisualComponent}
                   onChange={setEditVisualComponent}
                   groupIndex={2}
                 />
                 <ComponentMultiSelect
-                  label="动画积木"
-                  helper="动效"
+                  label="挑战区"
+                  helper="输入、验证、反馈"
                   value={editAnimationComponent}
                   onChange={setEditAnimationComponent}
                   groupIndex={3}
@@ -653,7 +655,7 @@ export default function TypeManagePage() {
                 <textarea
                   value={editComponentRules}
                   onChange={(e) => setEditComponentRules(e.target.value)}
-                  placeholder="component_rules（JSON）"
+                  placeholder='{"scene_components":["ThreeZoneLayout"],"observation_components":["MCard"],"discovery_components":["ClickControl"],"challenge_components":["AnswerInput"]}'
                   rows={5}
                   className="w-full rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-xs text-[var(--color-ink)] font-mono resize-y"
                 />

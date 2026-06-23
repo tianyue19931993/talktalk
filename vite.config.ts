@@ -59,8 +59,33 @@ async function loadHandler(routePath: string) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  process.env.SUPABASE_URL ||= env.SUPABASE_URL || env.VITE_SUPABASE_URL || ''
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||= env.SUPABASE_SERVICE_ROLE_KEY || ''
+  process.env.SUPABASE_URL = process.env.SUPABASE_URL?.trim()
+    ? process.env.SUPABASE_URL
+    : (env.SUPABASE_URL || env.VITE_SUPABASE_URL || '')
+  process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    ? process.env.SUPABASE_SERVICE_ROLE_KEY
+    : (env.SUPABASE_SERVICE_ROLE_KEY || '')
+  process.env.DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim()
+    ? process.env.DEEPSEEK_API_KEY
+    : (env.DEEPSEEK_API_KEY || '')
+  process.env.DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL?.trim()
+    ? process.env.DEEPSEEK_BASE_URL
+    : (env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com')
+  process.env.QINIU_ACCESS_KEY = process.env.QINIU_ACCESS_KEY?.trim()
+    ? process.env.QINIU_ACCESS_KEY
+    : (env.QINIU_ACCESS_KEY || '')
+  process.env.QINIU_SECRET_KEY = process.env.QINIU_SECRET_KEY?.trim()
+    ? process.env.QINIU_SECRET_KEY
+    : (env.QINIU_SECRET_KEY || '')
+  process.env.QINIU_DOMAIN = process.env.QINIU_DOMAIN?.trim()
+    ? process.env.QINIU_DOMAIN
+    : (env.QINIU_DOMAIN || '')
+  process.env.QINIU_BUCKET = process.env.QINIU_BUCKET?.trim()
+    ? process.env.QINIU_BUCKET
+    : (env.QINIU_BUCKET || '')
+  process.env.QINIU_UPLOAD_HOST = process.env.QINIU_UPLOAD_HOST?.trim()
+    ? process.env.QINIU_UPLOAD_HOST
+    : (env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com')
 
   return {
     plugins: [

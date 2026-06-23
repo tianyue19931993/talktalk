@@ -1,3 +1,5 @@
+import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
+
 /**
  * POST /api/auth/reset-password
  *
@@ -8,8 +10,7 @@
  * 响应:   { success: true } | { success: false, error: string }
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')

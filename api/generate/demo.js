@@ -17,10 +17,10 @@
 
 import { callAI } from '../../server/lib/ai.js'
 import { consumeGeneration } from '../../server/lib/membership.js'
+import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 import crypto from 'crypto'
 
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
 
 // ─── JWT 载荷解码（轻量，无依赖） ─────────────────
 function getUserIdFromToken(req) {
@@ -196,6 +196,11 @@ function normalizeQuestionTypeRow(row) {
 }
 
 const KNOWN_COMPONENT_LIBRARY = {
+  scene: new Set(['ThreeZoneLayout']),
+  observation: new Set(['MTitle', 'MHint', 'MCard', 'MInput', 'MProgress', 'MResult', 'Counter', 'ItemIcon', 'ItemGroup', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment', 'PersonIcon', 'BoxIcon', 'CupIcon', 'TreeIcon', 'CherryIcon', 'AppleIcon', 'RoadIcon', 'CoinIcon', 'MachineIcon', 'AnimalIcon']),
+  discovery: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'MButton', 'Highlight', 'Move', 'Split', 'Merge', 'FadeOut', 'CountUp', 'Shake', 'Glow', 'ConnectLine', 'RevealGap']),
+  challenge: new Set(['AnswerInput', 'MResult', 'MProgress', 'StepButton', 'ChoiceControl', 'MButton', 'CountUp', 'Glow', 'Shake', 'RevealGap']),
+  // Legacy buckets kept for compatibility with older render plans and logs.
   layout: new Set(['SceneFrame', 'TwoColumnLayout', 'SingleColumnLayout', 'ThreeZoneLayout', 'StickyAsideLayout']),
   control: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'AnswerInput']),
   visual: new Set(['ItemIcon', 'ItemGroup', 'Counter', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment']),
@@ -208,6 +213,8 @@ function inferLayoutFromAnalysis(analysisJson, typeContext) {
   const hint = [
     typeContext.layoutComponent,
     rules.layout_component,
+    rules.scene_component,
+    rules.scene_components,
     analysisJson?.scene?.layout,
     analysisJson?.scene?.type,
   ].find(Boolean)
@@ -215,13 +222,29 @@ function inferLayoutFromAnalysis(analysisJson, typeContext) {
   if (analysisJson?.thinking_steps?.length) return 'SingleColumnLayout'
   if (analysisJson?.scene && analysisJson?.objects) return 'SceneFrame'
   if (analysisJson?.known_data && analysisJson?.discoveries) return 'ThreeZoneLayout'
-  return 'TwoColumnLayout'
+  return 'ThreeZoneLayout'
 }
 
-function inferControlComponents(analysisJson, typeContext) {
+function inferObservationComponents(analysisJson, typeContext) {
   const candidates = [
     ...normalizeComponentList(typeContext.controlComponent),
     ...normalizeComponentList(typeContext.componentRules?.control_components),
+    ...normalizeComponentList(typeContext.componentRules?.observation_component),
+    ...normalizeComponentList(typeContext.componentRules?.observation_components),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+
+  if (analysisJson?.known_data || analysisJson?.discoveries || analysisJson?.known_conditions) return ['MCard', 'MHint']
+  if (analysisJson?.scene?.objects) return ['ItemGroup']
+  return ['MCard']
+}
+
+function inferDiscoveryComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.visualComponent),
+    ...normalizeComponentList(typeContext.componentRules?.visual_components),
+    ...normalizeComponentList(typeContext.componentRules?.discovery_component),
+    ...normalizeComponentList(typeContext.componentRules?.discovery_components),
   ]
   if (candidates.length > 0) return [...new Set(candidates)]
 
@@ -241,27 +264,18 @@ function inferControlComponents(analysisJson, typeContext) {
   return ['ClickControl']
 }
 
-function inferVisualComponents(analysisJson, typeContext) {
-  const candidates = [
-    ...normalizeComponentList(typeContext.visualComponent),
-    ...normalizeComponentList(typeContext.componentRules?.visual_components),
-  ]
-  if (candidates.length > 0) return [...new Set(candidates)]
-
-  if (analysisJson?.known_data || analysisJson?.discoveries) return ['Counter', 'Bar']
-  if (analysisJson?.scene?.objects) return ['ItemGroup']
-  return ['Box']
-}
-
-function inferAnimationComponents(analysisJson, typeContext) {
+function inferChallengeComponents(analysisJson, typeContext) {
   const candidates = [
     ...normalizeComponentList(typeContext.animationComponent),
     ...normalizeComponentList(typeContext.componentRules?.animation_components),
+    ...normalizeComponentList(typeContext.componentRules?.challenge_component),
+    ...normalizeComponentList(typeContext.componentRules?.challenge_components),
   ]
   if (candidates.length > 0) return [...new Set(candidates)]
 
-  if (analysisJson?.thinking_steps?.length) return ['RevealGap']
-  return ['FadeOut']
+  if (analysisJson?.answer || analysisJson?.verification_target) return ['AnswerInput', 'MResult']
+  if (analysisJson?.challenge_steps?.length) return ['AnswerInput']
+  return ['AnswerInput']
 }
 
 function inferDefaultAssets(typeContext, analysisJson) {
@@ -280,51 +294,53 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
   const layoutName = pickFirstString(
     typeContext.layoutComponent,
     componentRules.layout_component,
+    componentRules.scene_component,
+    componentRules.scene_components,
     inferLayoutFromAnalysis(analysisJson, typeContext),
   )
-  if (!KNOWN_COMPONENT_LIBRARY.layout.has(layoutName)) {
+  if (!KNOWN_COMPONENT_LIBRARY.scene.has(layoutName) && !KNOWN_COMPONENT_LIBRARY.layout.has(layoutName)) {
     missingComponents.push({
-      category: 'layout',
+      category: 'scene',
       name: layoutName || 'UnknownLayout',
       reason: typeContext.layoutComponent
-        ? `question_types.layout_component=${typeContext.layoutComponent} 不在布局组件库`
+        ? `question_types.layout_component=${typeContext.layoutComponent} 不在三段式布局组件库`
         : '未配置 layout_component，使用推断布局',
-      fallback: fallbackStrategy.layout || 'TwoColumnLayout',
+      fallback: fallbackStrategy.layout || 'ThreeZoneLayout',
     })
   }
 
-  const controlComponents = inferControlComponents(analysisJson, typeContext)
-  controlComponents.forEach((name) => {
-    if (!KNOWN_COMPONENT_LIBRARY.control.has(name)) {
+  const observationComponents = inferObservationComponents(analysisJson, typeContext)
+  observationComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.observation.has(name) && !KNOWN_COMPONENT_LIBRARY.visual.has(name)) {
       missingComponents.push({
-        category: 'control',
+        category: 'observation',
         name,
-        reason: '控制组件不在已知组件库中',
-        fallback: fallbackStrategy.control || 'ClickControl',
+        reason: '观察区组件不在已知组件库中',
+        fallback: fallbackStrategy.observation || 'MCard',
       })
     }
   })
 
-  const visualComponents = inferVisualComponents(analysisJson, typeContext)
-  visualComponents.forEach((name) => {
-    if (!KNOWN_COMPONENT_LIBRARY.visual.has(name)) {
+  const discoveryComponents = inferDiscoveryComponents(analysisJson, typeContext)
+  discoveryComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.discovery.has(name) && !KNOWN_COMPONENT_LIBRARY.control.has(name) && !KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
       missingComponents.push({
-        category: 'visual',
+        category: 'discovery',
         name,
-        reason: '视觉组件不在已知组件库中',
-        fallback: fallbackStrategy.visual || 'ItemGroup',
+        reason: '发现区组件不在已知组件库中',
+        fallback: fallbackStrategy.discovery || 'ClickControl',
       })
     }
   })
 
-  const animationComponents = inferAnimationComponents(analysisJson, typeContext)
-  animationComponents.forEach((name) => {
-    if (!KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
+  const challengeComponents = inferChallengeComponents(analysisJson, typeContext)
+  challengeComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.challenge.has(name) && !KNOWN_COMPONENT_LIBRARY.control.has(name) && !KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
       missingComponents.push({
-        category: 'animation',
+        category: 'challenge',
         name,
-        reason: '动画组件不在已知组件库中',
-        fallback: fallbackStrategy.animation || 'FadeOut',
+        reason: '挑战区组件不在已知组件库中',
+        fallback: fallbackStrategy.challenge || 'AnswerInput',
       })
     }
   })
@@ -345,19 +361,19 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
 
   if (!Array.isArray(analysisJson?.controls) || analysisJson.controls.length === 0) {
     missingCapabilities.push({
-      category: 'control',
+      category: 'discovery',
       name: 'controls',
       reason: 'analysis_json 未产出 controls 字段，交互层只能使用默认控件',
-      fallback: fallbackStrategy.control || 'ClickControl',
+      fallback: fallbackStrategy.discovery || 'ClickControl',
     })
   }
 
   if (!analysisJson?.scene && !analysisJson?.thinking_steps) {
     missingCapabilities.push({
-      category: 'layout',
+      category: 'scene',
       name: 'scene',
       reason: 'analysis_json 缺少 scene / thinking_steps，页面骨架只能使用默认布局',
-      fallback: fallbackStrategy.layout || 'TwoColumnLayout',
+      fallback: fallbackStrategy.layout || 'ThreeZoneLayout',
     })
   }
 
@@ -371,17 +387,25 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
       name: layoutName,
       source: typeContext.layoutComponent ? 'question_types.layout_component' : 'inferred',
     },
-    controls: controlComponents,
-    visuals: visualComponents,
-    animations: animationComponents,
+    scene: [layoutName].filter(Boolean),
+    observations: observationComponents,
+    discoveries: discoveryComponents,
+    challenges: challengeComponents,
+    controls: discoveryComponents,
+    visuals: observationComponents,
+    animations: challengeComponents,
     assets: defaultAssets,
     rules: componentRules,
     fallbackStrategy,
     matchedComponents: {
+      scene: [layoutName].filter(Boolean),
+      observations: observationComponents,
+      discoveries: discoveryComponents,
+      challenges: challengeComponents,
       layout: layoutName ? [layoutName] : [],
-      controls: controlComponents,
-      visuals: visualComponents,
-      animations: animationComponents,
+      controls: discoveryComponents,
+      visuals: observationComponents,
+      animations: challengeComponents,
       assets: defaultAssets,
     },
     missingComponents,
@@ -398,6 +422,10 @@ function buildTypeContextSummary(typeContext) {
     typeContext.controlComponent ? `control_component：${typeContext.controlComponent}` : '',
     typeContext.visualComponent ? `visual_component：${typeContext.visualComponent}` : '',
     typeContext.animationComponent ? `animation_component：${typeContext.animationComponent}` : '',
+    typeContext.componentRules?.scene_components ? `scene_components：${JSON.stringify(typeContext.componentRules.scene_components)}` : '',
+    typeContext.componentRules?.observation_components ? `observation_components：${JSON.stringify(typeContext.componentRules.observation_components)}` : '',
+    typeContext.componentRules?.discovery_components ? `discovery_components：${JSON.stringify(typeContext.componentRules.discovery_components)}` : '',
+    typeContext.componentRules?.challenge_components ? `challenge_components：${JSON.stringify(typeContext.componentRules.challenge_components)}` : '',
     typeContext.discoveryFlow ? `discovery_flow：${typeContext.discoveryFlow}` : '',
     typeContext.interactionFlow ? `interaction_flow：${typeContext.interactionFlow}` : '',
     typeContext.animationFlow ? `animation_flow：${typeContext.animationFlow}` : '',
@@ -425,23 +453,70 @@ function renderListItems(items, fallbackText = '暂无') {
   return list.map((item, index) => `<li><span class="idx">${index + 1}</span><span>${escapeHtml(item)}</span></li>`).join('')
 }
 
+function looksLikeHtmlDocument(value) {
+  const text = String(value || '').trim()
+  if (!text) return false
+  return /<!DOCTYPE\s+html|<html[\s>]/i.test(text) && /<\/html>/i.test(text)
+}
+
 function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
   const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : {}
-  const questionType = analysis.question_type || renderPlan?.coreDiscovery || '暂未分类'
-  const coreDiscovery = analysis.core_discovery || renderPlan?.coreDiscovery || ''
+
+  const normalizeList = (value) => {
+    if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
+    if (value == null) return []
+    const text = String(value).trim()
+    if (!text) return []
+    return [text]
+  }
+
+  const parseKnownData = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+    return Object.entries(value).map(([key, val]) => `${key}：${String(val ?? '')}`)
+  }
+
+  const extractNumbers = (text) => {
+    const matches = String(text || '').match(/-?\d+(?:\.\d+)?/g) || []
+    return matches.map(Number).filter((n) => Number.isFinite(n))
+  }
+
+  const extractFirstNumber = (...values) => {
+    for (const value of values) {
+      const num = extractNumbers(value)[0]
+      if (typeof num === 'number') return num
+    }
+    return null
+  }
+
+  const questionType = analysis.question_type || analysis.knowledge || renderPlan?.coreDiscovery || '暂未分类'
+  const coreDiscovery = analysis.core_discovery || renderPlan?.coreDiscovery || questionType || ''
   const verificationTarget = analysis.verification_target || ''
-  const interactionFlow = analysis.interaction_flow || {}
-  const animationFlow = analysis.animation_flow || {}
-
-  const knownConditions = Array.isArray(analysis.known_conditions) ? analysis.known_conditions : []
-  const hiddenConditions = Array.isArray(analysis.hidden_conditions) ? analysis.hidden_conditions : []
-  const discoveryFlow = Array.isArray(analysis.discovery_flow) ? analysis.discovery_flow : []
-  const challengeSteps = Array.isArray(analysis.challenge_steps) ? analysis.challenge_steps : []
-  const feedbackItems = Array.isArray(interactionFlow.feedback) ? interactionFlow.feedback : []
-  const visualEffects = Array.isArray(animationFlow.visual_effect) ? animationFlow.visual_effect : []
-
-  const analysisJsonPretty = escapeHtml(JSON.stringify(analysisJson, null, 2))
-  const renderPlanPretty = escapeHtml(JSON.stringify(renderPlan, null, 2))
+  const knownConditions = normalizeList(analysis.known_conditions).length > 0
+    ? normalizeList(analysis.known_conditions)
+    : parseKnownData(analysis.known_data)
+  const hiddenConditions = normalizeList(analysis.hidden_conditions)
+  const challengeSteps = normalizeList(analysis.challenge_steps)
+  const interactionFlow = analysis.interaction_flow && typeof analysis.interaction_flow === 'object'
+    ? analysis.interaction_flow
+    : {}
+  const answerText = analysis.answer
+    ? (typeof analysis.answer === 'object' ? JSON.stringify(analysis.answer) : String(analysis.answer))
+    : ''
+  const answerValue = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.value ?? '')
+    : String(analysis.answer ?? '')
+  const answerUnit = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.unit ?? '')
+    : ''
+  const answerNumber = extractFirstNumber(answerValue, verificationTarget, answerText, ...challengeSteps, ...knownConditions, questionText)
+  const startNumber = extractFirstNumber(...knownConditions, questionText) ?? 0
+  const targetNumber = answerNumber ?? (startNumber + 1)
+  const maxNumber = Math.max(startNumber, targetNumber, 1)
+  const feedbackItems = normalizeList(interactionFlow.feedback)
+  const discoveryHints = feedbackItems.length > 0
+    ? feedbackItems
+    : ['拖动滑块观察变化', '点击按钮推进步骤', '输入答案后验证']
+  const hasAnswer = Boolean(answerText || verificationTarget)
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -450,111 +525,295 @@ function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>互动演示</title>
 <style>
-:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
-body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
-.container{width:100%;max-width:760px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
-.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:22px}
-.title{font-size:13px;color:var(--mute);margin-bottom:12px;font-weight:600;letter-spacing:.5px}
-.q-text{font-size:15px;color:var(--ink);line-height:1.7;font-weight:600}
-.badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--bg);font-size:12px;color:var(--body);border:1px solid #eee}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.section{background:var(--bg);border-radius:18px;padding:16px;border:1px solid rgba(0,0,0,.04)}
-.section h3{font-size:14px;color:var(--ink);margin-bottom:10px}
-ul{list-style:none;display:flex;flex-direction:column;gap:8px}
-li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#fff;border-radius:14px;border:1px solid #f0f0f0;line-height:1.6}
-.idx{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:12px;flex:none}
-.empty{color:var(--mute);font-size:13px;padding:8px 0}
-.kv{display:grid;grid-template-columns:120px 1fr;gap:10px 12px}
-.k{color:var(--mute);font-size:12px}
-.v{color:var(--ink);font-size:13px;line-height:1.7;white-space:pre-wrap}
-.mono{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #f0f0f0;border-radius:16px;padding:14px;font-size:11px;line-height:1.6;color:var(--body);overflow:auto}
-.accent{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border-radius:18px;padding:16px}
-.accent .title{color:rgba(255,255,255,.8)}
-.accent .q-text{color:#fff}
-@media (max-width:640px){body{padding:12px}.card{padding:16px}.grid,.kv{grid-template-columns:1fr}}
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888;--line:#e8e8ec}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;display:flex;justify-content:center}
+.wrap{width:100%;max-width:860px;display:flex;flex-direction:column;gap:16px;padding-bottom:32px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:20px;border:1px solid rgba(0,0,0,.03)}
+.hero{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff}
+.hero .muted,.hero .label{color:rgba(255,255,255,.8)}
+.title{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--mute);margin-bottom:12px}
+.hero .title{color:rgba(255,255,255,.9)}
+.q{font-size:15px;line-height:1.8;font-weight:600;color:var(--ink)}
+.hero .q{color:#fff}
+.section-grid{display:flex;flex-direction:column;gap:12px}
+.section-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #ebe4ff;background:#f7f4ff;color:var(--purple);font-size:12px;line-height:1.4}
+.chip.gray{background:#fff;border-color:var(--line);color:var(--body)}
+.box{border-radius:18px;border:1px solid var(--line);background:#fff;padding:14px}
+.box.soft{background:var(--bg)}
+.k-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kv{font-size:12px;color:var(--mute);margin-bottom:6px}
+.text{font-size:13px;line-height:1.7;color:var(--body);white-space:pre-wrap}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:none;border-radius:999px;padding:10px 14px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.ghost{background:#f7f7f7;color:var(--body);border:1px solid #ededed}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.input{width:100%;border:1px solid #e7e7e7;border-radius:14px;padding:12px 14px;font-size:14px;background:#fff;color:var(--ink);outline:none}
+.input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,112,243,.08)}
+.feedback{margin-top:10px;border-radius:14px;background:#f8f7ff;border:1px solid #ece5ff;color:var(--purple);padding:12px 14px;font-size:13px;line-height:1.7}
+.feedback.good{background:#eefdf3;border-color:#caedcf;color:#15803d}
+.feedback.bad{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
+.progress{height:12px;border-radius:999px;background:#f1eefb;overflow:hidden}
+.progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(135deg,var(--purple),var(--pink));width:0%;transition:width .25s ease}
+.layout{display:grid;gap:12px;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
+.visual{display:grid;gap:12px}
+.meter{border-radius:20px;background:linear-gradient(135deg,rgba(121,40,202,.08),rgba(255,0,128,.08));padding:16px;border:1px solid rgba(121,40,202,.12)}
+.meter-num{font-size:32px;font-weight:800;color:var(--ink);line-height:1}
+.meter-sub{font-size:12px;color:var(--body);margin-top:6px}
+.slider{width:100%;accent-color:var(--link)}
+.stage{display:flex;flex-direction:column;gap:12px}
+.stage-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:12px;color:var(--body)}
+.stage-pill.active{background:#eef5ff;border-color:#cfe0ff;color:var(--blue)}
+.step-list{display:flex;flex-direction:column;gap:8px}
+.step{padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--body)}
+.core{border-radius:16px;background:#eef5ff;border:1px solid #d6e7ff;padding:12px 14px;color:var(--blue);font-size:13px;line-height:1.7}
+.core.hidden{display:none}
+@media (max-width:760px){body{padding:12px}.card{padding:16px}.layout,.k-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="card accent">
+<div class="wrap">
+  <section class="card hero">
     <div class="title">📝 题目</div>
-    <div class="q-text">${escapeHtml(questionText)}</div>
-  </div>
+    <div class="q">${escapeHtml(questionText)}</div>
+  </section>
 
-  <div class="card">
-    <div class="title">🔎 分析概览</div>
-    <div class="badges">
-      <span class="badge">题型：${escapeHtml(questionType)}</span>
-      <span class="badge">核心发现：${escapeHtml(coreDiscovery || '待分析')}</span>
-      ${verificationTarget ? `<span class="badge">验证目标：${escapeHtml(verificationTarget)}</span>` : ''}
-      ${renderPlan?.layout?.name ? `<span class="badge">布局：${escapeHtml(renderPlan.layout.name)}</span>` : ''}
+  <section class="card">
+    <div class="section-title">1. 观察区</div>
+    <div class="chip-row">
+      ${knownConditions.length ? knownConditions.map((item) => `<span class="chip gray">${escapeHtml(item)}</span>`).join('') : '<span class="chip gray">暂无已知条件</span>'}
+      ${hiddenConditions.length ? hiddenConditions.map((item) => `<span class="chip gray">${escapeHtml(item)}</span>`).join('') : ''}
     </div>
-  </div>
+  </section>
 
-  <div class="grid">
-    <div class="section">
-      <h3>1. 观察区</h3>
-      <div class="kv">
-        <div class="k">已知条件</div>
-        <div class="v">${knownConditions.length ? `<ul>${renderListItems(knownConditions)}</ul>` : '<div class="empty">暂无已知条件</div>'}</div>
-        <div class="k">隐含条件</div>
-        <div class="v">${hiddenConditions.length ? `<ul>${renderListItems(hiddenConditions)}</ul>` : '<div class="empty">暂无隐含条件</div>'}</div>
+  <section class="card">
+    <div class="section-title">2. 发现区</div>
+    <div class="layout">
+      <div class="box soft">
+        <div class="kv">互动控制</div>
+        <div class="stage">
+          <div class="chip-row">
+            <span class="stage-pill active" id="mode-pill">拖动滑块</span>
+            <span class="stage-pill" id="step-pill">第 1 步</span>
+            <span class="stage-pill" id="progress-pill">探索中</span>
+          </div>
+          <input id="discovery-slider" class="slider" type="range" min="0" max="100" value="0" step="1" aria-label="发现滑块">
+          <div class="btn-row">
+            <button class="btn" id="step-back" type="button">上一步</button>
+            <button class="btn" id="step-next" type="button">下一步</button>
+            <button class="btn secondary" id="jump-half" type="button">走一半</button>
+            <button class="btn ghost" id="reset-all" type="button">重置</button>
+          </div>
+          <div class="meter">
+            <div class="meter-num" id="discovery-number">0</div>
+            <div class="meter-sub" id="discovery-summary">拖动滑块看数值变化</div>
+          </div>
+        </div>
+      </div>
+      <div class="visual">
+        <div class="box">
+          <div class="kv">变化画面</div>
+          <div class="progress"><span id="progress-bar"></span></div>
+          <div class="meter-sub" id="progress-text">当前进度 0%</div>
+        </div>
+        <div class="box">
+          <div class="kv">发现线索</div>
+          <div class="chip-row">
+            ${discoveryHints.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="box">
+          <div class="kv">核心发现</div>
+          <div class="core hidden" id="core-box">${escapeHtml(coreDiscovery || '核心发现待显示')}</div>
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn secondary" id="toggle-core" type="button">显示核心发现</button>
+          </div>
+        </div>
       </div>
     </div>
+  </section>
 
-    <div class="section">
-      <h3>2. 发现区</h3>
-      <div class="kv">
-        <div class="k">探索路径</div>
-        <div class="v">${discoveryFlow.length ? `<ul>${renderListItems(discoveryFlow)}</ul>` : '<div class="empty">暂无探索路径</div>'}</div>
-        <div class="k">交互方式</div>
-        <div class="v">${escapeHtml(interactionFlow.trigger || '点击/拖拽/滑动')}</div>
-        <div class="k">交互反馈</div>
-        <div class="v">${feedbackItems.length ? `<ul>${renderListItems(feedbackItems)}</ul>` : '<div class="empty">暂无反馈</div>'}</div>
+  <section class="card">
+    <div class="section-title">3. 挑战区</div>
+    <div class="stage">
+      <div class="box">
+        <div class="kv">挑战步骤</div>
+        <div class="step-list">
+          ${challengeSteps.length ? challengeSteps.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再计算，再验证。</div>'}
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="kv">输入验证</div>
+        <input id="verify-input" class="input" type="text" placeholder="请输入你的答案" autocomplete="off">
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn" id="verify-btn" type="button">验证</button>
+          <button class="btn secondary" id="show-answer-btn" type="button"${hasAnswer ? '' : ' disabled'}>显示答案</button>
+          <button class="btn ghost" id="reset-challenge" type="button">重置</button>
+        </div>
+        <div class="feedback" id="verify-feedback">先拖动，后验证。</div>
+        <div class="feedback good" id="answer-box" style="display:none;margin-top:10px"></div>
       </div>
     </div>
-  </div>
-
-  <div class="grid">
-    <div class="section">
-      <h3>3. 挑战解题区</h3>
-      <div class="kv">
-        <div class="k">挑战步骤</div>
-        <div class="v">${challengeSteps.length ? `<ul>${renderListItems(challengeSteps)}</ul>` : '<div class="empty">暂无挑战步骤</div>'}</div>
-        <div class="k">验证目标</div>
-        <div class="v">${escapeHtml(verificationTarget || '待补充')}</div>
-      </div>
-    </div>
-
-    <div class="section">
-      <h3>4. 动画说明</h3>
-      <div class="kv">
-        <div class="k">动画类型</div>
-        <div class="v">${escapeHtml(animationFlow.type || renderPlan?.animations?.[0] || '淡出')}</div>
-        <div class="k">动画描述</div>
-        <div class="v">${escapeHtml(animationFlow.description || '根据题意自动演示数量关系变化')}</div>
-        <div class="k">视觉效果</div>
-        <div class="v">${visualEffects.length ? `<ul>${renderListItems(visualEffects)}</ul>` : '<div class="empty">暂无视觉效果</div>'}</div>
-        <div class="k">时长</div>
-        <div class="v">${escapeHtml(animationFlow.duration || '0.8s')}</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h3>5. 调试信息</h3>
-    <div class="kv">
-      <div class="k">interaction_flow.action</div>
-      <div class="v">${escapeHtml(interactionFlow.action || '')}</div>
-      <div class="k">interaction_flow.reset</div>
-      <div class="v">${escapeHtml(interactionFlow.reset || '提供重置按钮')}</div>
-    </div>
-    <div style="margin-top:12px" class="mono">${analysisJsonPretty}</div>
-    <div style="margin-top:12px" class="mono">${renderPlanPretty}</div>
-  </div>
+  </section>
 </div>
+<script>
+(function(){
+  var slider = document.getElementById('discovery-slider');
+  var progressBar = document.getElementById('progress-bar');
+  var progressText = document.getElementById('progress-text');
+  var discoveryNumber = document.getElementById('discovery-number');
+  var discoverySummary = document.getElementById('discovery-summary');
+  var modePill = document.getElementById('mode-pill');
+  var stepPill = document.getElementById('step-pill');
+  var progressPill = document.getElementById('progress-pill');
+  var stepBack = document.getElementById('step-back');
+  var stepNext = document.getElementById('step-next');
+  var jumpHalf = document.getElementById('jump-half');
+  var resetAll = document.getElementById('reset-all');
+  var toggleCore = document.getElementById('toggle-core');
+  var coreBox = document.getElementById('core-box');
+  var verifyInput = document.getElementById('verify-input');
+  var verifyBtn = document.getElementById('verify-btn');
+  var showAnswerBtn = document.getElementById('show-answer-btn');
+  var resetChallenge = document.getElementById('reset-challenge');
+  var verifyFeedback = document.getElementById('verify-feedback');
+  var answerBox = document.getElementById('answer-box');
+  var coreVisible = false;
+  var steps = [
+    '观察题目条件',
+    '拖动滑块试一试',
+    '发现变化规律',
+    '进入验证阶段'
+  ];
+  var startNumber = ${JSON.stringify(startNumber)};
+  var targetNumber = ${JSON.stringify(targetNumber)};
+  var maxNumber = ${JSON.stringify(maxNumber)};
+  var answerText = ${JSON.stringify(answerText)};
+  var answerValue = ${JSON.stringify(answerValue)};
+  var answerUnit = ${JSON.stringify(answerUnit)};
+  var verificationTarget = ${JSON.stringify(verificationTarget)};
+  function esc(text){
+    return String(text || '').replace(/[&<>"']/g, function(s){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s];
+    });
+  }
+  function compact(text){
+    return String(text || '').replace(/\s+/g, '').toLowerCase();
+  }
+  function currentStepIndex(){
+    return Math.min(3, Math.floor((Number(slider.value || 0) / 100) * 4));
+  }
+  function currentValue(){
+    var percent = Number(slider.value || 0) / 100;
+    return Math.round(startNumber + (targetNumber - startNumber) * percent);
+  }
+  function render(){
+    var percent = Number(slider.value || 0);
+    var stageIndex = currentStepIndex();
+    var value = currentValue();
+    progressBar.style.width = percent + '%';
+    progressText.textContent = '当前进度 ' + percent + '%';
+    discoveryNumber.textContent = String(value) + (answerUnit ? (' ' + answerUnit) : '');
+    discoverySummary.textContent = percent < 25
+      ? '先观察题目里的已知条件'
+      : percent < 50
+        ? '继续拖动，关系开始变化'
+        : percent < 75
+          ? '数值正在逼近目标'
+          : '可以去挑战区验证答案了';
+    modePill.textContent = percent === 0 ? '拖动滑块' : percent === 100 ? '已经到位' : '继续探索';
+    stepPill.textContent = '第 ' + (stageIndex + 1) + ' 步';
+    progressPill.textContent = percent >= 75 ? '接近答案' : '探索中';
+    progressPill.className = percent >= 75 ? 'stage-pill active' : 'stage-pill';
+    stepBack.disabled = percent <= 0;
+    stepNext.disabled = percent >= 100;
+    if (coreBox) {
+      coreBox.style.display = coreVisible ? 'block' : 'none';
+    }
+  }
+  function setFeedback(text, tone){
+    verifyFeedback.className = tone ? ('feedback ' + tone) : 'feedback';
+    verifyFeedback.textContent = text;
+  }
+  function matchesAnswer(input){
+    var value = compact(input);
+    var expected = compact(answerText || verificationTarget || answerValue);
+    if (!expected) return value.length > 0;
+    if (value === expected || value.includes(expected) || expected.includes(value)) return true;
+    var inputNums = value.match(/-?\d+(?:\.\d+)?/g) || [];
+    var expectedNums = expected.match(/-?\d+(?:\.\d+)?/g) || [];
+    if (inputNums.length && expectedNums.length) {
+      return inputNums.join(',') === expectedNums.join(',');
+    }
+    return false;
+  }
+  slider.addEventListener('input', render);
+  stepBack.addEventListener('click', function(){ slider.value = String(Math.max(0, Number(slider.value || 0) - 25)); render(); });
+  stepNext.addEventListener('click', function(){ slider.value = String(Math.min(100, Number(slider.value || 0) + 25)); render(); });
+  jumpHalf.addEventListener('click', function(){ slider.value = '50'; render(); });
+  resetAll.addEventListener('click', function(){
+    slider.value = '0';
+    if (verifyInput) verifyInput.value = '';
+    coreVisible = false;
+    setFeedback('先拖动，后验证。');
+    if (answerBox) answerBox.style.display = 'none';
+    render();
+  });
+  toggleCore.addEventListener('click', function(){
+    coreVisible = !coreVisible;
+    toggleCore.textContent = coreVisible ? '隐藏核心发现' : '显示核心发现';
+    render();
+  });
+  verifyBtn.addEventListener('click', function(){
+    var value = verifyInput ? verifyInput.value : '';
+    if (!String(value || '').trim()) {
+      setFeedback('先输入答案再验证。', 'bad');
+      return;
+    }
+    if (matchesAnswer(value)) {
+      setFeedback('正确！你已经找到答案。', 'good');
+      coreVisible = true;
+      toggleCore.textContent = '隐藏核心发现';
+      if (answerBox) {
+        answerBox.style.display = 'block';
+        answerBox.textContent = '答案：' + (answerValue ? (answerValue + (answerUnit ? (' ' + answerUnit) : '')) : (answerText || verificationTarget || ''));
+      }
+      render();
+      return;
+    }
+    setFeedback('还差一点，再看一眼发现区。', 'bad');
+  });
+  showAnswerBtn.addEventListener('click', function(){
+    if (answerBox) {
+      answerBox.style.display = 'block';
+      answerBox.textContent = '答案：' + (answerValue ? (answerValue + (answerUnit ? (' ' + answerUnit) : '')) : (answerText || verificationTarget || '暂无'));
+    }
+    setFeedback('标准答案已经显示。', 'good');
+    coreVisible = true;
+    toggleCore.textContent = '隐藏核心发现';
+    render();
+  });
+  resetChallenge.addEventListener('click', function(){
+    if (verifyInput) verifyInput.value = '';
+    if (answerBox) answerBox.style.display = 'none';
+    setFeedback('先拖动，后验证。');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowLeft') { slider.value = String(Math.max(0, Number(slider.value || 0) - 5)); render(); }
+    if (e.key === 'ArrowRight') { slider.value = String(Math.min(100, Number(slider.value || 0) + 5)); render(); }
+  });
+  if (verifyInput) {
+    verifyInput.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') verifyBtn.click();
+    });
+  }
+  render();
+})();
+</script>
 </body>
 </html>`
 }
@@ -593,12 +852,30 @@ async function recordGenerationArtifacts({ headers, supabaseUrl, runId, question
 
   const gaps = [
     ...(renderPlan?.missingComponents || []).map((gap) => ({
-      gap_type: gap.category || 'component',
+      gap_type:
+        gap.category === 'scene'
+          ? 'layout'
+          : gap.category === 'observation'
+            ? 'visual'
+            : gap.category === 'discovery'
+              ? 'control'
+              : gap.category === 'challenge'
+                ? 'control'
+                : (gap.category || 'component'),
       gap_name: gap.name || '',
       gap_reason: gap.reason || '',
     })),
     ...(renderPlan?.missingCapabilities || []).map((gap) => ({
-      gap_type: gap.category || 'capability',
+      gap_type:
+        gap.category === 'scene'
+          ? 'layout'
+          : gap.category === 'observation'
+            ? 'visual'
+            : gap.category === 'discovery'
+              ? 'control'
+              : gap.category === 'challenge'
+                ? 'control'
+                : (gap.category || 'capability'),
       gap_name: gap.name || '',
       gap_reason: gap.reason || '',
     })),
@@ -881,7 +1158,7 @@ export default async function handler(req, res) {
           const fallbackTypeContext = normalizeQuestionTypeRow({
             name: 'temp-fallback',
             core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
-            layout_component: 'temp_fallback',
+            layout_component: 'TwoColumnLayout',
             control_component: '',
             visual_component: '',
             animation_component: '',
@@ -937,7 +1214,7 @@ ${question.question_text}`,
                 version: fallbackTypeContext.pageSchemaVersion || 1,
                 questionText: question.question_text,
                 coreDiscovery: fallbackTypeContext.coreDiscovery || '',
-                layout: { name: 'temp_fallback', source: 'configs.temp' },
+                layout: { name: 'TwoColumnLayout', source: 'configs.temp' },
                 controls: [],
                 visuals: [],
                 animations: [],
@@ -953,7 +1230,7 @@ ${question.question_text}`,
                 },
                 missingComponents: [{
                   category: 'layout',
-                  name: 'temp_fallback',
+                  name: 'TwoColumnLayout',
                   reason: '未匹配到 question_types，使用 configs.temp 兜底',
                   fallback: 'configs.temp',
                 }],
@@ -1010,8 +1287,8 @@ ${question.question_text}`,
             runId: generationRunId,
             questionId: actualQuestionId,
             typeContext: fallbackTypeContext,
-            analysisJson: {},
-            renderPlan: fallbackRenderPlan,
+            analysisJson,
+            renderPlan,
             status: 'partial',
             htmlUrl: dataUrl,
             demoId: demo.id,
@@ -1029,10 +1306,10 @@ ${question.question_text}`,
             supabaseUrl: SUPABASE_URL,
             runId: generationRunId,
             questionId: actualQuestionId,
-            typeContext: normalizeQuestionTypeRow({
-              name: 'unmatched',
-              core_discovery: questionCoreDiscovery || questionTypeName || '',
-              layout_component: '',
+              typeContext: normalizeQuestionTypeRow({
+                name: 'unmatched',
+                core_discovery: questionCoreDiscovery || questionTypeName || '',
+              layout_component: 'TwoColumnLayout',
               control_component: '',
               visual_component: '',
               animation_component: '',
@@ -1046,7 +1323,7 @@ ${question.question_text}`,
               version: 1,
               questionText: question.question_text,
               coreDiscovery: questionCoreDiscovery || questionTypeName || '',
-              layout: { name: 'unknown', source: 'no_fallback_prompt' },
+              layout: { name: 'TwoColumnLayout', source: 'no_fallback_prompt' },
               controls: [],
               visuals: [],
               animations: [],
@@ -1054,7 +1331,7 @@ ${question.question_text}`,
               rules: {},
               fallbackStrategy: {},
               matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
-              missingComponents: [{ category: 'layout', name: 'unknown', reason: '未找到配置 temp 兜底 prompt', fallback: 'TwoColumnLayout' }],
+              missingComponents: [{ category: 'layout', name: 'TwoColumnLayout', reason: '未找到配置 temp 兜底 prompt', fallback: 'TwoColumnLayout' }],
               missingCapabilities: [],
               fallbackUsed: true,
             },
@@ -1310,12 +1587,20 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
       const rawHtml = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
       const htmlEnd = rawHtml.search(/<\/html>\s*/i)
       htmlContent = htmlEnd !== -1 ? rawHtml.slice(0, htmlEnd + '<\/html>'.length) : rawHtml
+      if (!looksLikeHtmlDocument(htmlContent) || htmlContent.length < 800) {
+        console.warn('[generate/demo] AI HTML output too short or invalid, falling back to static template')
+        htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
+      }
     } else {
       // 含占位符 → 字符串替换（兼容旧版或内置模板）
       htmlContent = htmlTemplate
         .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
         .replace(/\$\{render_json\}/g, () => renderPlanStr)
         .replace(/\$\{question_text\}/g, () => question.question_text)
+      if (!looksLikeHtmlDocument(htmlContent) || htmlContent.length < 800) {
+        console.warn('[generate/demo] template output too short or invalid, falling back to static template')
+        htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
+      }
     }
 
     const dataUrl = await saveHtmlToStorage(htmlContent, actualQuestionId)

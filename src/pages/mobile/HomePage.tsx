@@ -250,7 +250,7 @@ export default function HomePage() {
           {latestDemos.length === 0 && (
             <div className="pt-2 border-t border-[var(--color-hairline)]">
               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full text-yellow-600 bg-yellow-50">
-                待生成
+                生成中，请耐心等待 1～3 分钟
               </span>
             </div>
           )}

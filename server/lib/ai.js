@@ -82,23 +82,21 @@ export async function callAI(options) {
 
 function mockAI(options) {
   const promptText = String(options.prompt || '')
-  const coreDiscovery = mockCoreDiscovery(promptText)
+  const systemText = String(options.systemPrompt || '')
+  const questionText = extractQuestionText(promptText)
+  const coreDiscovery = mockCoreDiscovery(questionText || promptText)
 
   if (options.responseFormat === 'json_object' || promptText.includes('严格按照以下 JSON')) {
+    const analysis = buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemText)
     return {
       success: true,
-      content: JSON.stringify({
-        question_type: coreDiscovery,
-        knowledge: '长度单位换算',
-        known_data: { value: 3, from_unit: '米', to_unit: '厘米' },
-        steps: ['确定单位关系：1米 = 100厘米', '进行换算：3 × 100 = 300', '得到结果：3米 = 300厘米'],
-        answer: { value: 300, unit: '厘米' },
-      }),
+      content: JSON.stringify(analysis),
     }
   }
 
   if (promptText.includes('html_prompt') || promptText.includes('生成互动HTML')) {
     const color = ['#7928ca', '#0070f3', '#ff0080'][Math.floor(Math.random() * 3)]
+    const safeQuestion = escapeHtml(questionText || '互动演示')
     return {
       success: true,
       content: `<!DOCTYPE html>
@@ -116,10 +114,10 @@ h1{font-size:24px;color:#171717;margin:0 0 16px}
 <body>
 <div class="card">
   <h1>📐 互动演示</h1>
-  <div class="display">3 m = 300 cm</div>
-  <div class="step">📌 单位关系：1米 = 100厘米</div>
-  <div class="step">✏️ 计算：3 × 100 = 300</div>
-  <div class="step">✅ 答案：3米 = 300厘米</div>
+  <div class="display">${safeQuestion}</div>
+  <div class="step">📌 这是 mock 模式下的临时预览页</div>
+  <div class="step">✏️ 请配置真实 DeepSeek API 后再看正式生成效果</div>
+  <div class="step">✅ 当前页面不会再固定写死 3 米样例</div>
   <div class="footer">TalkTalk · AI 生成</div>
 </div>
 </html>`,
@@ -128,13 +126,135 @@ h1{font-size:24px;color:#171717;margin:0 0 16px}
 
   return {
     success: true,
-    content: coreDiscovery,
+    content: JSON.stringify(buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemText)),
   }
+}
+
+function extractQuestionText(prompt) {
+  const text = String(prompt || '')
+  const patterns = [
+    /题目原文[：:\n]\s*([\s\S]*?)(?:\n\s*---|\n\s*请|\n\s*内容[：:])/,
+    /题目[：:\n]\s*([\s\S]*?)(?:\n\s*---|\n\s*请|\n\s*内容[：:])/,
+    /内容[：:\n]\s*([\s\S]*?)(?:\n\s*---|\n\s*请)/,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match?.[1]) {
+      return match[1].trim().split(/\n+/)[0].trim()
+    }
+  }
+  return text.trim().split(/\n+/)[0].trim()
+}
+
+function buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemText) {
+  const text = String(questionText || promptText || '')
+  const analysis = {
+    question_type: coreDiscovery,
+    known_conditions: [],
+    hidden_conditions: [],
+    verification_target: text || '待补充',
+    core_discovery: coreDiscovery,
+    discovery_flow: [],
+    challenge_steps: [],
+    interaction_flow: {
+      trigger: '点击按钮',
+      action: '根据题意触发变化',
+      feedback: ['展示题目信息', '展示推理过程', '高亮答案'],
+      reset: '重置后回到初始状态',
+    },
+    animation_flow: {
+      type: coreDiscovery.includes('单位') ? '单位变化' : '步骤推进',
+      description: '根据题意逐步展示变化过程',
+      visual_effect: ['数值变化', '步骤高亮', '答案突出'],
+      duration: '0.8s',
+    },
+    knowledge: '待识别',
+    known_data: {},
+    answer: {},
+  }
+
+  if (/(换算|单位|厘米|分米|毫米|千米)/.test(text) && /米|厘米|分米|毫米|千米/.test(text)) {
+    const numMatch = text.match(/(\d+(?:\.\d+)?)\s*米/)
+    const value = numMatch ? Number(numMatch[1]) : 0
+    const toUnit = /厘米/.test(text) ? '厘米' : '米'
+    const fromUnit = /米/.test(text) ? '米' : '长度单位'
+    const answerValue = toUnit === '厘米' && fromUnit === '米' ? value * 100 : value
+    analysis.question_type = coreDiscovery
+    analysis.known_conditions = [text]
+    analysis.hidden_conditions = ['需要统一单位后再比较或计算']
+    analysis.verification_target = text
+    analysis.discovery_flow = ['先观察题目中的单位', '再统一单位后计算', '最后得到答案']
+    analysis.challenge_steps = ['先统一单位', '再进行计算', '得到最终结果']
+    analysis.interaction_flow = {
+      trigger: '点击换算按钮',
+      action: '将题目中的量转换为统一单位',
+      feedback: ['显示单位关系', '展示换算过程', '高亮答案'],
+      reset: '重置后回到初始状态',
+    }
+    analysis.animation_flow = {
+      type: '单位变化',
+      description: '将数量逐步转换成统一单位',
+      visual_effect: ['单位切换', '数值变化', '答案高亮'],
+      duration: '0.8s',
+    }
+    analysis.knowledge = '长度单位换算'
+    analysis.known_data = { value, from_unit: fromUnit, to_unit: toUnit }
+    analysis.answer = { value: answerValue || value, unit: toUnit }
+    return analysis
+  }
+
+  if (/工程|铺设|工作量|效率|每天.*?天.*?完工|要求.*?天完工/.test(text)) {
+    const dayRate = text.match(/每天.*?(\d+(?:\.\d+)?)\s*米/)
+    const totalDays = text.match(/(\d+)\s*天完成任务/)
+    const targetDays = text.match(/要求\s*(\d+)\s*天完工/)
+    const perDay = dayRate ? Number(dayRate[1]) : 0
+    const originalDays = totalDays ? Number(totalDays[1]) : 0
+    const target = targetDays ? Number(targetDays[1]) : 0
+    const totalLength = perDay && originalDays ? perDay * originalDays : 0
+    const answerValue = target ? Math.round(totalLength / target) : perDay
+    analysis.question_type = coreDiscovery
+    analysis.known_conditions = [
+      dayRate && totalDays ? `每天铺${perDay}米，${originalDays}天完成任务` : text,
+      target ? `要求${target}天完工` : '',
+    ].filter(Boolean)
+    analysis.hidden_conditions = ['总工作量不变', '先求出总长度，再除以新的天数']
+    analysis.verification_target = '平均每天要铺多少米'
+    analysis.discovery_flow = ['先求出总长度', '再根据新的完工天数计算', '最后得到每天要铺的米数']
+    analysis.challenge_steps = ['先求总长度', '再除以目标天数', '得到每天的米数']
+    analysis.interaction_flow = {
+      trigger: '点击换算按钮',
+      action: '保持总长度不变，调整天数后计算每天米数',
+      feedback: ['显示总长度', '展示除法过程', '高亮最终答案'],
+      reset: '重置后回到初始数据',
+    }
+    analysis.animation_flow = {
+      type: '总量不变',
+      description: `把总长度保持不变，再切换成 ${target || '目标'} 天完成`,
+      visual_effect: ['总量高亮', '数值变化', '答案高亮'],
+      duration: '0.8s',
+    }
+    analysis.knowledge = '工程问题'
+    analysis.known_data = {
+      per_day: perDay,
+      original_days: originalDays,
+      target_days: target,
+      total_length: totalLength,
+    }
+    analysis.answer = { value: answerValue, unit: '米' }
+    return analysis
+  }
+
+  analysis.known_conditions = [text].filter(Boolean)
+  analysis.hidden_conditions = ['请继续补充题目条件']
+  analysis.discovery_flow = ['先观察题目', '再找出关键条件', '最后完成推理']
+  analysis.challenge_steps = ['理解题意', '整理条件', '得出答案']
+  return analysis
 }
 
 function mockCoreDiscovery(prompt) {
   const text = String(prompt || '')
   const rules = [
+    { keywords: ['工程', '铺设', '完工', '每天', '完成任务', '工作量', '效率'], value: '工作总量一定，效率和时间成反比' },
     { keywords: ['米', '厘米', '单位', '换算', '千米', '毫米', '分米'], value: '不同单位必须先统一' },
     { keywords: ['平均分', '平均分配', '每份', '平均分成', '分成若干份'], value: '总量平均分成若干份' },
     { keywords: ['移多补少', '平衡', '多出', '少了', '补齐'], value: '平均本质是平衡' },

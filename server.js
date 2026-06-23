@@ -5,6 +5,38 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return
+  const content = fs.readFileSync(filePath, 'utf8')
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1) continue
+    const key = trimmed.slice(0, eqIndex).trim()
+    let value = trimmed.slice(eqIndex + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    if (key && (!process.env[key] || process.env[key].trim() === '')) {
+      process.env[key] = value
+    }
+  }
+}
+
+loadEnvFile(path.join(__dirname, '.env.local'))
+loadEnvFile(path.join(__dirname, '.env'))
+
+process.env.SUPABASE_URL = process.env.SUPABASE_URL?.trim()
+  ? process.env.SUPABASE_URL
+  : (process.env.VITE_SUPABASE_URL || '').trim()
+process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  ? process.env.SUPABASE_SERVICE_ROLE_KEY
+  : (process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '').trim()
+
+console.log('[server] SUPABASE_URL configured:', !!process.env.SUPABASE_URL)
+console.log('[server] SUPABASE_SERVICE_ROLE_KEY configured:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+
 const dist = path.join(__dirname, 'dist');
 const port = 5173;
 

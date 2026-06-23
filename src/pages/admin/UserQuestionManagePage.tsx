@@ -9,7 +9,7 @@ import type { UserQuestion, QuestionDemo } from '../../types/auth'
 const PAGE_SIZE = 20
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: '待生成', color: 'bg-yellow-50 text-yellow-700' },
+  pending: { label: '生成中，请耐心等待 1～3 分钟', color: 'bg-yellow-50 text-yellow-700' },
   completed: { label: '已生成', color: 'bg-green-50 text-green-700' },
   uploaded: { label: '已上传', color: 'bg-blue-50 text-blue-700' },
 }

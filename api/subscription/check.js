@@ -8,6 +8,7 @@
 import { query, updateWhere, insert } from '../../server/lib/supabase-admin.js'
 import { queryOrder } from '../../server/lib/wechat-pay.js'
 import { ensureBasicSubscription, syncGenerationQuotaFromActiveSubscription } from '../../server/lib/membership.js'
+import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 
 export default async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -25,9 +26,10 @@ export default async (req, res) => {
 
   try {
     // 获取当前用户
-    const userRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+    const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: {
-        'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY || '',
         'Authorization': authHeader,
       },
     })

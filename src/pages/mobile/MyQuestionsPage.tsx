@@ -183,15 +183,10 @@ export default function MyQuestionsPage() {
           filteredQuestions.map((q) => {
             const demos = demosMap[q.id] || []
             const latestDemo = demos[0]
-            const now = Date.now()
-            const created = new Date(q.createdAt).getTime()
-            const isRecent = (now - created) < 5 * 60 * 1000 // 5分钟内算"生成中"
-            // 有演示 → 已生成；无演示+近期 → 生成中；无演示+超时 → 待生成
+            // 有演示 → 已生成；无演示 → 统一显示生成中，避免首页/列表状态不一致
             const st = demos.length > 0
               ? { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
-              : isRecent
-                ? { label: '生成中，请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
-                : { label: '待生成', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+              : { label: '生成中，请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
             const StatusIcon = st.icon
             return (
               <div

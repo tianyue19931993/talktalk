@@ -1363,24 +1363,36 @@ ${question.question_text}`,
           const fallbackHtml = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
           const dataUrl = await saveHtmlToStorage(fallbackHtml, actualQuestionId)
 
-          // 标记为 completed（兜底也走分析 JSON + 本地模板）
+          // 标记为 completed：只要 HTML 已成功存储，就不要再因为后续附加步骤把状态拉回 pending
           await patchQuestionFull(actualQuestionId, {
             question_type: '暂未分类',
             status: 'completed',
+          }).catch((e) => {
+            console.warn('[generate/demo] fallback completed patch failed', e.message)
           })
-          // 存入 question_demos
-          const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              question_id: actualQuestionId,
-              html_url: dataUrl,
-              title: `演示 ${Date.now().toString().slice(-4)}`,
-            }),
-          })
-          if (!demoRes.ok) throw new Error('保存演示失败')
-          const demos = await demoRes.json()
-          const demo = demos?.[0] || {}
+
+          let demo = {}
+          try {
+            const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                question_id: actualQuestionId,
+                html_url: dataUrl,
+                title: `演示 ${Date.now().toString().slice(-4)}`,
+              }),
+            })
+            if (demoRes.ok) {
+              const demos = await demoRes.json()
+              demo = demos?.[0] || {}
+            } else {
+              const demoErr = await demoRes.text().catch(() => '')
+              console.warn('[generate/demo] fallback question_demos insert failed', demoRes.status, demoErr.slice(0, 200))
+            }
+          } catch (e) {
+            console.warn('[generate/demo] fallback question_demos insert exception', e.message)
+          }
+
           await recordGenerationArtifacts({
             headers,
             supabaseUrl: SUPABASE_URL,
@@ -1395,7 +1407,7 @@ ${question.question_text}`,
           })
           return res.status(200).json({
             success: true,
-            demoId: demo.id,
+            demoId: demo.id || null,
             htmlUrl: dataUrl,
             questionId: actualQuestionId,
           })

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -57,67 +57,73 @@ async function loadHandler(routePath: string) {
   return mod.default || mod.handler || null
 }
 
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-    {
-      name: 'local-api-routes',
-      configureServer(server) {
-        server.middlewares.use(async (req, res, next) => {
-          try {
-            const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
-            const pathname = url.pathname
-            if (!apiRoutes[pathname]) return next()
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  process.env.SUPABASE_URL ||= env.SUPABASE_URL || env.VITE_SUPABASE_URL || ''
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||= env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-            const handler = await loadHandler(pathname)
-            if (!handler) {
-              res.statusCode = 404
-              res.setHeader('Content-Type', 'application/json; charset=utf-8')
-              res.end(JSON.stringify({ error: 'Not found' }))
-              return
-            }
+  return {
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'local-api-routes',
+        configureServer(server) {
+          server.middlewares.use(async (req, res, next) => {
+            try {
+              const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+              const pathname = url.pathname
+              if (!apiRoutes[pathname]) return next()
 
-            if (pathname === '/api/pay/notify') {
-              return handler(req, res)
-            }
-
-            const rawBody = await readBody(req)
-            let body: any = null
-            if (rawBody) {
-              try {
-                body = JSON.parse(rawBody)
-              } catch {
-                body = rawBody
+              const handler = await loadHandler(pathname)
+              if (!handler) {
+                res.statusCode = 404
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({ error: 'Not found' }))
+                return
               }
-            }
 
-            const mockReq = {
-              method: req.method,
-              headers: req.headers,
-              url: req.url,
-              query: Object.fromEntries(url.searchParams.entries()),
-              body,
-            }
+              if (pathname === '/api/pay/notify') {
+                return handler(req, res)
+              }
 
-            return handler(mockReq, createResponse(res))
-          } catch (error: any) {
-            res.statusCode = 500
-            res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(JSON.stringify({ error: error.message || 'Internal Server Error' }))
-          }
-        })
+              const rawBody = await readBody(req)
+              let body: any = null
+              if (rawBody) {
+                try {
+                  body = JSON.parse(rawBody)
+                } catch {
+                  body = rawBody
+                }
+              }
+
+              const mockReq = {
+                method: req.method,
+                headers: req.headers,
+                url: req.url,
+                query: Object.fromEntries(url.searchParams.entries()),
+                body,
+              }
+
+              return handler(mockReq, createResponse(res))
+            } catch (error: any) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json; charset=utf-8')
+              res.end(JSON.stringify({ error: error.message || 'Internal Server Error' }))
+            }
+          })
+        },
+      },
+    ],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      strictPort: true,
     },
-  },
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    strictPort: true,
-  },
+  }
 })

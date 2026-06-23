@@ -26,6 +26,22 @@ interface GenerateOptions {
   regenerate?: boolean
 }
 
+function getApiBaseUrl() {
+  const configured = import.meta.env.VITE_API_BASE_URL
+  if (configured && configured.trim()) {
+    return configured.trim().replace(/\/+$/, '')
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return ''
+}
+
+function buildApiUrl(path: string) {
+  const baseUrl = getApiBaseUrl()
+  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 /** 触发生成（首次或重新生成） */
 export async function generateDemo(
   input: string,
@@ -48,7 +64,7 @@ export async function generateDemo(
       body.questionId = input
     }
 
-    const res = await fetch('/api/generate/demo', {
+    const res = await fetch(buildApiUrl('/api/generate/demo'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -96,7 +112,7 @@ export async function optimizeDemo(
     const timeoutId = setTimeout(() => controller.abort(), 90000)
 
     const token = getAccessToken()
-    const res = await fetch('/api/generate/optimize', {
+    const res = await fetch(buildApiUrl('/api/generate/optimize'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

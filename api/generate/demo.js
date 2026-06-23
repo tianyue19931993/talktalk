@@ -408,6 +408,157 @@ function buildTypeContextSummary(typeContext) {
   ].filter(Boolean).join('\n')
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function renderListItems(items, fallbackText = '暂无') {
+  const list = Array.isArray(items) ? items : []
+  if (list.length === 0) {
+    return `<div class="empty">${escapeHtml(fallbackText)}</div>`
+  }
+  return list.map((item, index) => `<li><span class="idx">${index + 1}</span><span>${escapeHtml(item)}</span></li>`).join('')
+}
+
+function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
+  const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : {}
+  const questionType = analysis.question_type || renderPlan?.coreDiscovery || '暂未分类'
+  const coreDiscovery = analysis.core_discovery || renderPlan?.coreDiscovery || ''
+  const verificationTarget = analysis.verification_target || ''
+  const interactionFlow = analysis.interaction_flow || {}
+  const animationFlow = analysis.animation_flow || {}
+
+  const knownConditions = Array.isArray(analysis.known_conditions) ? analysis.known_conditions : []
+  const hiddenConditions = Array.isArray(analysis.hidden_conditions) ? analysis.hidden_conditions : []
+  const discoveryFlow = Array.isArray(analysis.discovery_flow) ? analysis.discovery_flow : []
+  const challengeSteps = Array.isArray(analysis.challenge_steps) ? analysis.challenge_steps : []
+  const feedbackItems = Array.isArray(interactionFlow.feedback) ? interactionFlow.feedback : []
+  const visualEffects = Array.isArray(animationFlow.visual_effect) ? animationFlow.visual_effect : []
+
+  const analysisJsonPretty = escapeHtml(JSON.stringify(analysisJson, null, 2))
+  const renderPlanPretty = escapeHtml(JSON.stringify(renderPlan, null, 2))
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>互动演示</title>
+<style>
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
+.container{width:100%;max-width:760px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:22px}
+.title{font-size:13px;color:var(--mute);margin-bottom:12px;font-weight:600;letter-spacing:.5px}
+.q-text{font-size:15px;color:var(--ink);line-height:1.7;font-weight:600}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--bg);font-size:12px;color:var(--body);border:1px solid #eee}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.section{background:var(--bg);border-radius:18px;padding:16px;border:1px solid rgba(0,0,0,.04)}
+.section h3{font-size:14px;color:var(--ink);margin-bottom:10px}
+ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#fff;border-radius:14px;border:1px solid #f0f0f0;line-height:1.6}
+.idx{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:12px;flex:none}
+.empty{color:var(--mute);font-size:13px;padding:8px 0}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:10px 12px}
+.k{color:var(--mute);font-size:12px}
+.v{color:var(--ink);font-size:13px;line-height:1.7;white-space:pre-wrap}
+.mono{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #f0f0f0;border-radius:16px;padding:14px;font-size:11px;line-height:1.6;color:var(--body);overflow:auto}
+.accent{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border-radius:18px;padding:16px}
+.accent .title{color:rgba(255,255,255,.8)}
+.accent .q-text{color:#fff}
+@media (max-width:640px){body{padding:12px}.card{padding:16px}.grid,.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card accent">
+    <div class="title">📝 题目</div>
+    <div class="q-text">${escapeHtml(questionText)}</div>
+  </div>
+
+  <div class="card">
+    <div class="title">🔎 分析概览</div>
+    <div class="badges">
+      <span class="badge">题型：${escapeHtml(questionType)}</span>
+      <span class="badge">核心发现：${escapeHtml(coreDiscovery || '待分析')}</span>
+      ${verificationTarget ? `<span class="badge">验证目标：${escapeHtml(verificationTarget)}</span>` : ''}
+      ${renderPlan?.layout?.name ? `<span class="badge">布局：${escapeHtml(renderPlan.layout.name)}</span>` : ''}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h3>1. 观察区</h3>
+      <div class="kv">
+        <div class="k">已知条件</div>
+        <div class="v">${knownConditions.length ? `<ul>${renderListItems(knownConditions)}</ul>` : '<div class="empty">暂无已知条件</div>'}</div>
+        <div class="k">隐含条件</div>
+        <div class="v">${hiddenConditions.length ? `<ul>${renderListItems(hiddenConditions)}</ul>` : '<div class="empty">暂无隐含条件</div>'}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>2. 发现区</h3>
+      <div class="kv">
+        <div class="k">探索路径</div>
+        <div class="v">${discoveryFlow.length ? `<ul>${renderListItems(discoveryFlow)}</ul>` : '<div class="empty">暂无探索路径</div>'}</div>
+        <div class="k">交互方式</div>
+        <div class="v">${escapeHtml(interactionFlow.trigger || '点击/拖拽/滑动')}</div>
+        <div class="k">交互反馈</div>
+        <div class="v">${feedbackItems.length ? `<ul>${renderListItems(feedbackItems)}</ul>` : '<div class="empty">暂无反馈</div>'}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h3>3. 挑战解题区</h3>
+      <div class="kv">
+        <div class="k">挑战步骤</div>
+        <div class="v">${challengeSteps.length ? `<ul>${renderListItems(challengeSteps)}</ul>` : '<div class="empty">暂无挑战步骤</div>'}</div>
+        <div class="k">验证目标</div>
+        <div class="v">${escapeHtml(verificationTarget || '待补充')}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>4. 动画说明</h3>
+      <div class="kv">
+        <div class="k">动画类型</div>
+        <div class="v">${escapeHtml(animationFlow.type || renderPlan?.animations?.[0] || '淡出')}</div>
+        <div class="k">动画描述</div>
+        <div class="v">${escapeHtml(animationFlow.description || '根据题意自动演示数量关系变化')}</div>
+        <div class="k">视觉效果</div>
+        <div class="v">${visualEffects.length ? `<ul>${renderListItems(visualEffects)}</ul>` : '<div class="empty">暂无视觉效果</div>'}</div>
+        <div class="k">时长</div>
+        <div class="v">${escapeHtml(animationFlow.duration || '0.8s')}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>5. 调试信息</h3>
+    <div class="kv">
+      <div class="k">interaction_flow.action</div>
+      <div class="v">${escapeHtml(interactionFlow.action || '')}</div>
+      <div class="k">interaction_flow.reset</div>
+      <div class="v">${escapeHtml(interactionFlow.reset || '提供重置按钮')}</div>
+    </div>
+    <div style="margin-top:12px" class="mono">${analysisJsonPretty}</div>
+    <div style="margin-top:12px" class="mono">${renderPlanPretty}</div>
+  </div>
+</div>
+</body>
+</html>`
+}
+
 async function postJsonRow(url, headers, body) {
   const r = await fetch(url, {
     method: 'POST',
@@ -831,80 +982,8 @@ ${question.question_text}`,
             status: 'pending',
           })
 
-          // 使用本地通用模板渲染，避免 temp 分支再多走一次 HTML 生成 AI
-          const d = JSON.stringify(analysisJson, null, 2)
-          const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
-          const renderPlanStr = JSON.stringify(renderPlan, null, 2)
-          let fallbackHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>互动演示</title>
-<style>
-:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
-body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
-.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
-.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px;margin-bottom:16px}
-.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}
-h2{font-size:13px;color:var(--mute);margin-bottom:12px}
-.section-label{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.stat-box{padding:16px;background:var(--bg);border-radius:16px;text-align:center}
-.stat-value{font-size:20px;font-weight:700;color:var(--purple);margin-bottom:4px}
-.stat-label{font-size:11px;color:var(--mute)}
-.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}
-.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}
-.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}
-.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}
-.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}
-.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}
-.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}
-.obj-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--bg);border-radius:24px;font-size:13px;margin:0 4px 8px 0}
-.ctrl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:500;border:1px solid #ddd;background:var(--card);color:var(--ink);margin:0 4px 8px 0}
-.disc-card{padding:12px 16px;background:#f0fdf4;border-radius:12px;color:#16a34a;font-size:13px;margin-bottom:8px;border-left:4px solid #16a34a}
-.obs-card{padding:12px 16px;background:var(--bg);border-radius:12px;font-size:12px;color:var(--body);margin-bottom:8px;border-left:4px solid var(--blue)}
-.raw-json{font-size:11px;font-family:monospace;background:var(--bg);padding:16px;border-radius:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:var(--body);line-height:1.5}
-.equation{text-align:center;padding:16px;background:linear-gradient(135deg,rgba(121,40,202,.06),rgba(0,112,243,.06));border-radius:16px;font-size:16px;font-weight:600;color:var(--purple);margin:8px 0}
-</style>
-</head>
-<body>
-<div class="container" id="app-root">
-<div class="card"><h2>📝 题目</h2><p class="q-text">${question.question_text}</p></div>
-<div id="dynamic-content"><p style="font-size:13px;color:var(--mute);text-align:center;padding:20px">加载中...</p></div>
-</div>
-<script>
-var data = ${d};
-(function(){try{var el=document.getElementById('dynamic-content');if(!el)return;if(!data){el.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">暂无分析数据</p></div>';return;}
-
-if(data.scene&&data.objects){var s=data.scene,o=data.objects,c=data.controls,k=data.known_data,di=data.discoveries,ob=data.observations,h=data.hidden_data;var h2='<div class="card">';
-h2+='<div class="section-label">🧪 实验场景</div>';
-h2+='<p style="font-size:14px;color:var(--body);line-height:1.6;margin-bottom:16px">'+esc(s.description)+'</p>';
-if(o&&o.length){h2+='<div style="margin-bottom:12px">';o.forEach(function(x){h2+='<span class="obj-tag">'+esc(x.icon||'')+' '+esc(x.name||'')+'</span>'});h2+='</div>'}
-if(c&&c.length){h2+='<div class="section-label" style="margin-top:12px">🎮 操作</div><div>';c.forEach(function(x){h2+='<span class="ctrl-btn">'+esc(x.action)+'</span>'});h2+='</div>'}
-h2+='</div>';
-if(k&&k.length){h2+='<div class="card"><div class="section-label">📊 已知数据</div><div class="grid-2">';k.forEach(function(x){h2+='<div class="stat-box"><div class="stat-value">'+esc(x.total_value)+'<span style="font-size:13px;font-weight:400;color:var(--mute);margin-left:4px">'+esc(x.unit||'')+'</span></div><div class="stat-label">'+esc(x.label||'')+'</div></div>'});h2+='</div></div>'}
-if(di&&di.length){h2+='<div class="card"><div class="section-label">💡 思考发现</div>';di.forEach(function(x){h2+='<div class="disc-card">✨ '+esc(x.rule||'')+'</div>'});h2+='</div>'}
-if(ob&&ob.length){h2+='<div class="card"><div class="section-label">🔍 观察</div>';ob.forEach(function(x){h2+='<div class="obs-card">👁️ '+esc(x.phenomenon||'')+'</div>'});h2+='</div>'}
-if(h&&h.length){h2+='<div class="card" id="answer-section"><div class="section-label">🎯 隐藏发现</div>';h.forEach(function(x){h2+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-label" style="font-size:13px">'+esc(x.label||'')+'</div><div class="stat-value" style="color:var(--mute);font-size:16px">点击按钮显示答案</div></div>'});h2+='<div style="text-align:center;margin-top:12px"><button onclick="document.querySelectorAll(\'#answer-section .stat-value\').forEach(function(e,i){e.textContent=answers[i]||\'?\';e.style.color=\'var(--purple)\'})" style="padding:8px 20px;border:none;border-radius:24px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:13px;font-weight:500;cursor:pointer">🎯 显示答案</button></div></div>'}
-el.innerHTML=h2;return}
-
-if(data.thinking_steps&&data.thinking_steps.length){var h3='<div class="card" id="steps-container"><div class="section-label">🔍 思维引导</div>';data.thinking_steps.forEach(function(s,i){h3+='<div class="step"><div class="step-num">步骤 '+(i+1)+'</div><div class="step-q">'+esc(s.teacher_question||s.title||'')+'</div><div class="step-ans">✅ 答案：'+(s.correct_answer!=null?s.correct_answer:'')+'</div>';if(s.hint)h3+='<div class="step-hint">💡 提示：'+esc(s.hint)+'</div>';if(s.conclusion)h3+='<div class="step-concl">📌 '+esc(s.conclusion)+'</div>';h3+='</div>'});if(data.answer)h3+='<div class="answer-box">🎉 最终答案：'+JSON.stringify(data.answer)+'</div>';h3+='</div>';el.innerHTML=h3;return}
-
-if(data.known_data){var h4='<div class="card"><div class="section-label">📊 分析数据</div>';if(Array.isArray(data.known_data)){data.known_data.forEach(function(x){h4+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-value">'+esc(x.total_value||x.value||'')+'</div><div class="stat-label">'+esc(x.label||'')+'</div></div>'})}else{h4+='<pre class="raw-json">'+esc(JSON.stringify(data.known_data,null,2))+'</pre>'}h4+='</div>';el.innerHTML=h4;return}
-
-el.innerHTML='<div class="card"><div class="section-label">📊 分析结果</div><pre class="raw-json">'+esc(JSON.stringify(data,null,2))+'</pre></div>';}catch(e){var errEl=document.getElementById('dynamic-content');if(errEl)errEl.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">无法加载分析内容</p></div>'}})()
-function esc(s){if(typeof s!=='string')return String(s||'');return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-var answers=[];
-try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.label||'?'});if(r.discoveries&&answers.length===0)answers=r.discoveries.map(function(x,i){return r.known_data&&r.known_data.length>i?'\u89e3\u51b3\u65b9\u6848 '+(i+1):''})}catch(e){}
-<\/script>
-</body>
-</html>`
-          fallbackHtml = fallbackHtml
-            .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
-            .replace(/\$\{render_json\}/g, () => renderPlanStr)
-            .replace(/\$\{question_text\}/g, () => question.question_text)
+          // 使用本地静态模板渲染，避免 temp 分支再依赖页面脚本
+          const fallbackHtml = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
           const dataUrl = await saveHtmlToStorage(fallbackHtml, actualQuestionId)
 
           // 标记为 completed（兜底也走分析 JSON + 本地模板）

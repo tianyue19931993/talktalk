@@ -137,6 +137,69 @@ function safeJsonParse(value, fallback) {
   }
 }
 
+function extractJsonLikeText(text) {
+  const source = String(text || '').trim()
+  if (!source) return ''
+
+  const fenced = source.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenced?.[1]) return fenced[1].trim()
+
+  const start = source.search(/[\[{]/)
+  if (start === -1) return source
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+  let begin = -1
+  const openChar = source[start]
+  const closeChar = openChar === '{' ? '}' : ']'
+
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === '\\') {
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+
+    if (ch === openChar) {
+      if (depth === 0) begin = i
+      depth++
+      continue
+    }
+    if (ch === closeChar) {
+      depth--
+      if (depth === 0 && begin !== -1) {
+        return source.slice(begin, i + 1).trim()
+      }
+    }
+  }
+
+  return source
+}
+
+function parseAnalysisJson(content) {
+  if (!content) return {}
+  if (typeof content === 'object') return content
+
+  const direct = safeJsonParse(content, null)
+  if (direct && typeof direct === 'object') return direct
+
+  const extracted = extractJsonLikeText(content)
+  const parsed = safeJsonParse(extracted, null)
+  if (parsed && typeof parsed === 'object') return parsed
+
+  return { note: 'analysis_json_parse_failed', raw: String(content).slice(0, 4000) }
+}
+
 function asStringArray(value) {
   if (Array.isArray(value)) {
     return value.map((item) => String(item || '').trim()).filter(Boolean)
@@ -1245,12 +1308,7 @@ ${question.question_text}`,
               questionId: actualQuestionId,
             })
           }
-          let analysisJson = {}
-          try {
-            analysisJson = JSON.parse(fallbackAnalysis.content)
-          } catch {
-            analysisJson = { raw: fallbackAnalysis.content }
-          }
+          const analysisJson = parseAnalysisJson(fallbackAnalysis.content)
 
           const renderPlan = buildRenderPlan(fallbackTypeContext, analysisJson, question.question_text)
           await patchQuestionFull(actualQuestionId, {
@@ -1412,11 +1470,7 @@ ${question.question_text}`,
           })
           if (!analysisResult.success) throw new Error(`AI 分析失败: ${analysisResult.error}`)
 
-          try {
-            analysisJson = JSON.parse(analysisResult.content)
-          } catch {
-            analysisJson = { raw: analysisResult.content }
-          }
+          analysisJson = parseAnalysisJson(analysisResult.content)
         }
 
         // 保存分析结果（即使后续 HTML 生成超时，分析结果已落库）

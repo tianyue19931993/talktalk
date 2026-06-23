@@ -200,6 +200,164 @@ function parseAnalysisJson(content) {
   return { note: 'analysis_json_parse_failed', raw: String(content).slice(0, 4000) }
 }
 
+function buildHeuristicFallbackAnalysis(questionText, coreDiscoveryHint = '') {
+  const text = String(questionText || '').trim()
+  const numbers = (text.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((n) => Number.isFinite(n))
+  const pick = (index, fallback = 0) => (Number.isFinite(numbers[index]) ? numbers[index] : fallback)
+  const total = pick(0, 0)
+  const used = pick(1, 0)
+  const days = Math.max(1, pick(2, 1))
+  const remaining = Math.max(0, total - used)
+  const average = Number((remaining / days).toFixed(2))
+
+  const isRemainingAverage = /(剩下|余下|还剩|已经用掉|已经吃了|用掉|吃了)/.test(text) && /(平均每天|每天)/.test(text)
+  const isUnitConversion = /(单位|换算|米|厘米|分米|毫米|千米)/.test(text) && /(换算|多少厘米|多少米|多少千米)/.test(text)
+  const isEngineering = /(工程|铺设|完工|完成任务|每天)/.test(text)
+
+  if (isRemainingAverage && numbers.length >= 3) {
+    return {
+      question_type: '剩余平均分（归一问题）',
+      known_conditions: [
+        `总量：${total}`,
+        `已用/已吃：${used}`,
+        `天数：${days}`,
+      ],
+      hidden_conditions: [
+        '先求剩余总量',
+        '再平均分成若干天',
+      ],
+      verification_target: '平均每天要用多少',
+      core_discovery: '先求剩余总量，再平均分配到每天，得出平均每天用量',
+      discovery_flow: [
+        '先观察总量和已用量',
+        '再求出剩余量',
+        '最后平均分配到每天',
+      ],
+      challenge_steps: [
+        `先算剩余：${total} - ${used}`,
+        `再平均分：剩余 ÷ ${days}`,
+        '得到平均每天的用量',
+      ],
+      interaction_flow: {
+        trigger: '点击计算按钮',
+        action: '先显示剩余量，再平均分配到每天',
+        feedback: [
+          `剩余量为 ${remaining}`,
+          `平均每天约 ${average}`,
+          '可以重置重新观察',
+        ],
+        reset: '重置后恢复初始数据',
+      },
+      animation_flow: {
+        type: '拆分',
+        description: '先把总量减去已用部分，再把剩余量平均分到每天',
+        visual_effect: ['已用部分变灰', '剩余部分高亮', '平均分配展示'],
+        duration: '0.8s',
+      },
+      knowledge: '归总问题',
+      known_data: {
+        total,
+        used,
+        days,
+        remaining,
+      },
+      answer: {
+        value: average,
+        unit: '千克',
+      },
+    }
+  }
+
+  if (isUnitConversion) {
+    return {
+      question_type: '不同单位必须先统一',
+      known_conditions: numbers.length ? [`已知数量：${numbers[0]}`] : [text],
+      hidden_conditions: ['需要先统一单位后再计算'],
+      verification_target: '换算结果',
+      core_discovery: coreDiscoveryHint || '不同单位必须先统一',
+      discovery_flow: ['先看单位', '再统一单位', '最后计算结果'],
+      challenge_steps: ['确定单位关系', '进行换算', '得到最终结果'],
+      interaction_flow: {
+        trigger: '点击换算按钮',
+        action: '将数量统一到相同单位',
+        feedback: ['显示单位关系', '展示换算过程', '高亮答案'],
+        reset: '重置后回到初始状态',
+      },
+      animation_flow: {
+        type: '单位变化',
+        description: '把数量逐步转换成统一单位',
+        visual_effect: ['单位切换', '数值变化', '答案高亮'],
+        duration: '0.8s',
+      },
+      knowledge: '长度单位换算',
+      known_data: { value: numbers[0] || 0 },
+      answer: {},
+    }
+  }
+
+  if (isEngineering) {
+    const perDay = pick(0, 0)
+    const originalDays = pick(1, 0)
+    const targetDays = pick(2, 0)
+    const totalLength = perDay && originalDays ? perDay * originalDays : 0
+    const answerValue = targetDays ? Number((totalLength / targetDays).toFixed(2)) : perDay
+    return {
+      question_type: '归总问题',
+      known_conditions: [text],
+      hidden_conditions: ['总量不变', '先求总量，再除以目标天数'],
+      verification_target: '平均每天要完成多少',
+      core_discovery: coreDiscoveryHint || '工作总量一定时，工作效率和工作时间成反比',
+      discovery_flow: ['先求总量', '再换算天数', '最后得到每天的量'],
+      challenge_steps: ['先求总量', '再除以目标天数', '得到每天的量'],
+      interaction_flow: {
+        trigger: '拖动滑块',
+        action: '保持总量不变，调整天数',
+        feedback: ['显示总量', '展示除法过程', '高亮答案'],
+        reset: '重置后回到初始状态',
+      },
+      animation_flow: {
+        type: '拆分与合并',
+        description: '总量先保持不变，再随天数变化进行平均分配',
+        visual_effect: ['总量高亮', '数值变化', '答案突出'],
+        duration: '0.8s',
+      },
+      knowledge: '工程问题',
+      known_data: {
+        per_day,
+        original_days,
+        target_days,
+        total_length: totalLength,
+      },
+      answer: { value: answerValue, unit: '米' },
+    }
+  }
+
+  return {
+    question_type: coreDiscoveryHint || '暂未分类',
+    known_conditions: text ? [text] : [],
+    hidden_conditions: ['请继续补充题目条件'],
+    verification_target: text || '待补充',
+    core_discovery: coreDiscoveryHint || '请先识别题目核心规律',
+    discovery_flow: ['先观察题目', '再找出关键条件', '最后完成推理'],
+    challenge_steps: ['理解题意', '整理条件', '得出答案'],
+    interaction_flow: {
+      trigger: '点击按钮',
+      action: '根据题意触发变化',
+      feedback: ['展示题目信息', '展示推理过程', '高亮答案'],
+      reset: '重置后回到初始状态',
+    },
+    animation_flow: {
+      type: '步骤推进',
+      description: '根据题意逐步展示变化过程',
+      visual_effect: ['数值变化', '步骤高亮', '答案突出'],
+      duration: '0.8s',
+    },
+    knowledge: '待识别',
+    known_data: {},
+    answer: {},
+  }
+}
+
 function asStringArray(value) {
   if (Array.isArray(value)) {
     return value.map((item) => String(item || '').trim()).filter(Boolean)
@@ -1306,51 +1464,21 @@ ${question.question_text}`,
             maxTokens: 1200,
             timeoutSeconds: 6,
           })
-          if (!fallbackAnalysis.success || !fallbackAnalysis.content) {
-            await patchQuestionFull(actualQuestionId, { status: 'pending' })
-            await recordGenerationArtifacts({
-              headers,
-              supabaseUrl: SUPABASE_URL,
-              runId: generationRunId,
-              questionId: actualQuestionId,
-              typeContext: fallbackTypeContext,
-              analysisJson: {},
-              renderPlan: {
-                version: fallbackTypeContext.pageSchemaVersion || 1,
-                questionText: question.question_text,
-                coreDiscovery: fallbackTypeContext.coreDiscovery || '',
-                layout: { name: 'TwoColumnLayout', source: 'configs.temp' },
-                controls: [],
-                visuals: [],
-                animations: [],
-                assets: [],
-                rules: {},
-                fallbackStrategy: { html: 'configs.temp' },
-                matchedComponents: {
-                  layout: [],
-                  controls: [],
-                  visuals: [],
-                  animations: [],
-                  assets: [],
-                },
-                missingComponents: [{
-                  category: 'layout',
-                  name: 'TwoColumnLayout',
-                  reason: '未匹配到 question_types，使用 configs.temp 兜底',
-                  fallback: 'configs.temp',
-                }],
-                missingCapabilities: [],
-                fallbackUsed: true,
-              },
-              status: 'failed',
-            })
-            return res.status(200).json({
-              success: false,
-              error: 'AI 分析暂时不可用，请到「我的互动列表」中重新生成',
-              questionId: actualQuestionId,
-            })
+          let analysisJson = buildHeuristicFallbackAnalysis(
+            question.question_text,
+            fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
+          )
+          if (fallbackAnalysis.success && fallbackAnalysis.content) {
+            const parsedFallbackAnalysis = parseAnalysisJson(fallbackAnalysis.content)
+            if (parsedFallbackAnalysis && typeof parsedFallbackAnalysis === 'object') {
+              analysisJson = {
+                ...analysisJson,
+                ...parsedFallbackAnalysis,
+              }
+            }
+          } else {
+            console.warn('[generate/demo] fallback AI analysis failed, using heuristic analysis', fallbackAnalysis.error)
           }
-          const analysisJson = parseAnalysisJson(fallbackAnalysis.content)
 
           const renderPlan = buildRenderPlan(fallbackTypeContext, analysisJson, question.question_text)
           await patchQuestionFull(actualQuestionId, {

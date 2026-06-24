@@ -49,12 +49,13 @@ function rowToType(row: any): QuestionType {
     interactionFlow: row.interaction_flow || '',
     animationFlow: row.animation_flow || '',
     layoutComponent: row.layout_component || '',
+    lookComponent: row.look_component || '',
     controlComponent: row.control_component || '',
     visualComponent: row.visual_component || '',
     animationComponent: row.animation_component || '',
+    challengeComponent: row.challenge_component || '',
     defaultAssets: row.default_assets || [],
     pageSchemaVersion: Number(row.page_schema_version || 1),
-    componentRules: row.component_rules || {},
     fallbackStrategy: row.fallback_strategy || {},
     createdAt: row.created_at?.slice(0, 10) || '',
     updatedAt: row.updated_at?.slice(0, 10) || '',
@@ -174,12 +175,13 @@ export async function addType(data: {
   interactionFlow?: string
   animationFlow?: string
   layoutComponent?: string
+  lookComponent?: string
   controlComponent?: string
   visualComponent?: string
   animationComponent?: string
+  challengeComponent?: string
   defaultAssets?: any[]
   pageSchemaVersion?: number
-  componentRules?: Record<string, any>
   fallbackStrategy?: Record<string, any>
 }): Promise<QuestionType> {
   const r = await insert<any[]>('question_types', {
@@ -191,12 +193,13 @@ export async function addType(data: {
     interaction_flow: data.interactionFlow || '',
     animation_flow: data.animationFlow || '',
     layout_component: data.layoutComponent || '',
+    look_component: data.lookComponent || '',
     control_component: data.controlComponent || '',
     visual_component: data.visualComponent || '',
     animation_component: data.animationComponent || '',
+    challenge_component: data.challengeComponent || '',
     default_assets: data.defaultAssets || [],
     page_schema_version: data.pageSchemaVersion || 1,
-    component_rules: data.componentRules || {},
     fallback_strategy: data.fallbackStrategy || {},
   })
   if (r.error || !r.data) throw r.error || new Error('insert failed')
@@ -213,12 +216,13 @@ export async function updateType(id: string, data: {
   interactionFlow?: string
   animationFlow?: string
   layoutComponent?: string
+  lookComponent?: string
   controlComponent?: string
   visualComponent?: string
   animationComponent?: string
+  challengeComponent?: string
   defaultAssets?: any[]
   pageSchemaVersion?: number
-  componentRules?: Record<string, any>
   fallbackStrategy?: Record<string, any>
 }) {
   const i = types.findIndex((t) => t.id === id); if (i === -1) return
@@ -231,12 +235,13 @@ export async function updateType(id: string, data: {
   if (data.interactionFlow !== undefined) p.interaction_flow = data.interactionFlow
   if (data.animationFlow !== undefined) p.animation_flow = data.animationFlow
   if (data.layoutComponent !== undefined) p.layout_component = data.layoutComponent
+  if (data.lookComponent !== undefined) p.look_component = data.lookComponent
   if (data.controlComponent !== undefined) p.control_component = data.controlComponent
   if (data.visualComponent !== undefined) p.visual_component = data.visualComponent
   if (data.animationComponent !== undefined) p.animation_component = data.animationComponent
+  if (data.challengeComponent !== undefined) p.challenge_component = data.challengeComponent
   if (data.defaultAssets !== undefined) p.default_assets = data.defaultAssets as any
   if (data.pageSchemaVersion !== undefined) p.page_schema_version = data.pageSchemaVersion
-  if (data.componentRules !== undefined) p.component_rules = data.componentRules as any
   if (data.fallbackStrategy !== undefined) p.fallback_strategy = data.fallbackStrategy as any
   types[i] = { ...types[i], ...p, updatedAt: new Date().toISOString().slice(0, 10) }
   resolveTypeNames(); notify()

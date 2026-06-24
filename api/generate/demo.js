@@ -15,10 +15,16 @@
  *   Step 6: 存入 question_demos + 生成日志 + 标记 completed
  */
 
-import { callAI } from '../../server/lib/ai.js'
 import { consumeGeneration } from '../../server/lib/membership.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 import crypto from 'crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const aiFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../server/lib/ai.js')
+const aiStamp = fs.statSync(aiFile).mtimeMs
+const { callAI } = await import(`${pathToFileURL(aiFile).href}?t=${aiStamp}`)
 
 const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
 
@@ -266,162 +272,599 @@ function parseAnalysisJson(content) {
   return null
 }
 
-function buildHeuristicFallbackAnalysis(questionText, coreDiscoveryHint = '') {
+function buildMinimalFallbackAnalysis(questionText, coreDiscoveryHint = '') {
   const text = String(questionText || '').trim()
-  const numbers = (text.match(/\d+(?:\.\d+)?/g) || []).map(Number).filter((n) => Number.isFinite(n))
-  const pick = (index, fallback = 0) => (Number.isFinite(numbers[index]) ? numbers[index] : fallback)
-  const total = pick(0, 0)
-  const used = pick(1, 0)
-  const days = Math.max(1, pick(2, 1))
-  const remaining = Math.max(0, total - used)
-  const average = Number((remaining / days).toFixed(2))
-
-  const isRemainingAverage = /(剩下|余下|还剩|已经用掉|已经吃了|用掉|吃了)/.test(text) && /(平均每天|每天)/.test(text)
-  const isUnitConversion = /(单位|换算|米|厘米|分米|毫米|千米)/.test(text) && /(换算|多少厘米|多少米|多少千米)/.test(text)
-  const isEngineering = /(工程|铺设|完工|完成任务|每天)/.test(text)
-
-  if (isRemainingAverage && numbers.length >= 3) {
-    return {
-      question_type: '剩余平均分（归一问题）',
-      known_conditions: [
-        `总量：${total}`,
-        `已用/已吃：${used}`,
-        `天数：${days}`,
-      ],
-      hidden_conditions: [
-        '先求剩余总量',
-        '再平均分成若干天',
-      ],
-      verification_target: '平均每天要用多少',
-      core_discovery: '先求剩余总量，再平均分配到每天，得出平均每天用量',
-      discovery_flow: [
-        '先观察总量和已用量',
-        '再求出剩余量',
-        '最后平均分配到每天',
-      ],
-      challenge_steps: [
-        `先算剩余：${total} - ${used}`,
-        `再平均分：剩余 ÷ ${days}`,
-        '得到平均每天的用量',
-      ],
-      interaction_flow: {
-        trigger: '点击计算按钮',
-        action: '先显示剩余量，再平均分配到每天',
-        feedback: [
-          `剩余量为 ${remaining}`,
-          `平均每天约 ${average}`,
-          '可以重置重新观察',
-        ],
-        reset: '重置后恢复初始数据',
-      },
-      animation_flow: {
-        type: '拆分',
-        description: '先把总量减去已用部分，再把剩余量平均分到每天',
-        visual_effect: ['已用部分变灰', '剩余部分高亮', '平均分配展示'],
-        duration: '0.8s',
-      },
-      knowledge: '归总问题',
-      known_data: {
-        total,
-        used,
-        days,
-        remaining,
-      },
-      answer: {
-        value: average,
-        unit: '千克',
-      },
-    }
-  }
-
-  if (isUnitConversion) {
-    return {
-      question_type: '不同单位必须先统一',
-      known_conditions: numbers.length ? [`已知数量：${numbers[0]}`] : [text],
-      hidden_conditions: ['需要先统一单位后再计算'],
-      verification_target: '换算结果',
-      core_discovery: coreDiscoveryHint || '不同单位必须先统一',
-      discovery_flow: ['先看单位', '再统一单位', '最后计算结果'],
-      challenge_steps: ['确定单位关系', '进行换算', '得到最终结果'],
-      interaction_flow: {
-        trigger: '点击换算按钮',
-        action: '将数量统一到相同单位',
-        feedback: ['显示单位关系', '展示换算过程', '高亮答案'],
-        reset: '重置后回到初始状态',
-      },
-      animation_flow: {
-        type: '单位变化',
-        description: '把数量逐步转换成统一单位',
-        visual_effect: ['单位切换', '数值变化', '答案高亮'],
-        duration: '0.8s',
-      },
-      knowledge: '长度单位换算',
-      known_data: { value: numbers[0] || 0 },
-      answer: {},
-    }
-  }
-
-  if (isEngineering) {
-    const perDay = pick(0, 0)
-    const originalDays = pick(1, 0)
-    const targetDays = pick(2, 0)
-    const totalLength = perDay && originalDays ? perDay * originalDays : 0
-    const answerValue = targetDays ? Number((totalLength / targetDays).toFixed(2)) : perDay
-    return {
-      question_type: '归总问题',
-      known_conditions: [text],
-      hidden_conditions: ['总量不变', '先求总量，再除以目标天数'],
-      verification_target: '平均每天要完成多少',
-      core_discovery: coreDiscoveryHint || '工作总量一定时，工作效率和工作时间成反比',
-      discovery_flow: ['先求总量', '再换算天数', '最后得到每天的量'],
-      challenge_steps: ['先求总量', '再除以目标天数', '得到每天的量'],
-      interaction_flow: {
-        trigger: '拖动滑块',
-        action: '保持总量不变，调整天数',
-        feedback: ['显示总量', '展示除法过程', '高亮答案'],
-        reset: '重置后回到初始状态',
-      },
-      animation_flow: {
-        type: '拆分与合并',
-        description: '总量先保持不变，再随天数变化进行平均分配',
-        visual_effect: ['总量高亮', '数值变化', '答案突出'],
-        duration: '0.8s',
-      },
-      knowledge: '工程问题',
-      known_data: {
-        per_day,
-        original_days,
-        target_days,
-        total_length: totalLength,
-      },
-      answer: { value: answerValue, unit: '米' },
-    }
-  }
-
   return {
     question_type: coreDiscoveryHint || '暂未分类',
     known_conditions: text ? [text] : [],
-    hidden_conditions: ['请继续补充题目条件'],
-    verification_target: text || '待补充',
-    core_discovery: coreDiscoveryHint || '请先识别题目核心规律',
-    discovery_flow: ['先观察题目', '再找出关键条件', '最后完成推理'],
-    challenge_steps: ['理解题意', '整理条件', '得出答案'],
+    hidden_conditions: [],
+    verification_target: '',
+    core_discovery: coreDiscoveryHint || '',
+    discovery_flow: [],
+    challenge_steps: [],
     interaction_flow: {
-      trigger: '点击按钮',
-      action: '根据题意触发变化',
-      feedback: ['展示题目信息', '展示推理过程', '高亮答案'],
-      reset: '重置后回到初始状态',
+      trigger: '',
+      action: '',
+      feedback: [],
+      reset: '',
     },
     animation_flow: {
-      type: '步骤推进',
-      description: '根据题意逐步展示变化过程',
-      visual_effect: ['数值变化', '步骤高亮', '答案突出'],
-      duration: '0.8s',
+      type: '',
+      description: '',
+      visual_effect: [],
+      duration: '',
     },
-    knowledge: '待识别',
-    known_data: {},
-    answer: {},
+    component_rules: {
+      scene: '',
+      look: '',
+      control: '',
+      visual: '',
+      animation: '',
+      challenge: '',
+    },
   }
+}
+
+function stripAnalysisNoise(analysisJson) {
+  const next = analysisJson && typeof analysisJson === 'object' && !Array.isArray(analysisJson)
+    ? { ...analysisJson }
+    : {}
+  delete next.knowledge
+  delete next.known_data
+  return next
+}
+
+function buildTempFallbackHtml(questionText, analysisJson) {
+  const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : {}
+  const normalizeList = (value) => {
+    if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
+    if (value == null) return []
+    const text = String(value).trim()
+    return text ? [text] : []
+  }
+  const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+  const questionType = String(analysis.question_type || '暂未分类')
+  const coreDiscovery = String(analysis.core_discovery || questionType || '')
+  const knownConditions = normalizeList(analysis.known_conditions)
+  const hiddenConditions = normalizeList(analysis.hidden_conditions)
+  const defaultAssets = normalizeList(analysis.default_assets)
+  const challengeSteps = normalizeList(analysis.challenge_steps)
+  const discoveryFlow = normalizeList(analysis.discovery_flow)
+  const feedbackItems = normalizeList(analysis.interaction_flow?.feedback)
+  const componentRules = analysis.component_rules && typeof analysis.component_rules === 'object' && !Array.isArray(analysis.component_rules)
+    ? analysis.component_rules
+    : {}
+  const trigger = String(analysis.interaction_flow?.trigger || '点击开始探索')
+  const action = String(analysis.interaction_flow?.action || '根据题意触发变化')
+  const resetText = String(analysis.interaction_flow?.reset || '重置后回到初始状态')
+  const animationType = String(analysis.animation_flow?.type || '步骤推进')
+  const animationDescription = String(analysis.animation_flow?.description || '根据题意逐步展示变化过程')
+  const visualEffects = normalizeList(analysis.animation_flow?.visual_effect)
+  const verificationTarget = String(analysis.verification_target || '')
+  const answer = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.value ?? '')
+    : String(analysis.answer ?? '')
+  const answerUnit = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.unit ?? '')
+    : ''
+  const fallbackSummary = [
+    ...knownConditions.slice(0, 3),
+    ...hiddenConditions.slice(0, 2),
+    ...challengeSteps.slice(0, 3),
+  ]
+  const interactionMode = (() => {
+    const source = `${trigger} ${action} ${verificationTarget} ${questionText}`.toLowerCase()
+    if (/(滑块|拖动|拖拽|滑动|slider|range)/.test(source)) return 'slider'
+    if (/(输入|填写|输入框|answer|填空)/.test(source)) return 'input'
+    return 'button'
+  })()
+  const pickUnique = (items, limit = 3) => [...new Set(items.filter(Boolean))].slice(0, limit)
+  const selectTempComponents = () => {
+    const controlSource = [questionType, coreDiscovery, trigger, action, discoveryFlow.join(' '), componentRules.control, componentRules.challenge].join(' ')
+    const visualSource = [questionType, coreDiscovery, componentRules.visual, knownConditions.join(' '), hiddenConditions.join(' '), animationDescription, visualEffects.join(' ')].join(' ')
+    const animationSource = [questionType, coreDiscovery, componentRules.animation, animationDescription, visualEffects.join(' '), action].join(' ')
+    const challengeSource = [questionType, coreDiscovery, componentRules.challenge, verificationTarget, challengeSteps.join(' ')].join(' ')
+
+    const controls = []
+    if (/(滑块|滑动|拖动|进度)/.test(controlSource)) controls.push('SliderControl')
+    if (/(拖拽|拖入|拖到)/.test(controlSource)) controls.push('DragControl')
+    if (/(点击|按钮|开始|继续|重置|下一步|加减)/.test(controlSource)) controls.push('ClickControl', 'MButton', 'StepButton')
+    if (/(选择|选项)/.test(controlSource)) controls.push('ChoiceControl')
+
+    const visuals = []
+    if (/(数量|总数|剩余|花费|金额|数字|商|余数)/.test(visualSource)) visuals.push('Counter', 'Bar', 'MResult')
+    if (/(硬币|分组|盒子|装入|购物车|篮子)/.test(visualSource)) visuals.push('ItemGroup', 'Box', 'DashedBox', 'SolidBox')
+    if (/(平衡|比较|差额|左右)/.test(visualSource)) visuals.push('Balance', 'Arrow')
+    if (/(线段|数轴|时间|天)/.test(visualSource)) visuals.push('Timeline', 'NumberLine', 'PointSegment')
+
+    const animations = []
+    if (/(跳动|增大|减少|变化|递增|递减)/.test(animationSource)) animations.push('CountUp', 'Move')
+    if (/(闪烁|警告|高亮|强调|变红)/.test(animationSource)) animations.push('Glow', 'Shake', 'Highlight')
+    if (/(拆分|分裂)/.test(animationSource)) animations.push('Split')
+    if (/(合并|汇总)/.test(animationSource)) animations.push('Merge')
+    if (/(连线|对应)/.test(animationSource)) animations.push('ConnectLine')
+    if (/(消失|淡出)/.test(animationSource)) animations.push('FadeOut')
+    if (/(揭示|缺口|空位)/.test(animationSource)) animations.push('RevealGap')
+
+    const challenges = []
+    if (/(输入|填写|答案|验证)/.test(challengeSource)) challenges.push('AnswerInput', 'MInput')
+    if (/(提交|确认|验证)/.test(challengeSource)) challenges.push('MButton')
+    if (/(正确|结果|答案)/.test(challengeSource)) challenges.push('MResult')
+
+    return {
+      controls: pickUnique(controls, 3),
+      visuals: pickUnique(visuals, 4),
+      animations: pickUnique(animations, 4),
+      challenges: pickUnique(challenges, 3),
+    }
+  }
+  const selectedComponents = selectTempComponents()
+  const controlMode = selectedComponents.controls.includes('SliderControl')
+    ? 'slider'
+    : selectedComponents.controls.includes('DragControl')
+      ? 'button'
+      : selectedComponents.controls.includes('ChoiceControl')
+        ? 'choice'
+    : 'button'
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>互动演示</title>
+<style>
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888;--line:#e8e8ec}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;display:flex;justify-content:center}
+.wrap{width:100%;max-width:860px;display:flex;flex-direction:column;gap:16px;padding-bottom:32px}
+.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:20px;border:1px solid rgba(0,0,0,.03)}
+.hero{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff}
+.title{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--mute);margin-bottom:12px}
+.hero .title{color:rgba(255,255,255,.9)}
+.q{font-size:15px;line-height:1.8;font-weight:600;color:var(--ink)}
+.hero .q{color:#fff}
+.section-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #ebe4ff;background:#f7f4ff;color:var(--purple);font-size:12px;line-height:1.4}
+.chip.gray{background:#fff;border-color:var(--line);color:var(--body)}
+.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.summary-card{border-radius:18px;border:1px solid var(--line);background:#fff;padding:12px}
+.summary-k{font-size:11px;color:var(--mute);margin-bottom:4px}
+.summary-v{font-size:15px;line-height:1.5;color:var(--ink);font-weight:700}
+.rule-list{display:flex;flex-direction:column;gap:8px}
+.rule-card{border-radius:16px;border:1px solid var(--line);background:#fff;padding:12px}
+.rule-k{font-size:11px;color:var(--mute);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+.rule-v{font-size:13px;line-height:1.6;color:var(--ink)}
+.relation{border-radius:18px;border:1px solid rgba(121,40,202,.14);background:linear-gradient(135deg,rgba(121,40,202,.06),rgba(255,0,128,.04));padding:12px 14px;color:var(--ink);font-size:13px;line-height:1.7}
+.box{border-radius:18px;border:1px solid var(--line);background:#fff;padding:14px}
+.box.soft{background:var(--bg)}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:none;border-radius:999px;padding:10px 14px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.ghost{background:#f7f7f7;color:var(--body);border:1px solid #ededed}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.input{width:100%;border:1px solid #e7e7e7;border-radius:14px;padding:12px 14px;font-size:14px;background:#fff;color:var(--ink);outline:none}
+.feedback{margin-top:10px;border-radius:14px;background:#f8f7ff;border:1px solid #ece5ff;color:var(--purple);padding:12px 14px;font-size:13px;line-height:1.7}
+.feedback.good{background:#eefdf3;border-color:#caedcf;color:#15803d}
+.feedback.bad{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
+.stack{display:flex;flex-direction:column;gap:12px}
+.stage{display:flex;flex-direction:column;gap:12px}
+.stage-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:12px;color:var(--body)}
+.stage-pill.active{background:#eef5ff;border-color:#cfe0ff;color:var(--blue)}
+.step-list{display:flex;flex-direction:column;gap:8px}
+.step{padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--body)}
+.core{border-radius:16px;background:#eef5ff;border:1px solid #d6e7ff;padding:12px 14px;color:var(--blue);font-size:13px;line-height:1.7}
+.core.hidden{display:none}
+.guide-item{padding:10px 12px;border-radius:14px;background:#fff;border:1px dashed #eadfff;font-size:13px;line-height:1.6;color:var(--body)}
+.control-wrap{display:flex;flex-direction:column;gap:12px}
+.control-label{font-size:13px;font-weight:700;color:var(--ink)}
+.control-meta{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--mute);line-height:1.5}
+.meter{border-radius:20px;background:linear-gradient(135deg,rgba(121,40,202,.08),rgba(255,0,128,.08));padding:16px;border:1px solid rgba(121,40,202,.12)}
+.meter-num{font-size:28px;font-weight:800;color:var(--ink);line-height:1}
+.meter-sub{font-size:12px;color:var(--body);margin-top:6px}
+.slider{width:100%;accent-color:var(--blue)}
+@media (max-width:760px){body{padding:12px}.card{padding:16px}.summary-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card hero">
+    <div class="title">📝 题目</div>
+    <div class="q">${escapeHtml(questionText)}</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">1. 观察区</div>
+    ${knownConditions.length ? `
+    <div class="box" style="margin-bottom:12px">
+      <div class="summary-grid">
+        ${knownConditions.map((item, index) => `<div class="summary-card"><div class="summary-k">已知条件 ${index + 1}</div><div class="summary-v">${escapeHtml(item)}</div></div>`).join('')}
+      </div>
+    </div>` : ''}
+    ${hiddenConditions.length ? `
+    <div class="box" style="margin-bottom:12px">
+      <div class="summary-grid">
+        ${hiddenConditions.map((item, index) => `<div class="summary-card"><div class="summary-k">隐含条件 ${index + 1}</div><div class="summary-v">${escapeHtml(item)}</div></div>`).join('')}
+      </div>
+    </div>` : ''}
+    <div class="box">
+      <div class="relation">${escapeHtml(coreDiscovery || '先观察条件之间的数量关系')}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">2. 发现区</div>
+    <div class="stack">
+      <div class="box soft">
+        <div class="control-wrap">
+          <div class="control-label">${escapeHtml(trigger || '点击开始探索')}</div>
+          ${controlMode === 'slider' ? `
+            <input id="temp-slider" class="slider" type="range" min="0" max="100" value="0" step="1">
+            <div class="control-meta"><span>0%</span><span>${escapeHtml(action || '拖动查看变化')}</span><span>100%</span></div>
+          ` : ''}
+          <div class="btn-row">
+            <button class="btn" id="temp-primary" type="button">${escapeHtml(trigger || '开始探索')}</button>
+            <button class="btn ghost" id="temp-reset" type="button">重置</button>
+          </div>
+        </div>
+        <div class="meter" style="margin-top:12px">
+          <div class="meter-num" id="temp-meter">0</div>
+          <div class="meter-sub" id="temp-meter-sub">${escapeHtml(animationDescription || '页面会随着操作展示变化')}</div>
+        </div>
+      </div>
+      <div class="box">
+        <div class="chip-row">
+          ${feedbackItems.length ? feedbackItems.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : ''}
+        </div>
+      </div>
+      <div class="box">
+        <div class="step-list">
+          ${discoveryFlow.length ? discoveryFlow.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再互动，再验证。</div>'}
+        </div>
+      </div>
+      <div class="box">
+        <div class="guide-item">${escapeHtml(animationType)}：${escapeHtml(animationDescription)}</div>
+        <div class="chip-row" style="margin-top:8px">
+          ${visualEffects.length ? visualEffects.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : ''}
+        </div>
+      </div>
+      <div class="relation">${escapeHtml(coreDiscovery || '先观察条件之间的数量关系')}</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">3. 挑战区</div>
+    <div class="stage">
+      <div class="box">
+        <input id="temp-answer" class="input" type="text" placeholder="请输入答案">
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn" id="temp-verify" type="button">验证</button>
+          <button class="btn secondary" id="temp-show" type="button">显示答案</button>
+          <button class="btn ghost" id="temp-reset2" type="button">重置</button>
+        </div>
+        <div class="feedback" id="temp-feedback">先观察，再互动，再验证。</div>
+        <div class="feedback good" id="temp-answer-box" style="display:none;margin-top:10px"></div>
+      </div>
+      <div class="box">
+        <div class="step-list">
+          ${challengeSteps.length ? challengeSteps.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再计算，再验证。</div>'}
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  var slider = document.getElementById('temp-slider');
+  var primary = document.getElementById('temp-primary');
+  var reset = document.getElementById('temp-reset');
+  var reset2 = document.getElementById('temp-reset2');
+  var meter = document.getElementById('temp-meter');
+  var meterSub = document.getElementById('temp-meter-sub');
+  var answerInput = document.getElementById('temp-answer');
+  var verify = document.getElementById('temp-verify');
+  var show = document.getElementById('temp-show');
+  var feedback = document.getElementById('temp-feedback');
+  var answerBox = document.getElementById('temp-answer-box');
+  var answerText = ${JSON.stringify(answer)};
+  var answerUnit = ${JSON.stringify(answerUnit)};
+  var triggerText = ${JSON.stringify(trigger)};
+  var actionText = ${JSON.stringify(action)};
+  var resetText = ${JSON.stringify(resetText)};
+  var stage = 0;
+  function setFeedback(text, tone){
+    feedback.className = tone ? ('feedback ' + tone) : 'feedback';
+    feedback.textContent = text;
+  }
+  function render(){
+    if (meter) meter.textContent = slider ? String(Math.round((Number(slider.value || 0) / 100) * 100)) : String(stage + 1);
+    if (meterSub) meterSub.textContent = stage >= 2 ? (${JSON.stringify(animationDescription)}) : (${JSON.stringify(coreDiscovery)});
+  }
+  if (slider) slider.addEventListener('input', render);
+  if (primary) primary.addEventListener('click', function(){ stage = Math.min(stage + 1, 2); if (slider) slider.value = String(Math.min(100, stage * 50)); render(); });
+  if (reset) reset.addEventListener('click', function(){ stage = 0; if (slider) slider.value = '0'; if (answerInput) answerInput.value = ''; if (answerBox) answerBox.style.display = 'none'; setFeedback('先观察，再互动，再验证。'); render(); });
+  if (reset2) reset2.addEventListener('click', function(){ reset.click(); });
+  if (verify) verify.addEventListener('click', function(){
+    var value = String(answerInput && answerInput.value || '').replace(/\s+/g,'');
+    var expected = String(answerText || '').replace(/\s+/g,'');
+    if (!value) return setFeedback('先输入答案再验证。', 'bad');
+    if (!expected || value === expected || value === expected + (answerUnit || '') || value.includes(expected)) {
+      setFeedback('正确！你已经找到答案。', 'good');
+      if (answerBox) {
+        answerBox.style.display = 'block';
+        answerBox.textContent = '答案：' + (answerText || '暂无') + (answerUnit ? (' ' + answerUnit) : '');
+      }
+      return;
+    }
+    setFeedback('还差一点，再看一眼发现区。', 'bad');
+  });
+  if (show) show.addEventListener('click', function(){
+    if (answerBox) {
+      answerBox.style.display = 'block';
+      answerBox.textContent = '答案：' + (answerText || '暂无') + (answerUnit ? (' ' + answerUnit) : '');
+    }
+    setFeedback('标准答案已经显示。', 'good');
+  });
+  if (answerInput) answerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') verify.click(); });
+  render();
+})();
+</script>
+</body>
+  </html>`
+}
+
+function buildPlanDrivenHtml(questionText, analysisJson, renderPlan) {
+  const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : {}
+  const plan = renderPlan && typeof renderPlan === 'object' ? renderPlan : {}
+  const normalizeList = (value) => {
+    if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
+    if (value == null) return []
+    const text = String(value).trim()
+    return text ? [text] : []
+  }
+  const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+  const questionType = String(analysis.question_type || plan.coreDiscovery || '暂未分类')
+  const coreDiscovery = String(analysis.core_discovery || plan.coreDiscovery || questionType)
+  const knownConditions = normalizeList(analysis.known_conditions)
+  const hiddenConditions = normalizeList(analysis.hidden_conditions)
+  const challengeSteps = normalizeList(analysis.challenge_steps)
+  const discoveryFlow = normalizeList(analysis.discovery_flow)
+  const feedbackItems = normalizeList(analysis.interaction_flow?.feedback)
+  const assets = normalizeList(plan.assets || analysis.default_assets)
+  const controls = normalizeList(plan.controls)
+  const visuals = normalizeList(plan.visuals)
+  const animations = normalizeList(plan.animations)
+  const observationCards = [...knownConditions, ...hiddenConditions].slice(0, 4)
+  const animationType = String(analysis.animation_flow?.type || '步骤推进')
+  const animationDescription = String(analysis.animation_flow?.description || '根据题意逐步展示变化过程')
+  const visualEffects = normalizeList(analysis.animation_flow?.visual_effect)
+  const trigger = String(analysis.interaction_flow?.trigger || '点击开始探索')
+  const action = String(analysis.interaction_flow?.action || '根据题意触发变化')
+  const resetText = String(analysis.interaction_flow?.reset || '重置后回到初始状态')
+  const answerValue = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.value ?? '')
+    : String(analysis.answer ?? '')
+  const answerUnit = analysis.answer && typeof analysis.answer === 'object'
+    ? String(analysis.answer.unit ?? '')
+    : ''
+  const expected = [answerValue, answerUnit].filter(Boolean).join('')
+  const primaryControl = controls[0] || ''
+  const hasSlider = controls.includes('SliderControl') || /(滑块|拖动|滑动|进度)/.test(`${trigger} ${action} ${questionType} ${coreDiscovery}`)
+  const hasChoice = controls.includes('ChoiceControl') || /(选择|选项)/.test(`${trigger} ${action} ${questionType}`)
+  const hasDrag = controls.includes('DragControl') || /(拖拽|拖入|拖到)/.test(`${trigger} ${action} ${questionType}`)
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${escapeHtml(questionType)}</title>
+<style>
+:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888;--line:#e8e8ec}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--body);min-height:100vh;padding:12px;display:flex;justify-content:center}
+.wrap{width:100%;max-width:860px;display:flex;flex-direction:column;gap:12px;padding-bottom:28px}
+.card{background:var(--card);border-radius:22px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:16px;border:1px solid rgba(0,0,0,.03)}
+.hero{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff}
+.title{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--mute);margin-bottom:10px}
+.hero .title{color:rgba(255,255,255,.9)}
+.q{font-size:16px;line-height:1.75;font-weight:700;color:#fff}
+.section-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.summary-card{border-radius:16px;border:1px solid var(--line);background:#fff;padding:12px}
+.summary-k{font-size:11px;color:var(--mute);margin-bottom:4px}
+.summary-v{font-size:15px;line-height:1.5;color:var(--ink);font-weight:700}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #ebe4ff;background:#f7f4ff;color:var(--purple);font-size:12px;line-height:1.4}
+.box{border-radius:18px;border:1px solid var(--line);background:#fff;padding:14px}
+.box.soft{background:var(--bg)}
+.step-list{display:flex;flex-direction:column;gap:8px}
+.step{padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--body)}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:none;border-radius:999px;padding:10px 14px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-weight:700;font-size:13px;cursor:pointer}
+.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.ghost{background:#f7f7f7;color:var(--body);border:1px solid #ededed}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.input{width:100%;border:1px solid #e7e7e7;border-radius:14px;padding:12px 14px;font-size:14px;background:#fff;color:var(--ink);outline:none}
+.feedback{margin-top:10px;border-radius:14px;background:#f8f7ff;border:1px solid #ece5ff;color:var(--purple);padding:12px 14px;font-size:13px;line-height:1.7}
+.feedback.good{background:#eefdf3;border-color:#caedcf;color:#15803d}
+.feedback.bad{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
+.control-label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.control-meta{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--mute);line-height:1.5}
+.meter{border-radius:20px;background:linear-gradient(135deg,rgba(121,40,202,.08),rgba(255,0,128,.08));padding:16px;border:1px solid rgba(121,40,202,.12)}
+.meter-num{font-size:28px;font-weight:800;color:var(--ink);line-height:1}
+.meter-sub{font-size:12px;color:var(--body);margin-top:6px}
+.slider{width:100%;accent-color:var(--blue)}
+.visual-card{border-radius:18px;border:1px solid var(--line);background:#fff;padding:14px}
+.visual-title{font-size:12px;color:var(--mute);margin-bottom:8px}
+.visual-value{font-size:20px;font-weight:800;color:var(--ink)}
+.visual-bar{height:12px;border-radius:999px;background:#ece8f6;overflow:hidden}
+.visual-bar > div{height:100%;border-radius:999px;background:linear-gradient(135deg,var(--purple),var(--pink));transition:width .3s ease}
+.visual-line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;color:var(--body);font-size:12px}
+@media (max-width:760px){body{padding:10px}.card{padding:14px}.summary-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="card hero">
+    <div class="title">📝 题目</div>
+    <div class="q">${escapeHtml(questionText)}</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">1. 观察区</div>
+    <div class="stack">
+      ${knownConditions.length ? `<div class="summary-grid">${knownConditions.map((item, index) => `<div class="summary-card"><div class="summary-k">已知条件 ${index + 1}</div><div class="summary-v">${escapeHtml(item)}</div></div>`).join('')}</div>` : ''}
+      ${hiddenConditions.length ? `<div class="summary-grid">${hiddenConditions.map((item, index) => `<div class="summary-card"><div class="summary-k">隐含条件 ${index + 1}</div><div class="summary-v">${escapeHtml(item)}</div></div>`).join('')}</div>` : ''}
+      ${assets.length ? `<div class="chip-row">${assets.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('')}</div>` : ''}
+      <div class="box">
+        <div class="summary-v">${escapeHtml(coreDiscovery || '先观察条件之间的数量关系')}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">2. 发现区</div>
+    <div class="stack">
+      <div class="box soft">
+        <div class="control-label">${escapeHtml(trigger)}</div>
+        ${hasSlider ? `<input id="plan-slider" class="slider" type="range" min="0" max="100" value="0" step="1"><div class="control-meta"><span>0%</span><span>${escapeHtml(action)}</span><span>100%</span></div>` : ''}
+        ${hasChoice ? `<div class="btn-row" style="margin-top:10px"><button class="btn secondary" data-choice="0" type="button">选项 A</button><button class="btn secondary" data-choice="1" type="button">选项 B</button><button class="btn secondary" data-choice="2" type="button">选项 C</button></div>` : ''}
+        ${hasDrag ? `<div class="btn-row" style="margin-top:10px"><button class="btn secondary" id="drag-act" type="button">拖动探索</button><button class="btn ghost" id="drag-reset" type="button">重置拖动</button></div>` : ''}
+        <div class="btn-row" style="margin-top:10px"><button class="btn" id="primary-act" type="button">${escapeHtml(primaryControl || '开始探索')}</button><button class="btn ghost" id="plan-reset" type="button">${escapeHtml(resetText)}</button></div>
+        <div class="meter" style="margin-top:12px"><div class="meter-num" id="plan-meter">0</div><div class="meter-sub" id="plan-meter-sub">${escapeHtml(animationDescription)}</div></div>
+      </div>
+      <div class="visual-card">
+        <div class="visual-title">变化展示</div>
+        ${visuals.includes('Counter') || visuals.length === 0 ? `<div class="visual-value" id="plan-counter">0</div>` : ''}
+        ${visuals.includes('Bar') || visuals.includes('MProgress') || visuals.length === 0 ? `<div class="visual-bar" style="margin-top:10px"><div id="plan-bar" style="width:0%"></div></div>` : ''}
+        ${visuals.includes('NumberLine') || visuals.includes('Timeline') ? `<div class="visual-line"><span>起点</span><span>→</span><span>终点</span></div>` : ''}
+        ${visuals.includes('ItemGroup') ? `<div class="chip-row" style="margin-top:10px">${Array.from({ length: 6 }).map(() => '<span class="chip">🪙</span>').join('')}</div>` : ''}
+        <div class="chip-row" style="margin-top:10px">${feedbackItems.length ? feedbackItems.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : ''}</div>
+      </div>
+      <div class="visual-card">
+        <div class="visual-title">动画说明</div>
+        <div class="summary-v">${escapeHtml(animationType)}：${escapeHtml(animationDescription)}</div>
+        <div class="chip-row" style="margin-top:10px">${visualEffects.length ? visualEffects.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : ''}</div>
+        <div class="chip-row" style="margin-top:10px">${animations.length ? animations.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : ''}</div>
+      </div>
+      <div class="box">
+        <div class="step-list">
+          ${discoveryFlow.length ? discoveryFlow.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再互动，再验证。</div>'}
+        </div>
+      </div>
+      <div class="box">
+        <div class="summary-v">${escapeHtml(coreDiscovery)}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">3. 挑战区</div>
+    <div class="stack">
+      <div class="box">
+        <div class="step-list">
+          ${challengeSteps.length ? challengeSteps.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再计算，再验证。</div>'}
+        </div>
+      </div>
+      <div class="box">
+        <input id="plan-answer" class="input" type="text" placeholder="请输入答案">
+        <div class="btn-row" style="margin-top:10px"><button class="btn" id="plan-verify" type="button">验证</button><button class="btn secondary" id="plan-show" type="button">显示答案</button><button class="btn ghost" id="plan-reset2" type="button">重置</button></div>
+        <div class="feedback" id="plan-feedback">先观察，再互动，再验证。</div>
+        <div class="feedback good" id="plan-answer-box" style="display:none;margin-top:10px"></div>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+(function(){
+  var slider = document.getElementById('plan-slider');
+  var primaryAct = document.getElementById('primary-act');
+  var planReset = document.getElementById('plan-reset');
+  var planReset2 = document.getElementById('plan-reset2');
+  var planMeter = document.getElementById('plan-meter');
+  var planMeterSub = document.getElementById('plan-meter-sub');
+  var planCounter = document.getElementById('plan-counter');
+  var planBar = document.getElementById('plan-bar');
+  var answerInput = document.getElementById('plan-answer');
+  var planVerify = document.getElementById('plan-verify');
+  var planShow = document.getElementById('plan-show');
+  var planFeedback = document.getElementById('plan-feedback');
+  var planAnswerBox = document.getElementById('plan-answer-box');
+  var choiceButtons = Array.from(document.querySelectorAll('[data-choice]'));
+  var dragAct = document.getElementById('drag-act');
+  var dragReset = document.getElementById('drag-reset');
+  var expected = ${JSON.stringify(expected)};
+  var animationDescription = ${JSON.stringify(animationDescription)};
+  var coreDiscovery = ${JSON.stringify(coreDiscovery)};
+  var stage = 0;
+  var choiceIndex = 0;
+  function setFeedback(text, tone){
+    planFeedback.className = tone ? ('feedback ' + tone) : 'feedback';
+    planFeedback.textContent = text;
+  }
+  function render(){
+    var value = slider ? Number(slider.value || 0) : stage * 33;
+    if (planMeter) planMeter.textContent = String(Math.round(value));
+    if (planMeterSub) planMeterSub.textContent = stage >= 2 ? animationDescription : coreDiscovery;
+    if (planCounter) planCounter.textContent = String(Math.round(value));
+    if (planBar) planBar.style.width = Math.min(100, value) + '%';
+  }
+  if (slider) slider.addEventListener('input', render);
+  if (primaryAct) primaryAct.addEventListener('click', function(){ stage = Math.min(stage + 1, 3); if (slider) slider.value = String(Math.min(100, stage * 33)); render(); });
+  if (planReset) planReset.addEventListener('click', function(){ stage = 0; if (slider) slider.value = '0'; if (answerInput) answerInput.value = ''; if (planAnswerBox) planAnswerBox.style.display = 'none'; setFeedback('先观察，再互动，再验证。'); render(); });
+  if (planReset2) planReset2.addEventListener('click', function(){ if (planReset) planReset.click(); });
+  if (dragAct) dragAct.addEventListener('click', function(){ stage = Math.min(stage + 1, 3); if (slider) slider.value = String(Math.min(100, stage * 33)); render(); });
+  if (dragReset) dragReset.addEventListener('click', function(){ if (planReset) planReset.click(); });
+  choiceButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      choiceIndex = Number(btn.getAttribute('data-choice') || '0');
+      stage = Math.min(choiceIndex + 1, 3);
+      if (slider) slider.value = String(Math.min(100, stage * 33));
+      render();
+    });
+  });
+  if (planVerify) planVerify.addEventListener('click', function(){
+    var value = String(answerInput && answerInput.value || '').replace(/\s+/g,'');
+    var expectedValue = String(expected || '').replace(/\s+/g,'');
+    if (!value) return setFeedback('先输入答案再验证。', 'bad');
+    if (!expectedValue || value === expectedValue || value.includes(expectedValue)) {
+      setFeedback('正确！你已经找到答案。', 'good');
+      if (planAnswerBox) {
+        planAnswerBox.style.display = 'block';
+        planAnswerBox.textContent = '答案：' + (expectedValue || '暂无');
+      }
+      return;
+    }
+    setFeedback('还差一点，再看一眼发现区。', 'bad');
+  });
+  if (planShow) planShow.addEventListener('click', function(){
+    if (planAnswerBox) {
+      planAnswerBox.style.display = 'block';
+      planAnswerBox.textContent = '答案：' + (expected || '暂无');
+    }
+    setFeedback('标准答案已经显示。', 'good');
+  });
+  if (answerInput) answerInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') planVerify.click(); });
+  render();
+})();
+</script>
+</body>
+</html>`;
 }
 
 function asStringArray(value) {
@@ -459,6 +902,13 @@ function normalizeComponentList(value) {
   return asStringArray(value).map(normalizeTypeName)
 }
 
+function normalizeComponentRules(value) {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+  const parsed = safeJsonParse(value, {})
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+}
+
 function normalizeQuestionTypeRow(row) {
   return {
     id: row?.id,
@@ -470,12 +920,13 @@ function normalizeQuestionTypeRow(row) {
     analysisPrompt: row?.analysis_prompt || '',
     htmlPrompt: row?.html_prompt || '',
     layoutComponent: row?.layout_component || '',
+    lookComponent: row?.look_component || '',
     controlComponent: row?.control_component || '',
     visualComponent: row?.visual_component || '',
     animationComponent: row?.animation_component || '',
+    challengeComponent: row?.challenge_component || '',
     defaultAssets: safeJsonParse(row?.default_assets, []),
     pageSchemaVersion: Number(row?.page_schema_version || 1),
-    componentRules: safeJsonParse(row?.component_rules, {}),
     fallbackStrategy: safeJsonParse(row?.fallback_strategy, {}),
     createdAt: row?.created_at || '',
     updatedAt: row?.updated_at || '',
@@ -484,9 +935,9 @@ function normalizeQuestionTypeRow(row) {
 
 const KNOWN_COMPONENT_LIBRARY = {
   scene: new Set(['ThreeZoneLayout']),
-  observation: new Set(['MTitle', 'MHint', 'MCard', 'MInput', 'MProgress', 'MResult', 'Counter', 'ItemIcon', 'ItemGroup', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment', 'PersonIcon', 'BoxIcon', 'CupIcon', 'TreeIcon', 'CherryIcon', 'AppleIcon', 'RoadIcon', 'CoinIcon', 'MachineIcon', 'AnimalIcon']),
-  discovery: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'MButton', 'Highlight', 'Move', 'Split', 'Merge', 'FadeOut', 'CountUp', 'Shake', 'Glow', 'ConnectLine', 'RevealGap']),
-  challenge: new Set(['AnswerInput', 'MResult', 'MProgress', 'StepButton', 'ChoiceControl', 'MButton', 'CountUp', 'Glow', 'Shake', 'RevealGap']),
+  observation: new Set(['MTitle', 'MHint', 'MCard', 'MProgress', 'Counter', 'ItemIcon', 'ItemGroup', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment', 'PersonIcon', 'BoxIcon', 'CupIcon', 'TreeIcon', 'CherryIcon', 'AppleIcon', 'RoadIcon', 'CoinIcon', 'MachineIcon', 'AnimalIcon']),
+  discovery: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'MButton', 'MCard', 'MProgress', 'MResult', 'Counter', 'ItemGroup', 'Box', 'DashedBox', 'SolidBox', 'Arrow', 'Balance', 'Bar', 'Timeline', 'NumberLine', 'PointSegment', 'Highlight', 'Move', 'Split', 'Merge', 'FadeOut', 'CountUp', 'Shake', 'Glow', 'ConnectLine', 'RevealGap']),
+  challenge: new Set(['AnswerInput', 'MInput', 'MResult', 'MProgress', 'StepButton', 'ChoiceControl', 'MButton', 'CountUp', 'Glow', 'Shake', 'RevealGap']),
   // Legacy buckets kept for compatibility with older render plans and logs.
   layout: new Set(['SceneFrame', 'TwoColumnLayout', 'SingleColumnLayout', 'ThreeZoneLayout', 'StickyAsideLayout']),
   control: new Set(['ClickControl', 'DragControl', 'SliderControl', 'StepButton', 'ChoiceControl', 'AnswerInput']),
@@ -496,103 +947,71 @@ const KNOWN_COMPONENT_LIBRARY = {
 }
 
 function inferLayoutFromAnalysis(analysisJson, typeContext) {
-  const rules = safeJsonParse(typeContext.componentRules, {})
-  const hint = [
-    typeContext.layoutComponent,
-    rules.layout_component,
-    rules.scene_component,
-    rules.scene_components,
-    analysisJson?.scene?.layout,
-    analysisJson?.scene?.type,
-  ].find(Boolean)
-  if (hint) return String(hint)
-  if (analysisJson?.thinking_steps?.length) return 'SingleColumnLayout'
-  if (analysisJson?.scene && analysisJson?.objects) return 'SceneFrame'
-  if (analysisJson?.known_data && analysisJson?.discoveries) return 'ThreeZoneLayout'
-  return 'ThreeZoneLayout'
+  const hint = typeContext.layoutComponent
+  return hint ? String(hint) : ''
 }
 
 function inferObservationComponents(analysisJson, typeContext) {
-  const candidates = [
-    ...normalizeComponentList(typeContext.controlComponent),
-    ...normalizeComponentList(typeContext.componentRules?.control_components),
-    ...normalizeComponentList(typeContext.componentRules?.observation_component),
-    ...normalizeComponentList(typeContext.componentRules?.observation_components),
-  ]
+  const candidates = [...normalizeComponentList(typeContext.lookComponent)]
   if (candidates.length > 0) return [...new Set(candidates)]
-
-  if (analysisJson?.known_data || analysisJson?.discoveries || analysisJson?.known_conditions) return ['MCard', 'MHint']
-  if (analysisJson?.scene?.objects) return ['ItemGroup']
-  return ['MCard']
+  return []
 }
 
-function inferDiscoveryComponents(analysisJson, typeContext) {
+function inferDiscoveryControlComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.controlComponent),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+  return []
+}
+
+function inferDiscoveryVisualComponents(analysisJson, typeContext) {
   const candidates = [
     ...normalizeComponentList(typeContext.visualComponent),
-    ...normalizeComponentList(typeContext.componentRules?.visual_components),
-    ...normalizeComponentList(typeContext.componentRules?.discovery_component),
-    ...normalizeComponentList(typeContext.componentRules?.discovery_components),
   ]
   if (candidates.length > 0) return [...new Set(candidates)]
 
-  const controls = Array.isArray(analysisJson?.controls) ? analysisJson.controls : []
-  if (controls.length > 0) {
-    const mapped = controls.map((item) => {
-      const text = String(item?.action || item?.type || item?.label || '').toLowerCase()
-      if (text.includes('drag') || text.includes('拖')) return 'DragControl'
-      if (text.includes('slide') || text.includes('滑')) return 'SliderControl'
-      if (text.includes('choice') || text.includes('选') || text.includes('单选')) return 'ChoiceControl'
-      if (text.includes('input') || text.includes('填') || text.includes('答')) return 'AnswerInput'
-      return 'ClickControl'
-    })
-    return [...new Set(mapped)]
-  }
+  return []
+}
 
-  return ['ClickControl']
+function inferDiscoveryAnimationComponents(analysisJson, typeContext) {
+  const candidates = [
+    ...normalizeComponentList(typeContext.animationComponent),
+  ]
+  if (candidates.length > 0) return [...new Set(candidates)]
+  return []
 }
 
 function inferChallengeComponents(analysisJson, typeContext) {
   const candidates = [
-    ...normalizeComponentList(typeContext.animationComponent),
-    ...normalizeComponentList(typeContext.componentRules?.animation_components),
-    ...normalizeComponentList(typeContext.componentRules?.challenge_component),
-    ...normalizeComponentList(typeContext.componentRules?.challenge_components),
+    ...normalizeComponentList(typeContext.challengeComponent),
   ]
   if (candidates.length > 0) return [...new Set(candidates)]
 
   if (analysisJson?.answer || analysisJson?.verification_target) return ['AnswerInput', 'MResult']
   if (analysisJson?.challenge_steps?.length) return ['AnswerInput']
-  return ['AnswerInput']
+  return []
 }
 
 function inferDefaultAssets(typeContext, analysisJson) {
   const assets = Array.isArray(typeContext.defaultAssets) ? typeContext.defaultAssets : []
   if (assets.length > 0) return assets
-  if (analysisJson?.scene?.objects?.length) return analysisJson.scene.objects
   return []
 }
 
 function buildRenderPlan(typeContext, analysisJson, questionText) {
-  const componentRules = safeJsonParse(typeContext.componentRules, {})
+  const componentRules = normalizeComponentRules(analysisJson?.component_rules)
   const fallbackStrategy = safeJsonParse(typeContext.fallbackStrategy, {})
   const missingComponents = []
-  const missingCapabilities = []
 
-  const layoutName = pickFirstString(
-    typeContext.layoutComponent,
-    componentRules.layout_component,
-    componentRules.scene_component,
-    componentRules.scene_components,
-    inferLayoutFromAnalysis(analysisJson, typeContext),
-  )
-  if (!KNOWN_COMPONENT_LIBRARY.scene.has(layoutName) && !KNOWN_COMPONENT_LIBRARY.layout.has(layoutName)) {
+  const layoutName = pickFirstString(typeContext.layoutComponent, inferLayoutFromAnalysis(analysisJson, typeContext))
+  if (layoutName && !KNOWN_COMPONENT_LIBRARY.scene.has(layoutName) && !KNOWN_COMPONENT_LIBRARY.layout.has(layoutName)) {
     missingComponents.push({
       category: 'scene',
-      name: layoutName || 'UnknownLayout',
+      name: layoutName,
       reason: typeContext.layoutComponent
         ? `question_types.layout_component=${typeContext.layoutComponent} 不在三段式布局组件库`
-        : '未配置 layout_component，使用推断布局',
-      fallback: fallbackStrategy.layout || 'ThreeZoneLayout',
+        : '未配置 layout_component，当前布局来自分析结果',
     })
   }
 
@@ -603,19 +1022,39 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
         category: 'observation',
         name,
         reason: '观察区组件不在已知组件库中',
-        fallback: fallbackStrategy.observation || 'MCard',
       })
     }
   })
 
-  const discoveryComponents = inferDiscoveryComponents(analysisJson, typeContext)
-  discoveryComponents.forEach((name) => {
-    if (!KNOWN_COMPONENT_LIBRARY.discovery.has(name) && !KNOWN_COMPONENT_LIBRARY.control.has(name) && !KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
+  const discoveryControlComponents = inferDiscoveryControlComponents(analysisJson, typeContext)
+  discoveryControlComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.discovery.has(name) && !KNOWN_COMPONENT_LIBRARY.control.has(name)) {
       missingComponents.push({
-        category: 'discovery',
+        category: 'discovery_control',
         name,
-        reason: '发现区组件不在已知组件库中',
-        fallback: fallbackStrategy.discovery || 'ClickControl',
+        reason: '发现区操作类组件不在已知组件库中',
+      })
+    }
+  })
+
+  const discoveryVisualComponents = inferDiscoveryVisualComponents(analysisJson, typeContext)
+  discoveryVisualComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.discovery.has(name) && !KNOWN_COMPONENT_LIBRARY.visual.has(name)) {
+      missingComponents.push({
+        category: 'discovery_visual',
+        name,
+        reason: '发现区展示类组件不在已知组件库中',
+      })
+    }
+  })
+
+  const discoveryAnimationComponents = inferDiscoveryAnimationComponents(analysisJson, typeContext)
+  discoveryAnimationComponents.forEach((name) => {
+    if (!KNOWN_COMPONENT_LIBRARY.discovery.has(name) && !KNOWN_COMPONENT_LIBRARY.animation.has(name)) {
+      missingComponents.push({
+        category: 'discovery_animation',
+        name,
+        reason: '发现区动画类组件不在已知组件库中',
       })
     }
   })
@@ -627,7 +1066,6 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
         category: 'challenge',
         name,
         reason: '挑战区组件不在已知组件库中',
-        fallback: fallbackStrategy.challenge || 'AnswerInput',
       })
     }
   })
@@ -641,30 +1079,11 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
         category: 'asset',
         name: assetName,
         reason: '素材组件不在已知素材库中',
-        fallback: fallbackStrategy.asset || 'PersonIcon',
       })
     }
   })
 
-  if (!Array.isArray(analysisJson?.controls) || analysisJson.controls.length === 0) {
-    missingCapabilities.push({
-      category: 'discovery',
-      name: 'controls',
-      reason: 'analysis_json 未产出 controls 字段，交互层只能使用默认控件',
-      fallback: fallbackStrategy.discovery || 'ClickControl',
-    })
-  }
-
-  if (!analysisJson?.scene && !analysisJson?.thinking_steps) {
-    missingCapabilities.push({
-      category: 'scene',
-      name: 'scene',
-      reason: 'analysis_json 缺少 scene / thinking_steps，页面骨架只能使用默认布局',
-      fallback: fallbackStrategy.layout || 'ThreeZoneLayout',
-    })
-  }
-
-  const fallbackUsed = missingComponents.length > 0 || missingCapabilities.length > 0
+  const fallbackUsed = missingComponents.length > 0
 
   return {
     version: typeContext.pageSchemaVersion || 1,
@@ -674,29 +1093,36 @@ function buildRenderPlan(typeContext, analysisJson, questionText) {
       name: layoutName,
       source: typeContext.layoutComponent ? 'question_types.layout_component' : 'inferred',
     },
-    scene: [layoutName].filter(Boolean),
+    scene: layoutName ? [layoutName] : [],
     observations: observationComponents,
-    discoveries: discoveryComponents,
+    discoveries: [...new Set([
+      ...discoveryControlComponents,
+      ...discoveryVisualComponents,
+      ...discoveryAnimationComponents,
+    ])],
     challenges: challengeComponents,
-    controls: discoveryComponents,
-    visuals: observationComponents,
-    animations: challengeComponents,
+    controls: discoveryControlComponents,
+    visuals: discoveryVisualComponents,
+    animations: discoveryAnimationComponents,
     assets: defaultAssets,
     rules: componentRules,
     fallbackStrategy,
     matchedComponents: {
       scene: [layoutName].filter(Boolean),
       observations: observationComponents,
-      discoveries: discoveryComponents,
+      discoveries: [...new Set([
+        ...discoveryControlComponents,
+        ...discoveryVisualComponents,
+        ...discoveryAnimationComponents,
+      ])],
       challenges: challengeComponents,
       layout: layoutName ? [layoutName] : [],
-      controls: discoveryComponents,
-      visuals: observationComponents,
-      animations: challengeComponents,
+      controls: discoveryControlComponents,
+      visuals: discoveryVisualComponents,
+      animations: discoveryAnimationComponents,
       assets: defaultAssets,
     },
     missingComponents,
-    missingCapabilities,
     fallbackUsed,
   }
 }
@@ -706,19 +1132,16 @@ function buildTypeContextSummary(typeContext) {
     `core_discovery：${typeContext.coreDiscovery || ''}`,
     `name：${typeContext.name || ''}`,
     typeContext.layoutComponent ? `layout_component：${typeContext.layoutComponent}` : '',
+    typeContext.lookComponent ? `look_component：${typeContext.lookComponent}` : '',
     typeContext.controlComponent ? `control_component：${typeContext.controlComponent}` : '',
     typeContext.visualComponent ? `visual_component：${typeContext.visualComponent}` : '',
     typeContext.animationComponent ? `animation_component：${typeContext.animationComponent}` : '',
-    typeContext.componentRules?.scene_components ? `scene_components：${JSON.stringify(typeContext.componentRules.scene_components)}` : '',
-    typeContext.componentRules?.observation_components ? `observation_components：${JSON.stringify(typeContext.componentRules.observation_components)}` : '',
-    typeContext.componentRules?.discovery_components ? `discovery_components：${JSON.stringify(typeContext.componentRules.discovery_components)}` : '',
-    typeContext.componentRules?.challenge_components ? `challenge_components：${JSON.stringify(typeContext.componentRules.challenge_components)}` : '',
+    typeContext.challengeComponent ? `challenge_component：${typeContext.challengeComponent}` : '',
     typeContext.discoveryFlow ? `discovery_flow：${typeContext.discoveryFlow}` : '',
     typeContext.interactionFlow ? `interaction_flow：${typeContext.interactionFlow}` : '',
     typeContext.animationFlow ? `animation_flow：${typeContext.animationFlow}` : '',
     typeContext.analysisPrompt ? `analysis_prompt：${typeContext.analysisPrompt}` : '',
     typeContext.htmlPrompt ? `html_prompt：${typeContext.htmlPrompt}` : '',
-    typeContext.componentRules ? `component_rules：${JSON.stringify(typeContext.componentRules)}` : '',
     typeContext.fallbackStrategy ? `fallback_strategy：${JSON.stringify(typeContext.fallbackStrategy)}` : '',
   ].filter(Boolean).join('\n')
 }
@@ -738,414 +1161,6 @@ function renderListItems(items, fallbackText = '暂无') {
     return `<div class="empty">${escapeHtml(fallbackText)}</div>`
   }
   return list.map((item, index) => `<li><span class="idx">${index + 1}</span><span>${escapeHtml(item)}</span></li>`).join('')
-}
-
-function looksLikeHtmlDocument(value) {
-  const text = String(value || '').trim()
-  if (!text) return false
-  return /<!DOCTYPE\s+html|<html[\s>]/i.test(text) && /<\/html>/i.test(text)
-}
-
-function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
-  const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : {}
-
-  const normalizeList = (value) => {
-    if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean)
-    if (value == null) return []
-    const text = String(value).trim()
-    if (!text) return []
-    return [text]
-  }
-
-  const parseKnownData = (value) => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
-    return Object.entries(value).map(([key, val]) => `${key}：${String(val ?? '')}`)
-  }
-
-  const extractNumbers = (text) => {
-    const matches = String(text || '').match(/-?\d+(?:\.\d+)?/g) || []
-    return matches.map(Number).filter((n) => Number.isFinite(n))
-  }
-
-  const extractFirstNumber = (...values) => {
-    for (const value of values) {
-      const num = extractNumbers(value)[0]
-      if (typeof num === 'number') return num
-    }
-    return null
-  }
-
-  const questionType = analysis.question_type || analysis.knowledge || renderPlan?.coreDiscovery || '暂未分类'
-  const coreDiscovery = analysis.core_discovery || renderPlan?.coreDiscovery || questionType || ''
-  const verificationTarget = analysis.verification_target || ''
-  const knownConditions = normalizeList(analysis.known_conditions).length > 0
-    ? normalizeList(analysis.known_conditions)
-    : parseKnownData(analysis.known_data)
-  const hiddenConditions = normalizeList(analysis.hidden_conditions)
-  const discoveryFlow = normalizeList(analysis.discovery_flow)
-  const challengeSteps = normalizeList(analysis.challenge_steps)
-  const interactionFlow = analysis.interaction_flow && typeof analysis.interaction_flow === 'object'
-    ? analysis.interaction_flow
-    : {}
-  const answerText = analysis.answer
-    ? (typeof analysis.answer === 'object' ? JSON.stringify(analysis.answer) : String(analysis.answer))
-    : ''
-  const answerValue = analysis.answer && typeof analysis.answer === 'object'
-    ? String(analysis.answer.value ?? '')
-    : String(analysis.answer ?? '')
-  const answerUnit = analysis.answer && typeof analysis.answer === 'object'
-    ? String(analysis.answer.unit ?? '')
-    : ''
-  const allNumericSource = [
-    questionText,
-    verificationTarget,
-    ...knownConditions,
-    ...hiddenConditions,
-    ...challengeSteps,
-    ...discoveryFlow,
-    answerText,
-  ].join(' ')
-  const totalValue = extractFirstNumber(questionText, knownConditions[0], allNumericSource) ?? 0
-  const usedValue = extractFirstNumber(knownConditions[1], challengeSteps[0], allNumericSource)
-  const daysValue = extractFirstNumber(knownConditions[2], challengeSteps[1], allNumericSource)
-  const remainingValue =
-    Number.isFinite(totalValue) && Number.isFinite(usedValue)
-      ? Math.max(0, totalValue - usedValue)
-      : extractFirstNumber(challengeSteps[0], challengeSteps[1], allNumericSource)
-  const averageValue =
-    Number.isFinite(remainingValue) && Number.isFinite(daysValue) && Number(daysValue) > 0
-      ? Number((remainingValue / Number(daysValue)).toFixed(2))
-      : extractFirstNumber(answerValue, verificationTarget, answerText, challengeSteps[2], allNumericSource)
-  const derivedAnswerText = averageValue != null
-    ? `${averageValue}${answerUnit || '千克'}`
-    : (answerText || verificationTarget || '')
-  const startNumber = Number.isFinite(totalValue) ? totalValue : (extractFirstNumber(...knownConditions, questionText) ?? 0)
-  const targetNumber = Number.isFinite(remainingValue) ? remainingValue : (Number.isFinite(averageValue) ? averageValue : (startNumber + 1))
-  const maxNumber = Math.max(startNumber, targetNumber, 1)
-  const feedbackItems = normalizeList(interactionFlow.feedback)
-  const discoveryHints = feedbackItems.length > 0
-    ? feedbackItems
-    : ['拖动滑块观察变化', '点击按钮推进步骤', '输入答案后验证']
-  const hasAnswer = Boolean(derivedAnswerText || verificationTarget)
-  const derivedSummaryItems = [
-    Number.isFinite(totalValue) ? `总量：${totalValue}千克` : '',
-    Number.isFinite(usedValue) ? `已吃：${usedValue}千克` : '',
-    Number.isFinite(remainingValue) ? `剩余：${remainingValue}千克` : '',
-    Number.isFinite(daysValue) ? `天数：${daysValue}天` : '',
-    Number.isFinite(averageValue) ? `平均每天：${averageValue}${answerUnit || '千克'}` : '',
-  ].filter(Boolean)
-
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>互动演示</title>
-<style>
-:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888;--line:#e8e8ec}
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
-body{background:var(--bg);color:var(--body);min-height:100vh;padding:16px;display:flex;justify-content:center}
-.wrap{width:100%;max-width:860px;display:flex;flex-direction:column;gap:16px;padding-bottom:32px}
-.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:20px;border:1px solid rgba(0,0,0,.03)}
-.hero{background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff}
-.hero .muted,.hero .label{color:rgba(255,255,255,.8)}
-.title{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--mute);margin-bottom:12px}
-.hero .title{color:rgba(255,255,255,.9)}
-.q{font-size:15px;line-height:1.8;font-weight:600;color:var(--ink)}
-.hero .q{color:#fff}
-.section-grid{display:flex;flex-direction:column;gap:12px}
-.section-title{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px}
-.chip-row{display:flex;flex-wrap:wrap;gap:8px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #ebe4ff;background:#f7f4ff;color:var(--purple);font-size:12px;line-height:1.4}
-.chip.gray{background:#fff;border-color:var(--line);color:var(--body)}
-.box{border-radius:18px;border:1px solid var(--line);background:#fff;padding:14px}
-.box.soft{background:var(--bg)}
-.k-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.kv{font-size:12px;color:var(--mute);margin-bottom:6px}
-.text{font-size:13px;line-height:1.7;color:var(--body);white-space:pre-wrap}
-.btn-row{display:flex;flex-wrap:wrap;gap:8px}
-.btn{border:none;border-radius:999px;padding:10px 14px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-weight:700;font-size:13px;cursor:pointer}
-.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}
-.btn.ghost{background:#f7f7f7;color:var(--body);border:1px solid #ededed}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.input{width:100%;border:1px solid #e7e7e7;border-radius:14px;padding:12px 14px;font-size:14px;background:#fff;color:var(--ink);outline:none}
-.input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,112,243,.08)}
-.feedback{margin-top:10px;border-radius:14px;background:#f8f7ff;border:1px solid #ece5ff;color:var(--purple);padding:12px 14px;font-size:13px;line-height:1.7}
-.feedback.good{background:#eefdf3;border-color:#caedcf;color:#15803d}
-.feedback.bad{background:#fff7ed;border-color:#fed7aa;color:#c2410c}
-.progress{height:12px;border-radius:999px;background:#f1eefb;overflow:hidden}
-.progress > span{display:block;height:100%;border-radius:999px;background:linear-gradient(135deg,var(--purple),var(--pink));width:0%;transition:width .25s ease}
-.layout{display:grid;gap:12px;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr)}
-.visual{display:grid;gap:12px}
-.meter{border-radius:20px;background:linear-gradient(135deg,rgba(121,40,202,.08),rgba(255,0,128,.08));padding:16px;border:1px solid rgba(121,40,202,.12)}
-.meter-num{font-size:32px;font-weight:800;color:var(--ink);line-height:1}
-.meter-sub{font-size:12px;color:var(--body);margin-top:6px}
-.slider{width:100%;accent-color:var(--link)}
-.stage{display:flex;flex-direction:column;gap:12px}
-.stage-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:12px;color:var(--body)}
-.stage-pill.active{background:#eef5ff;border-color:#cfe0ff;color:var(--blue)}
-.step-list{display:flex;flex-direction:column;gap:8px}
-.step{padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--body)}
-.core{border-radius:16px;background:#eef5ff;border:1px solid #d6e7ff;padding:12px 14px;color:var(--blue);font-size:13px;line-height:1.7}
-.core.hidden{display:none}
-@media (max-width:760px){body{padding:12px}.card{padding:16px}.layout,.k-grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <section class="card hero">
-    <div class="title">📝 题目</div>
-    <div class="q">${escapeHtml(questionText)}</div>
-  </section>
-
-  <section class="card">
-    <div class="section-title">1. 观察区</div>
-    <div class="chip-row">
-      ${knownConditions.length ? knownConditions.map((item) => `<span class="chip gray">${escapeHtml(item)}</span>`).join('') : '<span class="chip gray">暂无已知条件</span>'}
-      ${hiddenConditions.length ? hiddenConditions.map((item) => `<span class="chip gray">${escapeHtml(item)}</span>`).join('') : ''}
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="section-title">2. 发现区</div>
-    <div class="layout">
-      <div class="box soft">
-        <div class="kv">互动控制</div>
-        <div class="stage">
-          <div class="chip-row">
-            <span class="stage-pill active" id="mode-pill">先算剩余</span>
-            <span class="stage-pill" id="step-pill">第 1 步</span>
-            <span class="stage-pill" id="progress-pill">探索中</span>
-          </div>
-          <input id="discovery-slider" class="slider" type="range" min="0" max="100" value="0" step="1" aria-label="发现滑块">
-          <div class="btn-row">
-            <button class="btn" id="step-back" type="button">算剩余</button>
-            <button class="btn" id="step-next" type="button">算平均</button>
-            <button class="btn secondary" id="jump-half" type="button">看结果</button>
-            <button class="btn ghost" id="reset-all" type="button">重置</button>
-          </div>
-          <div class="meter">
-            <div class="meter-num" id="discovery-number">${Number.isFinite(totalValue) ? `${totalValue} 千克` : '0'}</div>
-            <div class="meter-sub" id="discovery-summary">先看总量，再减去已吃，再平均分配</div>
-          </div>
-        </div>
-      </div>
-      <div class="visual">
-        <div class="box">
-          <div class="kv">变化画面</div>
-          <div class="progress"><span id="progress-bar"></span></div>
-          <div class="meter-sub" id="progress-text">当前进度 0%</div>
-        </div>
-        <div class="box">
-          <div class="kv">关键数据</div>
-          <div class="chip-row">
-            ${derivedSummaryItems.length ? derivedSummaryItems.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('') : '<span class="chip">请先看题目中的数量关系</span>'}
-          </div>
-        </div>
-        <div class="box">
-          <div class="kv">发现线索</div>
-          <div class="chip-row">
-            ${discoveryHints.map((item) => `<span class="chip">${escapeHtml(item)}</span>`).join('')}
-          </div>
-        </div>
-        <div class="box">
-          <div class="kv">核心发现</div>
-          <div class="core hidden" id="core-box">${escapeHtml(coreDiscovery || '核心发现待显示')}</div>
-          <div class="btn-row" style="margin-top:10px">
-            <button class="btn secondary" id="toggle-core" type="button">显示核心发现</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="section-title">3. 挑战区</div>
-    <div class="stage">
-      <div class="box">
-        <div class="kv">挑战步骤</div>
-        <div class="step-list">
-          ${challengeSteps.length ? challengeSteps.map((item, index) => `<div class="step">${index + 1}. ${escapeHtml(item)}</div>`).join('') : '<div class="step">1. 先观察，再计算，再验证。</div>'}
-        </div>
-      </div>
-
-      <div class="box">
-        <div class="kv">输入验证</div>
-        <input id="verify-input" class="input" type="text" placeholder="请输入你的答案" autocomplete="off">
-        <div class="btn-row" style="margin-top:10px">
-          <button class="btn" id="verify-btn" type="button">验证</button>
-          <button class="btn secondary" id="show-answer-btn" type="button"${hasAnswer ? '' : ' disabled'}>显示答案</button>
-          <button class="btn ghost" id="reset-challenge" type="button">重置</button>
-        </div>
-        <div class="feedback" id="verify-feedback">先拖动，后验证。</div>
-        <div class="feedback good" id="answer-box" style="display:none;margin-top:10px"></div>
-      </div>
-    </div>
-  </section>
-</div>
-<script>
-(function(){
-  var slider = document.getElementById('discovery-slider');
-  var progressBar = document.getElementById('progress-bar');
-  var progressText = document.getElementById('progress-text');
-  var discoveryNumber = document.getElementById('discovery-number');
-  var discoverySummary = document.getElementById('discovery-summary');
-  var modePill = document.getElementById('mode-pill');
-  var stepPill = document.getElementById('step-pill');
-  var progressPill = document.getElementById('progress-pill');
-  var stepBack = document.getElementById('step-back');
-  var stepNext = document.getElementById('step-next');
-  var jumpHalf = document.getElementById('jump-half');
-  var resetAll = document.getElementById('reset-all');
-  var toggleCore = document.getElementById('toggle-core');
-  var coreBox = document.getElementById('core-box');
-  var verifyInput = document.getElementById('verify-input');
-  var verifyBtn = document.getElementById('verify-btn');
-  var showAnswerBtn = document.getElementById('show-answer-btn');
-  var resetChallenge = document.getElementById('reset-challenge');
-  var verifyFeedback = document.getElementById('verify-feedback');
-  var answerBox = document.getElementById('answer-box');
-  var coreVisible = false;
-  var steps = [
-    '先看总量和已吃数量',
-    '算出剩余大米',
-    '平均分到 15 天',
-    '验证每天吃多少'
-  ];
-  var startNumber = ${JSON.stringify(startNumber)};
-  var targetNumber = ${JSON.stringify(targetNumber)};
-  var maxNumber = ${JSON.stringify(maxNumber)};
-  var answerText = ${JSON.stringify(derivedAnswerText)};
-  var answerValue = ${JSON.stringify(answerValue)};
-  var answerUnit = ${JSON.stringify(answerUnit)};
-  var verificationTarget = ${JSON.stringify(verificationTarget)};
-  var remainingValue = ${JSON.stringify(remainingValue)};
-  var averageValue = ${JSON.stringify(averageValue)};
-  function esc(text){
-    return String(text || '').replace(/[&<>"']/g, function(s){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s];
-    });
-  }
-  function compact(text){
-    return String(text || '').replace(/\\s+/g, '').toLowerCase();
-  }
-  function currentStepIndex(){
-    return Math.min(3, Math.floor((Number(slider.value || 0) / 100) * 4));
-  }
-  function currentValue(){
-    var percent = Number(slider.value || 0) / 100;
-    if (Number.isFinite(remainingValue) && Number.isFinite(averageValue)) {
-      if (percent < 0.45) return startNumber
-      if (percent < 0.8) return remainingValue
-      return averageValue
-    }
-    return Math.round(startNumber + (targetNumber - startNumber) * percent);
-  }
-  function render(){
-    var percent = Number(slider.value || 0);
-    var stageIndex = currentStepIndex();
-    var value = currentValue();
-    progressBar.style.width = percent + '%';
-    progressText.textContent = '当前进度 ' + percent + '%';
-    discoveryNumber.textContent = String(value) + (answerUnit ? (' ' + answerUnit) : '');
-    discoverySummary.textContent = percent < 25
-      ? '先观察总量和已吃数量'
-      : percent < 50
-        ? '先减去已吃部分，得到剩余量'
-      : percent < 75
-          ? '把剩余量平均分到 15 天'
-          : '已经可以验证最终答案';
-    modePill.textContent = percent < 45 ? '先算剩余' : percent < 80 ? '再平均分' : '看答案';
-    stepPill.textContent = '第 ' + (stageIndex + 1) + ' 步';
-    progressPill.textContent = percent >= 75 ? '接近答案' : '探索中';
-    progressPill.className = percent >= 75 ? 'stage-pill active' : 'stage-pill';
-    stepBack.disabled = percent <= 0;
-    stepNext.disabled = percent >= 100;
-    if (coreBox) {
-      coreBox.style.display = coreVisible ? 'block' : 'none';
-    }
-  }
-  function setFeedback(text, tone){
-    verifyFeedback.className = tone ? ('feedback ' + tone) : 'feedback';
-    verifyFeedback.textContent = text;
-  }
-  function matchesAnswer(input){
-    var value = compact(input);
-    var expected = compact(answerText || verificationTarget || answerValue);
-    if (!expected) return value.length > 0;
-    if (value === expected || value.includes(expected) || expected.includes(value)) return true;
-    var inputNums = value.match(/-?\\d+(?:\\.\\d+)?/g) || [];
-    var expectedNums = expected.match(/-?\\d+(?:\\.\\d+)?/g) || [];
-    if (inputNums.length && expectedNums.length) {
-      return inputNums.join(',') === expectedNums.join(',');
-    }
-    return false;
-  }
-  slider.addEventListener('input', render);
-  stepBack.addEventListener('click', function(){ slider.value = String(Math.max(0, Number(slider.value || 0) - 25)); render(); });
-  stepNext.addEventListener('click', function(){ slider.value = String(Math.min(100, Number(slider.value || 0) + 25)); render(); });
-  jumpHalf.addEventListener('click', function(){ slider.value = '50'; render(); });
-  resetAll.addEventListener('click', function(){
-    slider.value = '0';
-    if (verifyInput) verifyInput.value = '';
-    coreVisible = false;
-    setFeedback('先拖动，后验证。');
-    if (answerBox) answerBox.style.display = 'none';
-    render();
-  });
-  toggleCore.addEventListener('click', function(){
-    coreVisible = !coreVisible;
-    toggleCore.textContent = coreVisible ? '隐藏核心发现' : '显示核心发现';
-    render();
-  });
-  verifyBtn.addEventListener('click', function(){
-    var value = verifyInput ? verifyInput.value : '';
-    if (!String(value || '').trim()) {
-      setFeedback('先输入答案再验证。', 'bad');
-      return;
-    }
-    if (matchesAnswer(value)) {
-      setFeedback('正确！你已经找到答案。', 'good');
-      coreVisible = true;
-      toggleCore.textContent = '隐藏核心发现';
-      if (answerBox) {
-        answerBox.style.display = 'block';
-        answerBox.textContent = '答案：' + (answerText || answerValue || verificationTarget || '');
-      }
-      render();
-      return;
-    }
-    setFeedback('还差一点，再看一眼发现区。', 'bad');
-  });
-  showAnswerBtn.addEventListener('click', function(){
-    if (answerBox) {
-      answerBox.style.display = 'block';
-      answerBox.textContent = '答案：' + (answerText || answerValue || verificationTarget || '暂无');
-    }
-    setFeedback('标准答案已经显示。', 'good');
-    coreVisible = true;
-    toggleCore.textContent = '隐藏核心发现';
-    render();
-  });
-  resetChallenge.addEventListener('click', function(){
-    if (verifyInput) verifyInput.value = '';
-    if (answerBox) answerBox.style.display = 'none';
-    setFeedback('先拖动，后验证。');
-  });
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'ArrowLeft') { slider.value = String(Math.max(0, Number(slider.value || 0) - 5)); render(); }
-    if (e.key === 'ArrowRight') { slider.value = String(Math.min(100, Number(slider.value || 0) + 5)); render(); }
-  });
-  if (verifyInput) {
-    verifyInput.addEventListener('keydown', function(e){
-      if (e.key === 'Enter') verifyBtn.click();
-    });
-  }
-  render();
-})();
-</script>
-</body>
-</html>`
 }
 
 async function postJsonRow(url, headers, body) {
@@ -1356,8 +1371,10 @@ export default async function handler(req, res) {
     let questionCoreDiscovery = question.core_discovery || ''
     let analysisJson = question.analysis_json || {}
     let htmlTemplate = ''
+    let htmlContent = ''
     let typeContext = null
     let renderPlan = null
+    let isTempFallback = false
     const generationRunId = crypto.randomUUID()
 
     if (questionTypeId) {
@@ -1408,9 +1425,11 @@ export default async function handler(req, res) {
             name: 'unmatched',
             core_discovery: '',
             layout_component: '',
+            look_component: '',
             control_component: '',
             visual_component: '',
             animation_component: '',
+            challenge_component: '',
             default_assets: [],
             page_schema_version: 1,
             component_rules: {},
@@ -1421,7 +1440,7 @@ export default async function handler(req, res) {
             version: 1,
             questionText: question.question_text,
             coreDiscovery: '',
-            layout: { name: 'unknown', source: 'identify_failed' },
+            layout: { name: '', source: 'identify_failed' },
             controls: [],
             visuals: [],
             animations: [],
@@ -1429,9 +1448,8 @@ export default async function handler(req, res) {
             rules: {},
             fallbackStrategy: {},
             matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
-            missingComponents: [{ category: 'layout', name: 'unknown', reason: 'AI 识别题型失败', fallback: 'TwoColumnLayout' }],
-            missingCapabilities: [],
-            fallbackUsed: true,
+            missingComponents: [],
+            fallbackUsed: false,
           },
           status: 'failed',
         })
@@ -1484,22 +1502,75 @@ export default async function handler(req, res) {
           }
         } catch { /* best effort */ }
 
-        if (fallbackPrompt) {
-          const fallbackTypeContext = normalizeQuestionTypeRow({
-            name: 'temp-fallback',
-            core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
-            layout_component: 'TwoColumnLayout',
-            control_component: '',
-            visual_component: '',
-            animation_component: '',
-            default_assets: [],
-            page_schema_version: 1,
-            component_rules: {},
-            fallback_strategy: { html: 'configs.temp' },
+        if (!fallbackPrompt) {
+          await patchQuestionFull(actualQuestionId, { status: 'pending' })
+          await recordGenerationArtifacts({
+            headers,
+            supabaseUrl: SUPABASE_URL,
+            runId: generationRunId,
+            questionId: actualQuestionId,
+            typeContext: normalizeQuestionTypeRow({
+              name: 'unmatched',
+              core_discovery: questionCoreDiscovery || questionTypeName || '',
+              layout_component: '',
+              look_component: '',
+              control_component: '',
+              visual_component: '',
+              animation_component: '',
+              challenge_component: '',
+              default_assets: [],
+              page_schema_version: 1,
+              component_rules: {},
+              fallback_strategy: {},
+            }),
+            analysisJson: {},
+            renderPlan: {
+              version: 1,
+              questionText: question.question_text,
+              coreDiscovery: questionCoreDiscovery || questionTypeName || '',
+              layout: { name: '', source: 'no_temp_prompt' },
+              controls: [],
+              visuals: [],
+              animations: [],
+              assets: [],
+              rules: {},
+              fallbackStrategy: {},
+              matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
+              missingComponents: [],
+              fallbackUsed: false,
+            },
+            status: 'failed',
           })
-          const fallbackAnalysis = await callAI({
-            systemPrompt: fallbackPrompt,
-            prompt: `请只执行“第一阶段：分析题目，生成 analysis_json”。
+          return res.status(200).json({
+            success: false,
+            error: questionTypeName === '不匹配'
+              ? '题型识别结果为“不匹配”，请确认题目描述是否符合现有题型'
+              : '没有匹配到合适的题型，请尝试调整题目描述后重试',
+            questionId: actualQuestionId,
+          })
+        }
+
+        const fallbackTypeContext = normalizeQuestionTypeRow({
+          name: '',
+          core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
+          layout_component: '',
+          look_component: '',
+          control_component: '',
+          visual_component: '',
+          animation_component: '',
+          challenge_component: '',
+          default_assets: [],
+          page_schema_version: 1,
+          component_rules: {},
+          fallback_strategy: { html: 'configs.temp' },
+        })
+        typeContext = fallbackTypeContext
+        htmlTemplate = fallbackPrompt
+        isTempFallback = true
+
+        const fallbackAnalysis = await callAI({
+          systemPrompt: fallbackPrompt,
+          prompt: `请只执行“第一阶段：分析题目，生成 analysis_json”。
 不要输出 HTML，不要输出多余解释，不要进入第二阶段。
 请严格输出一个 JSON 对象，字段尽量完整，结构如下：
 {
@@ -1521,159 +1592,96 @@ export default async function handler(req, res) {
     "description": "",
     "visual_effect": [],
     "duration": ""
+  },
+  "component_rules": {
+    "scene": "",
+    "look": "",
+    "control": "",
+    "visual": "",
+    "animation": "",
+    "challenge": ""
   }
 }
 
 题目原文：
-${question.question_text}`,
-            responseFormat: 'json_object',
-            temperature: 0.3,
-            maxTokens: 12000,
-            timeoutSeconds: 60,
-          })
-          let analysisJson = buildHeuristicFallbackAnalysis(
-            question.question_text,
-            fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
-          )
-          if (fallbackAnalysis.success && fallbackAnalysis.content) {
-            const parsedFallbackAnalysis = parseAnalysisJson(fallbackAnalysis.content)
-            if (parsedFallbackAnalysis && typeof parsedFallbackAnalysis === 'object') {
-              analysisJson = {
-                ...analysisJson,
-                ...parsedFallbackAnalysis,
-              }
-            }
-          } else {
-            console.warn('[generate/demo] fallback AI analysis failed, using heuristic analysis', fallbackAnalysis.error)
-          }
+${question.question_text}
 
-          const renderPlan = buildRenderPlan(fallbackTypeContext, analysisJson, question.question_text)
-          await patchQuestionFull(actualQuestionId, {
-            core_discovery: fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || '暂未分类',
-            analysis_json: analysisJson,
-            status: 'pending',
-          })
-
-          const generationResult = await consumeGeneration(question.user_id)
-          if (!generationResult.success) {
-            await recordGenerationArtifacts({
-              headers,
-              supabaseUrl: SUPABASE_URL,
-              runId: generationRunId,
-              questionId: actualQuestionId,
-              typeContext: fallbackTypeContext,
-              analysisJson,
-              renderPlan,
-              status: 'failed',
-            })
-            await patchQuestionFull(actualQuestionId, { status: 'pending' }).catch(() => {})
-            return res.status(200).json({
-              success: false,
-              error: generationResult.error === 'quota_exceeded'
-                ? '当前套餐生成次数已用完，请升级会员后再试'
-                : '当前套餐没有可用的生成次数',
-              questionId: actualQuestionId,
-            })
-          }
-
-          // 使用本地静态模板渲染，避免 temp 分支再依赖页面脚本
-          const fallbackHtml = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
-          const dataUrl = await saveHtmlToStorage(fallbackHtml, actualQuestionId)
-
-          // 标记为 completed：只要 HTML 已成功存储，就不要再因为后续附加步骤把状态拉回 pending
-          await patchQuestionFull(actualQuestionId, {
-            question_type: '暂未分类',
-            status: 'completed',
-          }).catch((e) => {
-            console.warn('[generate/demo] fallback completed patch failed', e.message)
-          })
-
-          let demo = {}
-          try {
-            const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                question_id: actualQuestionId,
-                html_url: dataUrl,
-                title: `演示 ${Date.now().toString().slice(-4)}`,
-              }),
-            })
-            if (demoRes.ok) {
-              const demos = await demoRes.json()
-              demo = demos?.[0] || {}
-            } else {
-              const demoErr = await demoRes.text().catch(() => '')
-              console.warn('[generate/demo] fallback question_demos insert failed', demoRes.status, demoErr.slice(0, 200))
-            }
-          } catch (e) {
-            console.warn('[generate/demo] fallback question_demos insert exception', e.message)
-          }
-
-          await recordGenerationArtifacts({
-            headers,
-            supabaseUrl: SUPABASE_URL,
-            runId: generationRunId,
-            questionId: actualQuestionId,
-            typeContext: fallbackTypeContext,
-            analysisJson,
-            renderPlan,
-            status: 'partial',
-            htmlUrl: dataUrl,
-            demoId: demo.id,
-          })
-          return res.status(200).json({
-            success: true,
-            demoId: demo.id || null,
-            htmlUrl: dataUrl,
-            questionId: actualQuestionId,
-          })
-        } else {
-          await patchQuestionFull(actualQuestionId, { status: 'pending' })
-          await recordGenerationArtifacts({
-            headers,
-            supabaseUrl: SUPABASE_URL,
-            runId: generationRunId,
-            questionId: actualQuestionId,
-              typeContext: normalizeQuestionTypeRow({
-                name: 'unmatched',
-                core_discovery: questionCoreDiscovery || questionTypeName || '',
-              layout_component: 'TwoColumnLayout',
-              control_component: '',
-              visual_component: '',
-              animation_component: '',
-              default_assets: [],
-              page_schema_version: 1,
-              component_rules: {},
-              fallback_strategy: {},
-            }),
-            analysisJson: {},
-            renderPlan: {
-              version: 1,
-              questionText: question.question_text,
-              coreDiscovery: questionCoreDiscovery || questionTypeName || '',
-              layout: { name: 'TwoColumnLayout', source: 'no_fallback_prompt' },
-              controls: [],
-              visuals: [],
-              animations: [],
-              assets: [],
-              rules: {},
-              fallbackStrategy: {},
-              matchedComponents: { layout: [], controls: [], visuals: [], animations: [], assets: [] },
-              missingComponents: [{ category: 'layout', name: 'TwoColumnLayout', reason: '未找到配置 temp 兜底 prompt', fallback: 'TwoColumnLayout' }],
-              missingCapabilities: [],
-              fallbackUsed: true,
-            },
-            status: 'failed',
-          })
-          return res.status(200).json({
-            success: false,
-            error: questionTypeName === '不匹配'
-              ? '题型识别结果为“不匹配”，请确认题目描述是否符合现有题型'
-              : '没有匹配到合适的题型，请尝试调整题目描述后重试',
-            questionId: actualQuestionId,
-          })
+补充要求：
+component_rules 不是组件清单，而是这个题目在观察区、发现区、挑战区分别要遵守的规则说明。`,
+          responseFormat: 'json_object',
+          temperature: 0.3,
+          maxTokens: 12000,
+          timeoutSeconds: 60,
+        })
+        const fallbackCoreDiscovery = fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
+        let analysisJson = {
+          question_type: fallbackCoreDiscovery || '暂未分类',
+          known_conditions: [],
+          hidden_conditions: [],
+          verification_target: '',
+          core_discovery: fallbackCoreDiscovery,
+          discovery_flow: [],
+          challenge_steps: [],
+          interaction_flow: {
+            trigger: '',
+            action: '',
+            feedback: [],
+            reset: '',
+          },
+          animation_flow: {
+            type: '',
+            description: '',
+            visual_effect: [],
+            duration: '',
+          },
+          component_rules: {
+            scene: '',
+            look: '',
+            control: '',
+            visual: '',
+            animation: '',
+            challenge: '',
+          },
         }
+        if (fallbackAnalysis.success && fallbackAnalysis.content) {
+          const parsedFallbackAnalysis = parseAnalysisJson(fallbackAnalysis.content)
+          if (parsedFallbackAnalysis && typeof parsedFallbackAnalysis === 'object') {
+            analysisJson = stripAnalysisNoise({
+              ...analysisJson,
+              ...parsedFallbackAnalysis,
+              interaction_flow: {
+                ...analysisJson.interaction_flow,
+                ...(parsedFallbackAnalysis.interaction_flow && typeof parsedFallbackAnalysis.interaction_flow === 'object'
+                  ? parsedFallbackAnalysis.interaction_flow
+                  : {}),
+              },
+              animation_flow: {
+                ...analysisJson.animation_flow,
+                ...(parsedFallbackAnalysis.animation_flow && typeof parsedFallbackAnalysis.animation_flow === 'object'
+                  ? parsedFallbackAnalysis.animation_flow
+                  : {}),
+              },
+              component_rules: {
+                ...analysisJson.component_rules,
+                ...(parsedFallbackAnalysis.component_rules && typeof parsedFallbackAnalysis.component_rules === 'object'
+                  ? parsedFallbackAnalysis.component_rules
+                  : {}),
+              },
+            })
+          }
+        } else {
+          console.warn('[generate/demo] temp analysis AI failed, using minimal fallback analysis', fallbackAnalysis.error)
+        }
+
+        analysisJson = stripAnalysisNoise(analysisJson)
+        await patchQuestionFull(actualQuestionId, {
+          core_discovery: fallbackTypeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || '暂未分类',
+          analysis_json: analysisJson,
+          status: 'pending',
+        })
+
+        typeContext = fallbackTypeContext
+        renderPlan = buildRenderPlan(fallbackTypeContext, analysisJson, question.question_text)
       }
 
       if (matchedType) {
@@ -1721,6 +1729,17 @@ ${question.question_text}`,
             typeAnimationFlow && `👀 视觉呈现流程：\n${typeAnimationFlow}`,
           ].filter(Boolean).join('\n\n')
           const typeContextSummary = buildTypeContextSummary(typeContext)
+          const analysisRulesHint = [
+            `额外要求：请把 component_rules 也作为 analysis_json 的一部分输出，但这里的 component_rules 必须是“规则说明”，不是组件清单。`,
+            `它应该描述：`,
+            `- scene：页面骨架如何组织`,
+            `- look：观察区该展示什么、禁止放什么`,
+            `- control：发现区如何承载操作`,
+            `- visual：发现区如何承载展示`,
+            `- animation：发现区如何承载变化和动画`,
+            `- challenge：挑战区如何承载输入、验证和结果`,
+            `规则请写成可直接给渲染器读取的结构化文本或对象。`,
+          ].join('\n')
 
           const analysisResult = await callAI({
             systemPrompt: typeContext.analysisPrompt,
@@ -1732,6 +1751,8 @@ ${question.question_text}`,
               typeContextSummary,
               flowInfo ? `\n${flowInfo}` : '',
               ``,
+              analysisRulesHint,
+              ``,
               `请结合上述题型信息和流程指导，对题目进行结构化分析，输出符合要求的 JSON。`,
             ].filter(Boolean).join('\n'),
             responseFormat: 'json_object',
@@ -1740,8 +1761,8 @@ ${question.question_text}`,
             timeoutSeconds: 60,
           })
           if (!analysisResult.success) {
-            console.warn('[generate/demo] matched analysis AI failed, using heuristic analysis', analysisResult.error)
-            analysisJson = buildHeuristicFallbackAnalysis(
+            console.warn('[generate/demo] matched analysis AI failed, using minimal fallback analysis', analysisResult.error)
+            analysisJson = buildMinimalFallbackAnalysis(
               question.question_text,
               typeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
             )
@@ -1749,11 +1770,12 @@ ${question.question_text}`,
             const parsedAnalysisJson = parseAnalysisJson(analysisResult.content)
             analysisJson = parsedAnalysisJson && typeof parsedAnalysisJson === 'object'
               ? parsedAnalysisJson
-              : buildHeuristicFallbackAnalysis(
+              : buildMinimalFallbackAnalysis(
                   question.question_text,
                   typeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
                 )
           }
+          analysisJson = stripAnalysisNoise(analysisJson)
         }
 
         // 保存分析结果（即使后续 HTML 生成超时，分析结果已落库）
@@ -1776,9 +1798,11 @@ ${question.question_text}`,
         name: questionTypeName || '暂未分类',
         core_discovery: questionCoreDiscovery || questionTypeName || '暂未分类',
         layout_component: '',
+        look_component: '',
         control_component: '',
         visual_component: '',
         animation_component: '',
+        challenge_component: '',
         default_assets: [],
         page_schema_version: 1,
         component_rules: {},
@@ -1788,67 +1812,6 @@ ${question.question_text}`,
 
     if (!renderPlan) {
       renderPlan = buildRenderPlan(typeContext, analysisJson, question.question_text)
-    }
-
-    // 直接走本地模板组装 HTML，不再进入 AI 现写整页 HTML 的慢路径
-    {
-      const generationResult = await consumeGeneration(question.user_id)
-      if (!generationResult.success) {
-        await recordGenerationArtifacts({
-          headers,
-          supabaseUrl: SUPABASE_URL,
-          runId: generationRunId,
-          questionId: actualQuestionId,
-          typeContext,
-          analysisJson,
-          renderPlan,
-          status: 'failed',
-        })
-        await patchQuestionFull(actualQuestionId, { status: 'pending' }).catch(() => {})
-        return res.status(200).json({
-          success: false,
-          error: generationResult.error === 'quota_exceeded'
-            ? '当前套餐生成次数已用完，请升级会员后再试'
-            : '当前套餐没有可用的生成次数',
-          questionId: actualQuestionId,
-        })
-      }
-
-      const htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
-      const dataUrl = await saveHtmlToStorage(htmlContent, actualQuestionId)
-      const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          question_id: actualQuestionId,
-          html_url: dataUrl,
-          title: `演示 ${Date.now().toString().slice(-4)}`,
-        }),
-      })
-      if (!demoRes.ok) throw new Error('保存演示失败')
-      const demos = await demoRes.json()
-      const demo = demos?.[0] || {}
-
-      await patchQuestionFull(actualQuestionId, { status: 'completed' })
-      await recordGenerationArtifacts({
-        headers,
-        supabaseUrl: SUPABASE_URL,
-        runId: generationRunId,
-        questionId: actualQuestionId,
-        typeContext,
-        analysisJson,
-        renderPlan,
-        status: renderPlan?.fallbackUsed ? 'partial' : 'success',
-        htmlUrl: dataUrl,
-        demoId: demo.id,
-      })
-
-      return res.status(200).json({
-        success: true,
-        demoId: demo.id,
-        htmlUrl: dataUrl,
-        questionId: actualQuestionId,
-      })
     }
 
     // ════════════════════════════════════════════════════════════
@@ -1868,136 +1831,74 @@ ${question.question_text}`,
       }
     }
 
-    // 没有题型模板 → 使用内置通用模板（自适应多种 JSON 结构）
-    if (!htmlTemplate || !htmlTemplate.trim()) {
-      const d = JSON.stringify(analysisJson, null, 2)
-      htmlTemplate = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>互动演示</title>
-<style>
-:root{--pink:#FF0080;--purple:#7928CA;--blue:#0070F3;--bg:#FAFAFA;--card:#FFF;--ink:#171717;--body:#4D4D4D;--mute:#888}
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,system-ui,sans-serif}
-body{background:var(--bg);color:var(--body);padding:16px;display:flex;justify-content:center;min-height:100vh}
-.container{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;padding-bottom:40px}
-.card{background:var(--card);border-radius:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);padding:24px;margin-bottom:16px}
-.q-text{font-size:15px;color:var(--ink);line-height:1.6;font-weight:500}
-h2{font-size:13px;color:var(--mute);margin-bottom:12px}
-.section-label{font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.stat-box{padding:16px;background:var(--bg);border-radius:16px;text-align:center}
-.stat-value{font-size:20px;font-weight:700;color:var(--purple);margin-bottom:4px}
-.stat-label{font-size:11px;color:var(--mute)}
-.step{padding:16px;background:var(--bg);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--purple)}
-.step-num{font-size:11px;color:var(--mute);margin-bottom:4px}
-.step-q{font-size:14px;color:var(--ink);font-weight:600;margin-bottom:8px}
-.step-ans{font-size:13px;color:var(--blue);padding:8px 12px;background:rgba(0,112,243,.08);border-radius:8px;margin-bottom:6px}
-.step-hint{font-size:12px;color:var(--mute);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px dashed #ddd}
-.step-concl{font-size:13px;color:#16a34a;padding:8px 12px;background:rgba(22,163,74,.08);border-radius:8px;margin-top:6px}
-.answer-box{margin-top:16px;padding:16px;background:linear-gradient(135deg,var(--purple),var(--pink));border-radius:16px;color:#fff;text-align:center}
-.obj-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:var(--bg);border-radius:24px;font-size:13px;margin:0 4px 8px 0}
-.ctrl-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:500;border:1px solid #ddd;background:var(--card);color:var(--ink);margin:0 4px 8px 0}
-.disc-card{padding:12px 16px;background:#f0fdf4;border-radius:12px;color:#16a34a;font-size:13px;margin-bottom:8px;border-left:4px solid #16a34a}
-.obs-card{padding:12px 16px;background:var(--bg);border-radius:12px;font-size:12px;color:var(--body);margin-bottom:8px;border-left:4px solid var(--blue)}
-.raw-json{font-size:11px;font-family:monospace;background:var(--bg);padding:16px;border-radius:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:var(--body);line-height:1.5}
-.equation{text-align:center;padding:16px;background:linear-gradient(135deg,rgba(121,40,202,.06),rgba(0,112,243,.06));border-radius:16px;font-size:16px;font-weight:600;color:var(--purple);margin:8px 0}
-</style>
-</head>
-<body>
-<div class="container" id="app-root">
-<div class="card"><h2>📝 题目</h2><p class="q-text">\${question_text}</p></div>
-<div id="dynamic-content"><p style="font-size:13px;color:var(--mute);text-align:center;padding:20px">加载中...</p></div>
-</div>
-<script>
-var data = ${d};
-(function(){try{var el=document.getElementById('dynamic-content');if(!el)return;if(!data){el.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">暂无分析数据</p></div>';return;}
-
-// ---------- 场景式（scene + objects + controls）----------
-if(data.scene&&data.objects){var s=data.scene,o=data.objects,c=data.controls,k=data.known_data,di=data.discoveries,ob=data.observations,h=data.hidden_data;var h2='<div class="card">';
-h2+='<div class="section-label">🧪 实验场景</div>';
-h2+='<p style="font-size:14px;color:var(--body);line-height:1.6;margin-bottom:16px">'+esc(s.description)+'</p>';
-if(o&&o.length){h2+='<div style="margin-bottom:12px">';o.forEach(function(x){h2+='<span class="obj-tag">'+esc(x.icon||'')+' '+esc(x.name||'')+'</span>'});h2+='</div>'}
-if(c&&c.length){h2+='<div class="section-label" style="margin-top:12px">🎮 操作</div><div>';c.forEach(function(x){h2+='<span class="ctrl-btn">'+esc(x.action)+'</span>'});h2+='</div>'}
-h2+='</div>';
-
-// 已知数据
-if(k&&k.length){h2+='<div class="card"><div class="section-label">📊 已知数据</div><div class="grid-2">';k.forEach(function(x){h2+='<div class="stat-box"><div class="stat-value">'+esc(x.total_value)+'<span style="font-size:13px;font-weight:400;color:var(--mute);margin-left:4px">'+esc(x.unit||'')+'</span></div><div class="stat-label">'+esc(x.label||'')+'</div></div>'});h2+='</div></div>'}
-
-// 思考发现
-if(di&&di.length){h2+='<div class="card"><div class="section-label">💡 思考发现</div>';di.forEach(function(x){h2+='<div class="disc-card">✨ '+esc(x.rule||'')+'</div>'});h2+='</div>'}
-
-// 观察
-if(ob&&ob.length){h2+='<div class="card"><div class="section-label">🔍 观察</div>';ob.forEach(function(x){h2+='<div class="obs-card">👁️ '+esc(x.phenomenon||'')+'</div>'});h2+='</div>'}
-
-// 隐藏答案区域
-if(h&&h.length){h2+='<div class="card" id="answer-section"><div class="section-label">🎯 隐藏发现</div>';h.forEach(function(x){h2+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-label" style="font-size:13px">'+esc(x.label||'')+'</div><div class="stat-value" style="color:var(--mute);font-size:16px">点击按钮显示答案</div></div>'});h2+='<div style="text-align:center;margin-top:12px"><button onclick="document.querySelectorAll(\'#answer-section .stat-value\').forEach(function(e,i){e.textContent=answers[i]||\'?\';e.style.color=\'var(--purple)\'})" style="padding:8px 20px;border:none;border-radius:24px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;font-size:13px;font-weight:500;cursor:pointer">🎯 显示答案</button></div></div>'}
-
-el.innerHTML=h2;return}
-
-// ---------- thinking_steps 格式（兼容旧版）----------
-if(data.thinking_steps&&data.thinking_steps.length){var h3='<div class="card" id="steps-container"><div class="section-label">🔍 思维引导</div>';data.thinking_steps.forEach(function(s,i){h3+='<div class="step"><div class="step-num">步骤 '+(i+1)+'</div><div class="step-q">'+esc(s.teacher_question||s.title||'')+'</div><div class="step-ans">✅ 答案：'+(s.correct_answer!=null?s.correct_answer:'')+'</div>';if(s.hint)h3+='<div class="step-hint">💡 提示：'+esc(s.hint)+'</div>';if(s.conclusion)h3+='<div class="step-concl">📌 '+esc(s.conclusion)+'</div>';h3+='</div>'});if(data.answer)h3+='<div class="answer-box">🎉 最终答案：'+JSON.stringify(data.answer)+'</div>';h3+='</div>';el.innerHTML=h3;return}
-
-// ---------- 通用数据视图（known_data 等）----------
-if(data.known_data){var h4='<div class="card"><div class="section-label">📊 分析数据</div>';if(Array.isArray(data.known_data)){data.known_data.forEach(function(x){h4+='<div class="stat-box" style="margin-bottom:8px"><div class="stat-value">'+esc(x.total_value||x.value||'')+'</div><div class="stat-label">'+esc(x.label||'')+'</div></div>'})}else{h4+='<pre class="raw-json">'+esc(JSON.stringify(data.known_data,null,2))+'</pre>'}h4+='</div>';el.innerHTML=h4;return}
-
-// ---------- 兜底：格式化 JSON ----------
-el.innerHTML='<div class="card"><div class="section-label">📊 分析结果</div><pre class="raw-json">'+esc(JSON.stringify(data,null,2))+'</pre></div>';}catch(e){var errEl=document.getElementById('dynamic-content');if(errEl)errEl.innerHTML='<div class="card"><p style="font-size:13px;color:var(--mute);text-align:center">无法加载分析内容</p></div>'}})()
-function esc(s){if(typeof s!=='string')return String(s||'');return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-var answers=[];
-try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.label||'?'});if(r.discoveries&&answers.length===0)answers=r.discoveries.map(function(x,i){return r.known_data&&r.known_data.length>i?'\u89e3\u51b3\u65b9\u6848 '+(i+1):''})}catch(e){}
-<\/script>
-</body>
-</html>`
+    if (!htmlContent && !htmlTemplate.trim()) {
+      throw new Error('题型模板缺失，且当前题目未命中 temp 兜底模板')
     }
 
     // ── 执行模板替换 / AI 生成 ──
     const analysisJsonStr = JSON.stringify(analysisJson, null, 2)
     const renderPlanStr = JSON.stringify(renderPlan, null, 2)
-    let htmlContent
-
-    // 判断 htmlTemplate 中是否含有 ${analysis_json} / ${render_json} / ${question_text} 占位符
-    const hasPlaceholders = htmlTemplate.includes('\${analysis_json}')
-      || htmlTemplate.includes('\${render_json}')
-      || htmlTemplate.includes('\${question_text}')
-
-    if (!hasPlaceholders && htmlTemplate.trim()) {
-      // 没有占位符 → html_prompt 是 AI 提示词 → 调 AI 生成 HTML
-      const htmlResult = await callAI({
-        systemPrompt: htmlTemplate,
-        prompt: `以下是题目的结构化分析数据、渲染计划，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n渲染计划：\n\`\`\`json\n${renderPlanStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
-        temperature: 0.6,
-        maxTokens: 12000,
-        timeoutSeconds: 60,
-      })
-      if (!htmlResult.success || !htmlResult.content) {
-        await patchQuestionFull(actualQuestionId, { status: 'pending' })
-        return res.status(200).json({
-          success: false,
-          error: 'AI 生成 HTML 失败，请重试',
-          questionId: actualQuestionId,
+    if (!htmlContent) {
+      if (isTempFallback && htmlTemplate.trim()) {
+        const tempHtmlPrompt = [
+          `你是HTML渲染引擎。`,
+          `请根据 analysis_json 和 render_plan 生成完整、可直接运行的单页 HTML。`,
+          `只输出 HTML，不要解释，不要 Markdown，不要代码块，不要额外文本。`,
+          ``,
+          `渲染规则：`,
+          `1. 页面必须是一个完整 HTML 文件。`,
+          `2. 页面结构固定为三段式：观察区、发现区、挑战区。`,
+          `3. 观察区：只展示题干、已知条件、隐含条件、数量关系，不放操作控件，也不要直接展示由已知条件可算出的答案。`,
+          `4. 发现区：必须包含真实可交互控件，例如点击、拖拽、滑块、选择，并且要展示操作后的变化。`,
+          `5. 发现区的内容要分成 control / visual / animation 三部分来理解：`,
+          `   - control：孩子怎么操作`,
+          `   - visual：孩子看到什么`,
+          `   - animation：操作后页面怎么演`,
+          `6. 挑战区：必须包含输入、验证、反馈和结论展示。`,
+          `7. 页面必须优先手机端适配，同时兼容 PC。`,
+          `8. 样式必须内置在 HTML 中，不依赖外部框架、外部图片、外部 CDN。`,
+          `9. 所有交互必须可重置。`,
+          `10. 发现区的动画和反馈必须来自 analysis_json 的 interaction_flow / animation_flow。`,
+          `11. 如果 render_plan 里有组件信息，就按 render_plan 渲染；如果没有，就使用内置兜底组件，但兜底也必须保留真实交互。`,
+          `12. 观察区优先使用 render_plan 的 observations / assets。`,
+          `13. 发现区优先使用 render_plan 的 controls / visuals / animations。`,
+          `14. 挑战区优先使用 render_plan 的 challenges。`,
+          ``,
+          `现在请基于以下数据生成 HTML：`,
+          `analysis_json：`,
+          `\`\`\`json`,
+          `${analysisJsonStr}`,
+          `\`\`\``,
+          ``,
+          `render_plan：`,
+          `\`\`\`json`,
+          `${renderPlanStr}`,
+          `\`\`\``,
+          ``,
+          `题目原文：`,
+          question.question_text,
+        ].join('\n')
+        const htmlResult = await callAI({
+          systemPrompt: htmlTemplate,
+          prompt: tempHtmlPrompt,
+          temperature: 0.6,
+          maxTokens: 12000,
+          timeoutSeconds: 60,
         })
-      }
-
-      // 清理 HTML：只保留 DOCTYPE~html 之间的内容
-      const startIdx = htmlResult.content.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
-      const rawHtml = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
-      const htmlEnd = rawHtml.search(/<\/html>\s*/i)
-      htmlContent = htmlEnd !== -1 ? rawHtml.slice(0, htmlEnd + '<\/html>'.length) : rawHtml
-      if (!looksLikeHtmlDocument(htmlContent) || htmlContent.length < 800) {
-        console.warn('[generate/demo] AI HTML output too short or invalid, falling back to static template')
-        htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
-      }
-    } else {
-      // 含占位符 → 字符串替换（兼容旧版或内置模板）
-      htmlContent = htmlTemplate
-        .replace(/\$\{analysis_json\}/g, () => analysisJsonStr)
-        .replace(/\$\{render_json\}/g, () => renderPlanStr)
-        .replace(/\$\{question_text\}/g, () => question.question_text)
-      if (!looksLikeHtmlDocument(htmlContent) || htmlContent.length < 800) {
-        console.warn('[generate/demo] template output too short or invalid, falling back to static template')
-        htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
+        if (!htmlResult.success || !htmlResult.content) {
+          await patchQuestionFull(actualQuestionId, { status: 'pending' })
+          return res.status(200).json({
+            success: false,
+            error: 'AI 生成 HTML 失败，请重试',
+            questionId: actualQuestionId,
+          })
+        }
+        const startIdx = htmlResult.content.search(/<!DOCTYPE\s+html|<html[^>]*>/i)
+        const rawHtml = startIdx === -1 ? htmlResult.content.trim() : htmlResult.content.slice(startIdx).trim()
+        const htmlEnd = rawHtml.search(/<\/html>\s*/i)
+        htmlContent = htmlEnd !== -1 ? rawHtml.slice(0, htmlEnd + '<\/html>'.length) : rawHtml
+      } else {
+        htmlContent = buildPlanDrivenHtml(question.question_text, analysisJson, renderPlan)
       }
     }
 

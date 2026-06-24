@@ -119,12 +119,13 @@ export default function TypeManagePage() {
   const [newInteractionFlow, setNewInteractionFlow] = useState('')
   const [newAnimationFlow, setNewAnimationFlow] = useState('')
   const [newLayoutComponent, setNewLayoutComponent] = useState('')
-  const [newControlComponent, setNewControlComponent] = useState('')
-  const [newVisualComponent, setNewVisualComponent] = useState('')
-  const [newAnimationComponent, setNewAnimationComponent] = useState('')
+  const [newLookComponents, setNewLookComponents] = useState('')
+  const [newControlComponents, setNewControlComponents] = useState('')
+  const [newVisualComponents, setNewVisualComponents] = useState('')
+  const [newAnimationComponents, setNewAnimationComponents] = useState('')
+  const [newChallengeComponents, setNewChallengeComponents] = useState('')
   const [newDefaultAssets, setNewDefaultAssets] = useState('[]')
   const [newPageSchemaVersion, setNewPageSchemaVersion] = useState('1')
-  const [newComponentRules, setNewComponentRules] = useState('{}')
   const [newFallbackStrategy, setNewFallbackStrategy] = useState('{}')
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -136,12 +137,13 @@ export default function TypeManagePage() {
   const [editInteractionFlow, setEditInteractionFlow] = useState('')
   const [editAnimationFlow, setEditAnimationFlow] = useState('')
   const [editLayoutComponent, setEditLayoutComponent] = useState('')
-  const [editControlComponent, setEditControlComponent] = useState('')
-  const [editVisualComponent, setEditVisualComponent] = useState('')
-  const [editAnimationComponent, setEditAnimationComponent] = useState('')
+  const [editLookComponents, setEditLookComponents] = useState('')
+  const [editControlComponents, setEditControlComponents] = useState('')
+  const [editVisualComponents, setEditVisualComponents] = useState('')
+  const [editAnimationComponents, setEditAnimationComponents] = useState('')
+  const [editChallengeComponents, setEditChallengeComponents] = useState('')
   const [editDefaultAssets, setEditDefaultAssets] = useState('[]')
   const [editPageSchemaVersion, setEditPageSchemaVersion] = useState('1')
-  const [editComponentRules, setEditComponentRules] = useState('{}')
   const [editFallbackStrategy, setEditFallbackStrategy] = useState('{}')
 
   const [deleteTarget, setDeleteTarget] = useState<QuestionType | null>(null)
@@ -179,12 +181,13 @@ export default function TypeManagePage() {
       interactionFlow: newInteractionFlow.trim(),
       animationFlow: newAnimationFlow.trim(),
       layoutComponent: newLayoutComponent.trim(),
-      controlComponent: newControlComponent.trim(),
-      visualComponent: newVisualComponent.trim(),
-      animationComponent: newAnimationComponent.trim(),
+      lookComponent: newLookComponents.trim(),
+      controlComponent: newControlComponents.trim(),
+      visualComponent: newVisualComponents.trim(),
+      animationComponent: newAnimationComponents.trim(),
+      challengeComponent: newChallengeComponents.trim(),
       defaultAssets: parseJsonField(newDefaultAssets, []),
       pageSchemaVersion: Number(newPageSchemaVersion) || 1,
-      componentRules: parseJsonField(newComponentRules, {}),
       fallbackStrategy: parseJsonField(newFallbackStrategy, {}),
     })
     setNewName('')
@@ -196,12 +199,13 @@ export default function TypeManagePage() {
     setNewInteractionFlow('')
     setNewAnimationFlow('')
     setNewLayoutComponent('')
-    setNewControlComponent('')
-    setNewVisualComponent('')
-    setNewAnimationComponent('')
+    setNewLookComponents('')
+    setNewControlComponents('')
+    setNewVisualComponents('')
+    setNewAnimationComponents('')
+    setNewChallengeComponents('')
     setNewDefaultAssets('[]')
     setNewPageSchemaVersion('1')
-    setNewComponentRules('{}')
     setNewFallbackStrategy('{}')
   }
 
@@ -215,12 +219,13 @@ export default function TypeManagePage() {
     setEditInteractionFlow(t.interactionFlow || '')
     setEditAnimationFlow(t.animationFlow || '')
     setEditLayoutComponent(t.layoutComponent || '')
-    setEditControlComponent(t.controlComponent || '')
-    setEditVisualComponent(t.visualComponent || '')
-    setEditAnimationComponent(t.animationComponent || '')
+    setEditLookComponents(t.lookComponent || '')
+    setEditControlComponents(t.controlComponent || '')
+    setEditVisualComponents(t.visualComponent || '')
+    setEditAnimationComponents(t.animationComponent || '')
+    setEditChallengeComponents(t.challengeComponent || '')
     setEditDefaultAssets(JSON.stringify(t.defaultAssets || [], null, 2))
     setEditPageSchemaVersion(String(t.pageSchemaVersion || 1))
-    setEditComponentRules(JSON.stringify(t.componentRules || {}, null, 2))
     setEditFallbackStrategy(JSON.stringify(t.fallbackStrategy || {}, null, 2))
   }
 
@@ -235,12 +240,13 @@ export default function TypeManagePage() {
       interactionFlow: editInteractionFlow.trim(),
       animationFlow: editAnimationFlow.trim(),
       layoutComponent: editLayoutComponent.trim(),
-      controlComponent: editControlComponent.trim(),
-      visualComponent: editVisualComponent.trim(),
-      animationComponent: editAnimationComponent.trim(),
+      lookComponent: editLookComponents.trim(),
+      controlComponent: editControlComponents.trim(),
+      visualComponent: editVisualComponents.trim(),
+      animationComponent: editAnimationComponents.trim(),
+      challengeComponent: editChallengeComponents.trim(),
       defaultAssets: parseJsonField(editDefaultAssets, []),
       pageSchemaVersion: Number(editPageSchemaVersion) || 1,
-      componentRules: parseJsonField(editComponentRules, {}),
       fallbackStrategy: parseJsonField(editFallbackStrategy, {}),
     })
     setEditingId(null)
@@ -253,12 +259,13 @@ export default function TypeManagePage() {
     setEditInteractionFlow('')
     setEditAnimationFlow('')
     setEditLayoutComponent('')
-    setEditControlComponent('')
-    setEditVisualComponent('')
-    setEditAnimationComponent('')
+    setEditLookComponents('')
+    setEditControlComponents('')
+    setEditVisualComponents('')
+    setEditAnimationComponents('')
+    setEditChallengeComponents('')
     setEditDefaultAssets('[]')
     setEditPageSchemaVersion('1')
-    setEditComponentRules('{}')
     setEditFallbackStrategy('{}')
   }
 
@@ -377,24 +384,38 @@ export default function TypeManagePage() {
             />
             <ComponentMultiSelect
               label="观察区"
-              helper="题干、提示、数量和关系"
-              value={newControlComponent}
-              onChange={setNewControlComponent}
+              helper="题干、提示、数量和关系（只展示，不放操作控件）"
+              value={newLookComponents}
+              onChange={setNewLookComponents}
               groupIndex={1}
             />
             <ComponentMultiSelect
-              label="发现区"
-              helper="点击、拖拽、滑动、选择"
-              value={newVisualComponent}
-              onChange={setNewVisualComponent}
+              label="发现区 · 操作"
+              helper="点击、拖拽、滑动、选择，负责孩子怎么做"
+              value={newControlComponents}
+              onChange={setNewControlComponents}
               groupIndex={2}
             />
             <ComponentMultiSelect
-              label="挑战区"
-              helper="输入、验证、反馈"
-              value={newAnimationComponent}
-              onChange={setNewAnimationComponent}
+              label="发现区 · 展示"
+              helper="负责孩子看见什么，数量和关系怎么摆出来"
+              value={newVisualComponents}
+              onChange={setNewVisualComponents}
               groupIndex={3}
+            />
+            <ComponentMultiSelect
+              label="发现区 · 动画"
+              helper="负责操作后页面怎么演"
+              value={newAnimationComponents}
+              onChange={setNewAnimationComponents}
+              groupIndex={4}
+            />
+            <ComponentMultiSelect
+              label="挑战区"
+              helper="系统给 challenge_steps，孩子写答案并验证"
+              value={newChallengeComponents}
+              onChange={setNewChallengeComponents}
+              groupIndex={5}
             />
           </div>
           <details className="mt-4 rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
@@ -424,18 +445,6 @@ export default function TypeManagePage() {
               />
             </div>
             <div className="mt-3 flex flex-col gap-2">
-              <label className="text-xs font-medium text-[var(--color-body)]">component_rules（JSON，支持 scene / observation / discovery / challenge）</label>
-              <textarea
-                placeholder='{"scene_components":["ThreeZoneLayout"],"observation_components":["MCard"],"discovery_components":["ClickControl"],"challenge_components":["AnswerInput"]}'
-                value={newComponentRules}
-                onChange={(e) => setNewComponentRules(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 text-sm bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-[var(--radius-md)]
-                  text-[var(--color-ink)] placeholder:text-[var(--color-mute)] font-mono text-xs
-                  focus:outline-none focus:border-[var(--color-link)] transition-colors resize-y"
-              />
-            </div>
-            <div className="mt-3 flex flex-col gap-2">
               <label className="text-xs font-medium text-[var(--color-body)]">fallback_strategy（JSON）</label>
               <textarea
                 placeholder='{"layout":"TwoColumnLayout","control":"ClickControl"}'
@@ -449,7 +458,7 @@ export default function TypeManagePage() {
             </div>
           </details>
           <div className="flex items-center justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewCoreDiscovery(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewDiscoveryFlow(''); setNewInteractionFlow(''); setNewAnimationFlow(''); setNewLayoutComponent(''); setNewControlComponent(''); setNewVisualComponent(''); setNewAnimationComponent(''); setNewDefaultAssets('[]'); setNewPageSchemaVersion('1'); setNewComponentRules('{}'); setNewFallbackStrategy('{}') }}>
+              <Button variant="secondary" size="sm" onClick={() => { setShowNewForm(false); setNewName(''); setNewCoreDiscovery(''); setNewAnalysisPrompt(''); setNewHtmlPrompt(''); setNewDiscoveryFlow(''); setNewInteractionFlow(''); setNewAnimationFlow(''); setNewLayoutComponent(''); setNewLookComponents(''); setNewControlComponents(''); setNewVisualComponents(''); setNewAnimationComponents(''); setNewChallengeComponents(''); setNewDefaultAssets('[]'); setNewPageSchemaVersion('1'); setNewFallbackStrategy('{}') }}>
                 取消
               </Button>
             <Button variant="primary" size="sm" onClick={handleAdd}>
@@ -481,9 +490,16 @@ export default function TypeManagePage() {
             ) : (
               types.map((t) => {
                 const sceneTags = splitComponentValue(t.layoutComponent || '')
-                const observationTags = splitComponentValue(t.controlComponent || '')
-                const discoveryTags = splitComponentValue(t.visualComponent || '')
-                const challengeTags = splitComponentValue(t.animationComponent || '')
+                const lookTags = splitComponentValue(t.lookComponent || '')
+                const controlTags = splitComponentValue(t.controlComponent || '')
+                const visualTags = splitComponentValue(t.visualComponent || '')
+                const animationTags = splitComponentValue(t.animationComponent || '')
+                const challengeTags = splitComponentValue(t.challengeComponent || '')
+                const visibleLookTags = lookTags.filter((item) => item !== '{}' && item !== '[]')
+                const visibleControlTags = controlTags.filter((item) => item !== '{}' && item !== '[]')
+                const visibleVisualTags = visualTags.filter((item) => item !== '{}' && item !== '[]')
+                const visibleAnimationTags = animationTags.filter((item) => item !== '{}' && item !== '[]')
+                const visibleChallengeTags = challengeTags.filter((item) => item !== '{}' && item !== '[]')
 
                 return (
                   <tr key={t.id} className="border-b border-[var(--color-hairline)] hover:bg-[var(--color-canvas-soft)] transition-colors align-top">
@@ -508,16 +524,22 @@ export default function TypeManagePage() {
                         {sceneTags.map((item) => (
                           <span key={item} className="rounded-full bg-[var(--color-link-bg-soft)] px-2 py-1 text-[var(--color-link)]">Scene: {item}</span>
                         ))}
-                        {observationTags.map((item) => (
+                        {visibleLookTags.map((item) => (
                           <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">观察区: {item}</span>
                         ))}
-                        {discoveryTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区: {item}</span>
+                        {visibleControlTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 操作: {item}</span>
                         ))}
-                        {challengeTags.map((item) => (
+                        {visibleVisualTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 展示: {item}</span>
+                        ))}
+                        {visibleAnimationTags.map((item) => (
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 动画: {item}</span>
+                        ))}
+                        {visibleChallengeTags.map((item) => (
                           <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">挑战区: {item}</span>
                         ))}
-                        {!sceneTags.length && !observationTags.length && !discoveryTags.length && !challengeTags.length && (
+                        {!sceneTags.length && !visibleLookTags.length && !visibleControlTags.length && !visibleVisualTags.length && !visibleAnimationTags.length && !visibleChallengeTags.length && (
                           <span className="text-[var(--color-mute)]">暂无组件配置</span>
                         )}
                       </div>
@@ -623,24 +645,38 @@ export default function TypeManagePage() {
                 />
                 <ComponentMultiSelect
                   label="观察区"
-                  helper="题干、提示、数量和关系"
-                  value={editControlComponent}
-                  onChange={setEditControlComponent}
+                  helper="题干、提示、数量和关系（只展示，不放操作控件）"
+                  value={editLookComponents}
+                  onChange={setEditLookComponents}
                   groupIndex={1}
                 />
                 <ComponentMultiSelect
-                  label="发现区"
-                  helper="点击、拖拽、滑动、选择"
-                  value={editVisualComponent}
-                  onChange={setEditVisualComponent}
+                  label="发现区 · 操作"
+                  helper="点击、拖拽、滑动、选择，负责孩子怎么做"
+                  value={editControlComponents}
+                  onChange={setEditControlComponents}
                   groupIndex={2}
                 />
                 <ComponentMultiSelect
-                  label="挑战区"
-                  helper="输入、验证、反馈"
-                  value={editAnimationComponent}
-                  onChange={setEditAnimationComponent}
+                  label="发现区 · 展示"
+                  helper="负责孩子看见什么，数量和关系怎么摆出来"
+                  value={editVisualComponents}
+                  onChange={setEditVisualComponents}
                   groupIndex={3}
+                />
+                <ComponentMultiSelect
+                  label="发现区 · 动画"
+                  helper="负责操作后页面怎么演"
+                  value={editAnimationComponents}
+                  onChange={setEditAnimationComponents}
+                  groupIndex={4}
+                />
+                <ComponentMultiSelect
+                  label="挑战区"
+                  helper="系统给 challenge_steps，孩子写答案并验证"
+                  value={editChallengeComponents}
+                  onChange={setEditChallengeComponents}
+                  groupIndex={5}
                 />
               </div>
             </div>
@@ -651,14 +687,7 @@ export default function TypeManagePage() {
                 <Input value={editPageSchemaVersion} onChange={(e) => setEditPageSchemaVersion(e.target.value)} placeholder="page_schema_version" />
                 <Input value={editDefaultAssets} onChange={(e) => setEditDefaultAssets(e.target.value)} placeholder="default_assets（JSON）" />
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <textarea
-                  value={editComponentRules}
-                  onChange={(e) => setEditComponentRules(e.target.value)}
-                  placeholder='{"scene_components":["ThreeZoneLayout"],"observation_components":["MCard"],"discovery_components":["ClickControl"],"challenge_components":["AnswerInput"]}'
-                  rows={5}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-xs text-[var(--color-ink)] font-mono resize-y"
-                />
+              <div className="mt-3">
                 <textarea
                   value={editFallbackStrategy}
                   onChange={(e) => setEditFallbackStrategy(e.target.value)}

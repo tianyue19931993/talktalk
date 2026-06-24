@@ -40,7 +40,7 @@ export type ComponentChoice = {
 }
 
 export type ComponentGroup = {
-  id: 'scene' | 'observation' | 'discovery' | 'challenge'
+  id: 'scene' | 'look' | 'control' | 'visual' | 'animation' | 'challenge'
   label: string
   helper: string
   choices: ComponentChoice[]
@@ -80,25 +80,15 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
     ],
   },
   {
-    id: 'observation',
+    id: 'look',
     label: '观察区',
-    helper: '负责题干、提示、数量和关系的可视化。',
+    helper: '负责题干、提示、数量和关系的展示，只做观察，不放操作控件。',
     choices: [
       { key: 'MTitle', zh: '标题组件', en: 'MTitle', description: '观察区的标题与题目氛围。', preview: <MTitle>成长表达实验室 M</MTitle> },
       { key: 'MHint', zh: '提示标签', en: 'MHint', description: '给孩子看的观察提示。', preview: <MHint>先看条件</MHint> },
-      { key: 'MCard', zh: '内容卡片', en: 'MCard', description: '承载题干、图片和提示。', preview: <MCard title="观察区" hint="把题目条件放在这里"><div className="text-xs text-[var(--color-body)]">示例内容</div></MCard> },
-      { key: 'MInput', zh: '输入框', en: 'MInput', description: '题目文字或观察信息输入。', preview: <MInput value="在此输入文字..." /> },
+      { key: 'MCard', zh: '内容卡片', en: 'MCard', description: '承载题干、图片和提示，只放展示内容。', preview: <MCard title="观察区" hint="把题目条件放在这里"><div className="text-xs text-[var(--color-body)]">示例内容</div></MCard> },
       { key: 'Counter', zh: '数字计数', en: 'Counter', description: '数量一眼可见。', preview: <Counter value={12} unit="个" /> },
       { key: 'ItemGroup', zh: '物体分组', en: 'ItemGroup', description: '把多个对象展示成组。', preview: <ItemGroup emoji="🍎" count={6} /> },
-      { key: 'Bar', zh: '条形关系', en: 'Bar', description: '数量转长度。', preview: <Bar value={7} max={10} /> },
-      { key: 'Balance', zh: '平衡关系', en: 'Balance', description: '比较差额与移多补少。', preview: <Balance left={3} right={5} /> },
-      { key: 'Box', zh: '基础盒子', en: 'Box', description: '普通容器。', preview: <Box label="Box" /> },
-      { key: 'DashedBox', zh: '虚线盒子', en: 'DashedBox', description: '可观察的空位区域。', preview: <DashedBox label="可拖入" /> },
-      { key: 'SolidBox', zh: '实线盒子', en: 'SolidBox', description: '目标区域 / 结果框。', preview: <SolidBox label="目标区" /> },
-      { key: 'Arrow', zh: '箭头关系', en: 'Arrow', description: '表达移动和指向。', preview: <Arrow label="指向" /> },
-      { key: 'Timeline', zh: '时间线', en: 'Timeline', description: '时间推进观察。', preview: <Timeline activeIndex={1} /> },
-      { key: 'NumberLine', zh: '数轴', en: 'NumberLine', description: '数轴比较和定位。', preview: <NumberLine marker={4} /> },
-      { key: 'PointSegment', zh: '点段图', en: 'PointSegment', description: '点数和段数关系。', preview: <PointSegment start={2} end={7} /> },
       { key: 'PersonIcon', zh: '人物', en: 'PersonIcon', description: '小朋友 / 角色素材。', preview: <ItemIcon emoji="🧒" label="PersonIcon" tone="blue" /> },
       { key: 'AppleIcon', zh: '苹果', en: 'AppleIcon', description: '常见数量对象。', preview: <ItemIcon emoji="🍎" label="AppleIcon" tone="pink" /> },
       { key: 'TreeIcon', zh: '树', en: 'TreeIcon', description: '生长和规律场景。', preview: <ItemIcon emoji="🌳" label="TreeIcon" tone="green" /> },
@@ -107,9 +97,9 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
     ],
   },
   {
-    id: 'discovery',
-    label: '发现区',
-    helper: '负责点击、拖拽、滑动和逐步发现规律。',
+    id: 'control',
+    label: '发现区 · 操作',
+    helper: '负责孩子怎么点、怎么拖、怎么选。',
     choices: [
       { key: 'ClickControl', zh: '点击按钮', en: 'ClickControl', description: '一步一步点，适合简单推进。', preview: <ClickControl label="点一下" helper="点击后继续" /> },
       { key: 'DragControl', zh: '拖拽控制', en: 'DragControl', description: '拖动到目标位置，适合分组、匹配、移动。', preview: <DragControl from="🍎" to="📦" /> },
@@ -117,6 +107,34 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
       { key: 'StepButton', zh: '步骤按钮', en: 'StepButton', description: '按步骤推进，适合流程题。', preview: <StepButton label="下一步" /> },
       { key: 'ChoiceControl', zh: '选项控制', en: 'ChoiceControl', description: '单选 / 多选，适合判断和选择。', preview: <ChoiceControl options={['A', 'B', 'C']} activeIndex={1} /> },
       { key: 'MButton', zh: '操作按钮', en: 'MButton', description: '统一风格的操作按钮。', preview: <div className="flex flex-wrap gap-2"><MButton>开始探索</MButton><MButton variant="secondary">重置</MButton></div> },
+    ],
+  },
+  {
+    id: 'visual',
+    label: '发现区 · 展示',
+    helper: '负责孩子看见什么、数量关系怎么摆出来。',
+    choices: [
+      { key: 'MInput', zh: '输入框', en: 'MInput', description: '发现区里的可输入操作。', preview: <MInput value="在此输入文字..." /> },
+      { key: 'MProgress', zh: '进度条', en: 'MProgress', description: '交互过程中的进度反馈。', preview: <MProgress value={68} /> },
+      { key: 'MResult', zh: '结果卡', en: 'MResult', description: '把中间结果及时展示出来。', preview: <MResult label="当前值" value="68" unit="%" note="拖动后变化" /> },
+      { key: 'Counter', zh: '数字计数', en: 'Counter', description: '交互过程中的数字变化。', preview: <Counter value={8} unit="步" /> },
+      { key: 'ItemGroup', zh: '物体分组', en: 'ItemGroup', description: '交互中展示多个对象变化。', preview: <ItemGroup emoji="🍎" count={6} /> },
+      { key: 'Box', zh: '基础盒子', en: 'Box', description: '展示区域的基础容器。', preview: <Box label="展示区" /> },
+      { key: 'DashedBox', zh: '虚线盒子', en: 'DashedBox', description: '可拖入的空位。', preview: <DashedBox label="拖入这里" /> },
+      { key: 'SolidBox', zh: '实线盒子', en: 'SolidBox', description: '目标区域或结果框。', preview: <SolidBox label="目标区" /> },
+      { key: 'Arrow', zh: '箭头关系', en: 'Arrow', description: '表达移动和指向。', preview: <Arrow label="指向" /> },
+      { key: 'Balance', zh: '平衡关系', en: 'Balance', description: '比较差额与移多补少。', preview: <Balance left={3} right={5} /> },
+      { key: 'Bar', zh: '条形关系', en: 'Bar', description: '数量转长度。', preview: <Bar value={7} max={10} /> },
+      { key: 'Timeline', zh: '时间线', en: 'Timeline', description: '时间推进和状态变化。', preview: <Timeline activeIndex={1} /> },
+      { key: 'NumberLine', zh: '数轴', en: 'NumberLine', description: '数轴比较和定位。', preview: <NumberLine marker={4} /> },
+      { key: 'PointSegment', zh: '点段图', en: 'PointSegment', description: '点数和段数关系。', preview: <PointSegment start={2} end={7} /> },
+    ],
+  },
+  {
+    id: 'animation',
+    label: '发现区 · 动画',
+    helper: '负责操作后页面怎么演。',
+    choices: [
       { key: 'Highlight', zh: '高亮', en: 'Highlight', description: '强调关键位置。', preview: animationPill('Highlight', 'bg-[var(--color-link)]') },
       { key: 'Move', zh: '移动', en: 'Move', description: '元素位移。', preview: animationPill('Move', 'bg-[var(--color-gradient-start)]') },
       { key: 'Split', zh: '拆分', en: 'Split', description: '一个变多个。', preview: animationPill('Split', 'bg-[var(--color-highlight-pink)]') },
@@ -132,12 +150,10 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
     id: 'challenge',
     label: '挑战区',
-    helper: '负责答案输入、验证结果和回收结论。',
+    helper: '负责系统给孩子 challenge_steps，孩子写答案并验证。',
     choices: [
       { key: 'AnswerInput', zh: '答案输入', en: 'AnswerInput', description: '孩子自己输入最终答案。', preview: <AnswerInput value="4" /> },
       { key: 'MResult', zh: '结果卡', en: 'MResult', description: '把结果突出展示。', preview: <MResult label="最终答案" value="4" unit="个" note="验证正确后显示" /> },
-      { key: 'MProgress', zh: '进度条', en: 'MProgress', description: '挑战完成度。', preview: <MProgress value={86} /> },
-      { key: 'MCard', zh: '结果容器', en: 'MCard', description: '挑战区统一容器。', preview: <MCard title="验证结果" hint="输入答案后给出反馈"><div className="text-xs text-[var(--color-body)]">再看一遍条件</div></MCard> },
       { key: 'StepButton', zh: '提交按钮', en: 'StepButton', description: '最后一步推进。', preview: <StepButton label="提交答案" /> },
       { key: 'ChoiceControl', zh: '最终选择', en: 'ChoiceControl', description: '也可用于最终判定。', preview: <ChoiceControl options={['正确', '再想想', '看提示']} activeIndex={0} /> },
       { key: 'MButton', zh: '反馈按钮', en: 'MButton', description: '提交 / 查看答案 / 再试一次。', preview: <div className="flex flex-wrap gap-2"><MButton>提交</MButton><MButton variant="secondary">查看答案</MButton></div> },
@@ -161,10 +177,10 @@ export function ComponentPickerPreviewHelp() {
     <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-ink)]">
         <WandSparkles className="h-4 w-4 text-[var(--color-link)]" />
-        先按“观察 / 发现 / 挑战”分区，再在区内选择组件
+        先按“观察 / 发现操作 / 发现展示 / 发现动画 / 挑战”分区，再在区内选择组件
       </div>
       <div className="mt-2 text-xs leading-5 text-[var(--color-body)]">
-        每个分区都支持多选，多个值会用英文逗号保存。你可以先按推荐搭一版，后面再继续微调。
+        观察区只放展示类；发现区拆成操作、展示和动画三栏；挑战区放输入、验证和结果反馈。每个分区都支持多选，多个值会用英文逗号保存。
       </div>
     </div>
   )

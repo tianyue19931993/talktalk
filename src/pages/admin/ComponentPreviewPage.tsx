@@ -185,18 +185,8 @@ export default function ComponentPreviewPage() {
                     <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4">
                       <div className="text-xs text-[var(--color-body)]">上：观察区</div>
                       <div className="mt-2 text-lg font-semibold text-[var(--color-ink)]">题干 / 条件 / 数量</div>
-                      <div className="mt-3">
-                        <div className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-ink)]">
-                          在此输入文字...
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <button className="rounded-full bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] px-4 py-2 text-sm font-medium text-white">
-                          立即生成
-                        </button>
-                        <button className="rounded-full border border-[var(--color-hairline)] bg-white px-4 py-2 text-sm text-[var(--color-body)]">
-                          查看提示
-                        </button>
+                      <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-body)]">
+                        这里只展示页面骨架，不放输入框和操作按钮。
                       </div>
                     </div>
                     <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4">

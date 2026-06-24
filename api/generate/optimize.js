@@ -10,9 +10,15 @@
  *        | { success: false, error: string }
  */
 
-import { callAI } from '../../server/lib/ai.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 import crypto from 'crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const aiFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../server/lib/ai.js')
+const aiStamp = fs.statSync(aiFile).mtimeMs
+const { callAI } = await import(`${pathToFileURL(aiFile).href}?t=${aiStamp}`)
 
 const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
 

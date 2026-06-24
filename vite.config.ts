@@ -53,7 +53,8 @@ async function loadHandler(routePath: string) {
   if (!rel) return null
   const file = path.join(process.cwd(), rel)
   if (!fs.existsSync(file)) return null
-  const mod = await import(pathToFileURL(file).href)
+  const stamp = fs.statSync(file).mtimeMs
+  const mod = await import(`${pathToFileURL(file).href}?t=${stamp}`)
   return mod.default || mod.handler || null
 }
 

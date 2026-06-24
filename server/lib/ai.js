@@ -168,9 +168,6 @@ function buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemTe
       visual_effect: ['数值变化', '步骤高亮', '答案突出'],
       duration: '0.8s',
     },
-    knowledge: '待识别',
-    known_data: {},
-    answer: {},
   }
 
   if (/(换算|单位|厘米|分米|毫米|千米)/.test(text) && /米|厘米|分米|毫米|千米/.test(text)) {
@@ -178,7 +175,6 @@ function buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemTe
     const value = numMatch ? Number(numMatch[1]) : 0
     const toUnit = /厘米/.test(text) ? '厘米' : '米'
     const fromUnit = /米/.test(text) ? '米' : '长度单位'
-    const answerValue = toUnit === '厘米' && fromUnit === '米' ? value * 100 : value
     analysis.question_type = coreDiscovery
     analysis.known_conditions = [text]
     analysis.hidden_conditions = ['需要统一单位后再比较或计算']
@@ -197,9 +193,6 @@ function buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemTe
       visual_effect: ['单位切换', '数值变化', '答案高亮'],
       duration: '0.8s',
     }
-    analysis.knowledge = '长度单位换算'
-    analysis.known_data = { value, from_unit: fromUnit, to_unit: toUnit }
-    analysis.answer = { value: answerValue || value, unit: toUnit }
     return analysis
   }
 
@@ -233,14 +226,6 @@ function buildMockAnalysisJson(questionText, coreDiscovery, promptText, systemTe
       visual_effect: ['总量高亮', '数值变化', '答案高亮'],
       duration: '0.8s',
     }
-    analysis.knowledge = '工程问题'
-    analysis.known_data = {
-      per_day: perDay,
-      original_days: originalDays,
-      target_days: target,
-      total_length: totalLength,
-    }
-    analysis.answer = { value: answerValue, unit: '米' }
     return analysis
   }
 

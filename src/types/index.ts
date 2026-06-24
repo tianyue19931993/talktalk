@@ -9,12 +9,13 @@ export interface QuestionType {
   interactionFlow?: string
   animationFlow?: string
   layoutComponent?: string
+  lookComponent?: string
   controlComponent?: string
   visualComponent?: string
   animationComponent?: string
+  challengeComponent?: string
   defaultAssets?: any[]
   pageSchemaVersion?: number
-  componentRules?: Record<string, any>
   fallbackStrategy?: Record<string, any>
   createdAt: string
   updatedAt: string

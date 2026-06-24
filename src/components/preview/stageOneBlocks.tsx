@@ -446,55 +446,70 @@ type FallbackTemplatePreviewProps = {
 }
 
 const DEFAULT_FALLBACK_ANALYSIS = {
-  question_type: '工程问题',
-  core_discovery: '工作总量一定，效率和时间成反比',
+  question_type: '带余除法：求商和余数',
+  core_discovery: '用除法解决购物问题，商就是最多数量，余数就是剩下的钱',
   known_conditions: [
-    '每天铺 60 米，15 天完成任务',
-    '要求 12 天完工',
+    '乒乓球拍单价 37 元',
+    '李老师带的总钱数 280 元',
   ],
   hidden_conditions: [
-    '铺设总长度不变',
-    '先求出总长度，再除以新的天数',
+    '最多可买多少副意味着数量是整数，不能超支',
+    '剩下多少钱就是总钱数减去花费',
   ],
-  verification_target: '平均每天要铺多少米',
+  verification_target: '验证商×单价+余数是否等于总钱数',
   discovery_flow: [
-    '先观察总长度保持不变',
-    '再发现天数变少时，每天铺设量要增大',
-    '最后推理出新的平均每天铺设米数',
+    '先估算：把单价看作整十数，估算大概能买几副',
+    '选择一个数量尝试，计算总价，看是否超过总钱数',
+    '如果未超过，尝试增加数量；如果超过，减少数量',
+    '找到恰好不超过的最大数量，并计算剩余钱数',
   ],
   challenge_steps: [
-    '先求出总长度：60 × 15 = 900（米）',
-    '再用总长度除以 12 天',
-    '得到答案：75 米',
+    '写出除法算式：总钱数 ÷ 单价',
+    '用竖式计算，想单价乘几最接近总钱数且小于总钱数',
+    '得到的积就是花费，从总钱数中减去得到余数',
+    '商即为最多能买的副数，余数即为剩余钱数',
   ],
   interaction_flow: {
-    trigger: '拖动天数滑块',
-    action: '总长度保持不变，每天铺设米数自动调整',
+    trigger: '拖动数量滑块或点击加减按钮',
+    action: '改变购买乒乓球拍的数量',
     feedback: [
-      '显示总长度恒为 900 米',
-      '天数减少时，每天米数同步增加',
-      '反比例关系被直观展示',
+      '显示当前花费总额',
+      '显示剩余钱数',
+      '如果花费超过 280，给出警告且数量不可增加',
     ],
-    reset: '重置后回到初始 15 天、每天 60 米',
+    reset: '点击重置按钮将数量归零，剩余钱数恢复 280 元',
   },
   animation_flow: {
-    type: '拆分与合并',
-    description: '动画展示总长度被均分成 15 段，再动态合并成 12 段',
+    type: '滑块加减和硬币动画',
+    description: '乒乓球拍展示，价格标签 37 元，总钱数 280 元以硬币堆表示。拖动滑块增加数量，硬币逐渐减少，显示花费和剩余。当数量导致花费超过总钱数时，硬币变红闪烁警告。',
     visual_effect: [
-      '线段伸缩变换',
-      '数值随段数变化跳动',
-      '总数 900 始终显示',
+      '硬币数量动态减少',
+      '花费金额数字跳动',
+      '超限时红色闪烁',
     ],
-    duration: '1s',
+    duration: '滑块拖动时实时反馈，无固定时长',
   },
   answer: {
-    unit: '米',
-    value: 75,
+    unit: '副',
+    value: 7,
+  },
+  remaining_answer: {
+    unit: '元',
+    value: 21,
+  },
+  default_assets: ['乒乓球拍.png', '硬币.png'],
+  component_rules: {
+    scene: '页面分为顶部观察区（展示题目条件）和底部发现区（交互操作）以及右侧挑战区（输入答案）',
+    look: '观察区展示乒乓球拍图片、单价标签 37 元，李老师带的总钱数 280 元',
+    control: '发现区提供数量滑块和加减按钮，数量范围 0-10，滑块限制不超过最大可行数量',
+    visual: '发现区实时显示公式：37 × 数量 = 花费，以及剩余 = 280 - 花费，用数字和色块表示',
+    animation: '发现区根据数量变化，硬币从总数中减少，花费数字增大，剩余数字减小，超限时红色警示',
+    challenge: '挑战区提供两个输入框：第一问“最多可买多少副”，第二问“还剩多少元”，提交后验证答案，正确显示绿色勾，错误显示红色叉并提示',
   },
 }
 
 export function FallbackTemplatePreview({
-  questionText = '煤气公司铺设煤气管道、如果每天铺60米，15天完成任务，如果要求12天完工，那么平均每天要铺多少米？',
+  questionText = '一副乒乓球拍 37 元，李老师带了 280 元，最多可买多少副，还剩多少元？',
   analysisJson = DEFAULT_FALLBACK_ANALYSIS,
 }: FallbackTemplatePreviewProps) {
   const analysis = analysisJson && typeof analysisJson === 'object' ? analysisJson : DEFAULT_FALLBACK_ANALYSIS
@@ -512,34 +527,88 @@ export function FallbackTemplatePreview({
   const hiddenConditions = normalizeList(analysis.hidden_conditions)
   const challengeSteps = normalizeList(analysis.challenge_steps)
   const feedbackItems = normalizeList(analysis.interaction_flow?.feedback)
-  const [days, setDays] = useState(15)
-  const [verifyValue, setVerifyValue] = useState('')
-  const [verifyFeedback, setVerifyFeedback] = useState('把天数拖到 12，再输入答案验证。')
+  const defaultAssets = normalizeList(analysis.default_assets)
+  const componentRules = analysis.component_rules && typeof analysis.component_rules === 'object' ? analysis.component_rules : {}
+  const discoverySource = [
+    questionType,
+    coreDiscovery,
+    knownConditions.join(' '),
+    hiddenConditions.join(' '),
+    String(analysis.interaction_flow?.trigger || ''),
+    String(analysis.interaction_flow?.action || ''),
+    String(analysis.animation_flow?.description || ''),
+    String(analysis.animation_flow?.visual_effect || ''),
+    String(componentRules.control || ''),
+    String(componentRules.visual || ''),
+    String(componentRules.animation || ''),
+  ].join(' ')
+  const pickUnique = (items: string[], limit = 4) => Array.from(new Set(items.filter(Boolean))).slice(0, limit)
+  const selectedControls = pickUnique([
+    /(滑块|滑动|拖动|进度)/.test(discoverySource) ? 'SliderControl' : '',
+    /(拖拽|拖入|拖到)/.test(discoverySource) ? 'DragControl' : '',
+    /(点击|按钮|开始|继续|重置|下一步|加减)/.test(discoverySource) ? 'ClickControl' : '',
+    /(点击|按钮|开始|继续|重置|下一步|加减)/.test(discoverySource) ? 'MButton' : '',
+    /(选择|选项)/.test(discoverySource) ? 'ChoiceControl' : '',
+    /(步骤|推进|下一步)/.test(discoverySource) ? 'StepButton' : '',
+  ], 3)
+  const selectedVisuals = pickUnique([
+    /(数量|总数|剩余|花费|金额|数字|商|余数)/.test(discoverySource) ? 'Counter' : '',
+    /(数量|总数|剩余|花费|金额|数字|商|余数)/.test(discoverySource) ? 'Bar' : '',
+    /(数量|总数|剩余|花费|金额|数字|商|余数)/.test(discoverySource) ? 'MResult' : '',
+    /(硬币|分组|盒子|装入|购物车|篮子)/.test(discoverySource) ? 'ItemGroup' : '',
+    /(硬币|分组|盒子|装入|购物车|篮子)/.test(discoverySource) ? 'Box' : '',
+    /(硬币|分组|盒子|装入|购物车|篮子)/.test(discoverySource) ? 'DashedBox' : '',
+    /(平衡|比较|差额|左右)/.test(discoverySource) ? 'Balance' : '',
+    /(平衡|比较|差额|左右)/.test(discoverySource) ? 'Arrow' : '',
+    /(线段|数轴|时间|天)/.test(discoverySource) ? 'Timeline' : '',
+    /(线段|数轴|时间|天)/.test(discoverySource) ? 'NumberLine' : '',
+    /(线段|数轴|时间|天)/.test(discoverySource) ? 'PointSegment' : '',
+  ], 4)
+  const selectedAnimations = pickUnique([
+    /(跳动|增大|减少|变化|递增|递减)/.test(discoverySource) ? 'CountUp' : '',
+    /(跳动|增大|减少|变化|递增|递减)/.test(discoverySource) ? 'Move' : '',
+    /(闪烁|警告|高亮|强调|变红)/.test(discoverySource) ? 'Glow' : '',
+    /(闪烁|警告|高亮|强调|变红)/.test(discoverySource) ? 'Shake' : '',
+    /(拆分|分裂)/.test(discoverySource) ? 'Split' : '',
+    /(合并|汇总)/.test(discoverySource) ? 'Merge' : '',
+    /(连线|对应)/.test(discoverySource) ? 'ConnectLine' : '',
+    /(消失|淡出)/.test(discoverySource) ? 'FadeOut' : '',
+    /(揭示|缺口|空位)/.test(discoverySource) ? 'RevealGap' : '',
+    /(关键|重点|高亮)/.test(discoverySource) ? 'Highlight' : '',
+  ], 4)
+  const [quantity, setQuantity] = useState(0)
+  const [verifyCount, setVerifyCount] = useState('')
+  const [verifyRemain, setVerifyRemain] = useState('')
+  const [verifyFeedback, setVerifyFeedback] = useState('拖动数量滑块，再输入“最多可买副数”和“剩余钱数”验证。')
   const [revealCore, setRevealCore] = useState(false)
-  const totalWork = 900
-  const currentDaily = useMemo(() => Math.round(totalWork / Math.max(days, 1)), [days])
+  const unitPrice = 37
+  const totalMoney = 280
+  const currentSpent = useMemo(() => quantity * unitPrice, [quantity])
+  const currentRemain = useMemo(() => totalMoney - currentSpent, [currentSpent])
   const isCorrect = useMemo(() => {
-    const value = String(verifyValue || '').replace(/\s+/g, '')
-    return value === '75' || value === '75米' || value === '75米/天'
-  }, [verifyValue])
+    const countValue = String(verifyCount || '').replace(/\s+/g, '')
+    const remainValue = String(verifyRemain || '').replace(/\s+/g, '')
+    return (countValue === '7' || countValue === '7副') && (remainValue === '21' || remainValue === '21元')
+  }, [verifyCount, verifyRemain])
 
   const handleVerify = () => {
-    if (!String(verifyValue || '').trim()) {
-      setVerifyFeedback('先输入答案再验证。')
+    if (!String(verifyCount || '').trim() || !String(verifyRemain || '').trim()) {
+      setVerifyFeedback('先把两个答案都填完整。')
       return
     }
     if (isCorrect) {
-      setVerifyFeedback('正确！每天要铺 75 米。')
+      setVerifyFeedback('正确！最多可买 7 副，还剩 21 元。')
       setRevealCore(true)
       return
     }
-    setVerifyFeedback('还差一点，再看看总工作量是否不变。')
+    setVerifyFeedback('还差一点，再看看总钱数和单价。')
   }
 
   const handleReset = () => {
-    setDays(15)
-    setVerifyValue('')
-    setVerifyFeedback('把天数拖到 12，再输入答案验证。')
+    setQuantity(0)
+    setVerifyCount('')
+    setVerifyRemain('')
+    setVerifyFeedback('拖动数量滑块，再输入“最多可买副数”和“剩余钱数”验证。')
     setRevealCore(false)
   }
 
@@ -552,149 +621,173 @@ export function FallbackTemplatePreview({
         </div>
       </PreviewCard>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <PreviewCard title="1. 观察区" hint="只放题目原文、已知条件、隐含条件。">
-          <div className="space-y-4">
-            <MCard title="题目原文" hint="先让孩子看到完整题干">
-              <div className="rounded-[var(--radius-md)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm leading-7 text-[var(--color-ink)]">
-                {questionText}
-              </div>
-            </MCard>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <MCard title="已知条件" hint="显式条件">
-                <div className="space-y-2">
-                  {knownConditions.map((item) => (
-                    <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </MCard>
-              <MCard title="隐含条件" hint="解题必须补出来的关系">
-                <div className="space-y-2">
-                  {hiddenConditions.map((item) => (
-                    <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </MCard>
-            </div>
-          </div>
-        </PreviewCard>
-
-        <PreviewCard title="2. 发现区" hint="这里要真能拖、真能看变化。">
-          <div className="space-y-4">
-            <MCard title="拖动天数" hint="拖到 12 天，看看每天铺设量怎么变">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--color-body)]">天数</span>
-                  <span className="text-sm font-semibold text-[var(--color-ink)]">{days} 天</span>
-                </div>
-                <input
-                  type="range"
-                  min={12}
-                  max={15}
-                  step={1}
-                  value={days}
-                  onChange={(e) => setDays(Number(e.target.value))}
-                  className="w-full accent-[var(--color-link)]"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <MResult label="总工作量" value={String(totalWork)} unit="米" note="始终不变" />
-                  <MResult label="每天铺设" value={String(currentDaily)} unit="米" note="跟着天数变化" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[var(--color-body)]">
-                    <span>总量条</span>
-                    <span>{days === 12 ? '已变到 12 天' : '继续拖动'}</span>
-                  </div>
-                  <div className="h-3 rounded-full bg-[var(--color-canvas-soft)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)] transition-all duration-300"
-                      style={{ width: `${(days / 15) * 100}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-[var(--color-mute)]">
-                    每天铺设量会从 60 米变成 75 米
-                  </div>
-                </div>
-              </div>
-            </MCard>
-
-            <MCard title="关系变化" hint="用一个小动画感受反比例">
-              <div className="space-y-3">
-                <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
-                  <div className="text-xs text-[var(--color-mute)]">当前状态</div>
-                  <div className="mt-2 text-2xl font-semibold text-[var(--color-ink)]">
-                    15 天 → {days} 天
-                  </div>
-                  <div className="mt-1 text-sm text-[var(--color-body)]">
-                    每天 {days === 15 ? 60 : currentDaily} 米
-                  </div>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {feedbackItems.slice(0, 3).map((item) => (
-                    <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
-                      {item}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <MButton onClick={() => setDays((prev) => Math.max(12, prev - 1))}>减少 1 天</MButton>
-                  <MButton variant="secondary" onClick={() => setDays(12)}>直接到 12 天</MButton>
-                </div>
-                <div className="text-xs text-[var(--color-body)]">
-                  {days === 12 ? '已经到 12 天了，继续去挑战区验证答案。' : '继续调整，直到看到 12 天对应的结果。'}
-                </div>
-              </div>
-            </MCard>
-          </div>
-        </PreviewCard>
-
-        <PreviewCard title="3. 挑战区" hint="输入答案，真验证。">
-          <div className="space-y-4">
-            <MCard title="验证答案" hint="这里对应 html 模板里的输入验证区">
-              <div className="space-y-3">
-                <div className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-ink)]">
-                  {verifyValue || '请输入答案'}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <MButton onClick={handleVerify}>验证</MButton>
-                  <MButton variant="secondary" onClick={() => setRevealCore((prev) => !prev)}>
-                    {revealCore ? '隐藏核心发现' : '显示核心发现'}
-                  </MButton>
-                  <MButton variant="ghost" onClick={handleReset}>重置</MButton>
-                </div>
-                <input
-                  value={verifyValue}
-                  onChange={(e) => setVerifyValue(e.target.value)}
-                  placeholder="请输入你的答案"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-mute)] focus:outline-none focus:border-[var(--color-link)]"
-                />
-                <div className={`rounded-[var(--radius-xl)] border px-4 py-3 text-sm leading-6 ${isCorrect ? 'border-green-200 bg-green-50 text-green-700' : 'border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}>
-                  {verifyFeedback}
-                </div>
-                {revealCore && (
-                  <div className="rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] px-4 py-3 text-sm text-[var(--color-link)]">
-                    核心发现：{coreDiscovery}
-                  </div>
-                )}
-              </div>
-            </MCard>
-
-            <MCard title="挑战步骤" hint="引导孩子一步一步推理">
+      <div className="flex flex-col gap-4">
+      <PreviewCard title="1. 观察区" hint="只放题目原文、已知条件、隐含条件。">
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <MCard title="已知条件" hint="显式条件">
               <div className="space-y-2">
-                {challengeSteps.map((item, index) => (
-                  <div key={item} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)]">
-                    {index + 1}. {item}
+                {knownConditions.map((item) => (
+                  <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </MCard>
+            <MCard title="隐含条件" hint="解题必须补出来的关系">
+              <div className="space-y-2">
+                {hiddenConditions.map((item) => (
+                  <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
+                    {item}
                   </div>
                 ))}
               </div>
             </MCard>
           </div>
-        </PreviewCard>
+        </div>
+      </PreviewCard>
+
+      <PreviewCard title="2. 发现区" hint="这里要真能拖、真能看变化。">
+        <div className="space-y-4">
+          <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4 shadow-[var(--shadow-l2)]">
+            <div className="text-sm font-semibold text-[var(--color-ink)]">发现区精选组件</div>
+            <div className="mt-1 text-xs text-[var(--color-mute)]">系统只展示本题真正匹配出来的组件，不再把整套库摊开</div>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
+                <div className="text-xs text-[var(--color-body)] mb-3">精选控件</div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedControls.map((item) => (
+                    <span key={item} className="rounded-full bg-white px-3 py-1.5 text-xs text-[var(--color-body)] border border-[var(--color-hairline)]">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-col gap-3">
+                  {(selectedControls.includes('SliderControl') || selectedControls.includes('DragControl')) && (
+                    <SliderControl value={Math.round((quantity / 7) * 100)} />
+                  )}
+                  {selectedControls.includes('ClickControl') && <ClickControl label="买一副" helper="每次花掉 37 元" />}
+                  {selectedControls.includes('ChoiceControl') && <ChoiceControl options={['1副', '5副', '7副']} activeIndex={2} />}
+                  {selectedControls.includes('StepButton') && <StepButton label="继续尝试" />}
+                  {selectedControls.includes('MButton') && (
+                    <div className="flex flex-wrap gap-2">
+                      <MButton onClick={() => setQuantity((prev) => Math.min(10, prev + 1))}>加 1 副</MButton>
+                      <MButton variant="secondary" onClick={() => setQuantity(7)}>直接到 7 副</MButton>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
+                <div className="text-xs text-[var(--color-body)] mb-3">精选展示</div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedVisuals.map((item) => (
+                    <span key={item} className="rounded-full bg-white px-3 py-1.5 text-xs text-[var(--color-body)] border border-[var(--color-hairline)]">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-col gap-3">
+                  {selectedVisuals.includes('Counter') && <Counter value={quantity} unit="副" />}
+                  {selectedVisuals.includes('Bar') && <MProgress value={Math.min(100, Math.round((quantity / 7) * 100))} />}
+                  {selectedVisuals.includes('Balance') && <Balance left={3} right={5} />}
+                  {selectedVisuals.includes('NumberLine') && <NumberLine marker={4} />}
+                  {selectedVisuals.includes('ItemGroup') && <ItemGroup emoji="🪙" count={6} />}
+                </div>
+              </div>
+              <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
+                <div className="text-xs text-[var(--color-body)] mb-3">精选动画</div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAnimations.map((item) => (
+                    <span key={item} className="rounded-full bg-white px-3 py-1.5 text-xs text-[var(--color-body)] border border-[var(--color-hairline)]">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-xs text-[var(--color-body)]">
+              {quantity === 7 ? '已经到 7 副了，继续去挑战区验证答案。' : '继续调整，直到找到不超支的最大数量。'}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4 shadow-[var(--shadow-l2)]">
+            <div className="text-sm font-semibold text-[var(--color-ink)]">变化反馈</div>
+            <div className="mt-1 text-xs text-[var(--color-mute)]">交互之后，数量、关系和动画都在这里更新</div>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-col gap-3">
+                <MResult label="总钱数" value={String(totalMoney)} unit="元" note="始终不变" />
+                <MResult label="当前花费" value={String(currentSpent)} unit="元" note="跟着数量变化" />
+              </div>
+              <MProgress value={Math.min(100, Math.round((quantity / 7) * 100))} />
+              <div className="flex flex-col gap-3">
+                {feedbackItems.slice(0, 3).map((item) => (
+                  <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-body)]">
+                剩余金额：{currentRemain} 元
+              </div>
+            </div>
+          </div>
+        </div>
+      </PreviewCard>
+
+      <PreviewCard title="3. 挑战区" hint="输入答案，真验证。">
+        <div className="space-y-4">
+          <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4 shadow-[var(--shadow-l2)]">
+            <div className="text-sm font-semibold text-[var(--color-ink)]">挑战步骤</div>
+            <div className="mt-1 text-xs text-[var(--color-mute)]">先引导孩子一步一步推理，再验证答案</div>
+            <div className="mt-4 space-y-2">
+              {challengeSteps.map((item, index) => (
+                <div key={item} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)]">
+                  {index + 1}. {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4 shadow-[var(--shadow-l2)]">
+            <div className="text-sm font-semibold text-[var(--color-ink)]">验证答案</div>
+            <div className="mt-1 text-xs text-[var(--color-mute)]">这里对应 html 模板里的输入验证区</div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-ink)]">
+                {verifyCount || verifyRemain ? `${verifyCount || '？'} 副，${verifyRemain || '？'} 元` : '请输入答案'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <MButton onClick={handleVerify}>验证</MButton>
+                <MButton variant="secondary" onClick={() => setRevealCore((prev) => !prev)}>
+                  {revealCore ? '隐藏核心发现' : '显示核心发现'}
+                </MButton>
+                <MButton variant="ghost" onClick={handleReset}>重置</MButton>
+              </div>
+              <div className="grid gap-3">
+                <input
+                  value={verifyCount}
+                  onChange={(e) => setVerifyCount(e.target.value)}
+                  placeholder="最多可买多少副"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-mute)] focus:outline-none focus:border-[var(--color-link)]"
+                />
+                <input
+                  value={verifyRemain}
+                  onChange={(e) => setVerifyRemain(e.target.value)}
+                  placeholder="还剩多少元"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-mute)] focus:outline-none focus:border-[var(--color-link)]"
+                />
+              </div>
+              <div className={`rounded-[var(--radius-xl)] border px-4 py-3 text-sm leading-6 ${isCorrect ? 'border-green-200 bg-green-50 text-green-700' : 'border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}>
+                {verifyFeedback}
+              </div>
+              {revealCore && (
+                <div className="rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] px-4 py-3 text-sm text-[var(--color-link)]">
+                  核心发现：{coreDiscovery}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </PreviewCard>
       </div>
     </div>
   )
@@ -731,7 +824,7 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
   {
     key: 'observation',
     title: '观察区组件',
-    subtitle: '负责“看见题目”和“看懂条件”。',
+    subtitle: '负责看见题目、条件和数量关系，只做展示，不做操作。',
     items: [
       {
         name: 'MTitle',
@@ -762,25 +855,12 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
         name: 'MCard',
         description: '承载观察信息的统一卡片。',
         node: (
-          <MCard title="观察区示例" hint="把题干、图片、提示放在同一个信息卡里">
-            <div className="space-y-3">
-              <div className="rounded-[var(--radius-md)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-ink)]">
-                在此输入文字...
-              </div>
-              <MProgress value={42} />
+          <MCard title="观察区示例" hint="把题干、条件、提示放在同一个信息卡里">
+            <div className="rounded-[var(--radius-md)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm leading-7 text-[var(--color-ink)]">
+              题目条件与数量关系展示区
             </div>
           </MCard>
         ),
-      },
-      {
-        name: 'MInput',
-        description: '输入框的统一样式，可用于观察阶段收集信息。',
-        node: <MInput value="在此输入文字..." />,
-      },
-      {
-        name: 'MProgress',
-        description: '观察完成度或信息收集进度。',
-        node: <MProgress value={74} />,
       },
       {
         name: 'Counter',
@@ -797,57 +877,12 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
         description: '把多个物体直接组合展示出来。',
         node: <ItemGroup emoji="🍎" count={6} />,
       },
-      {
-        name: 'Box',
-        description: '基础容器盒子。',
-        node: <Box label="基础 Box" />,
-      },
-      {
-        name: 'DashedBox',
-        description: '虚线区域，适合观察待拖入的位置。',
-        node: <DashedBox label="观察区空位" />,
-      },
-      {
-        name: 'SolidBox',
-        description: '实线目标框，适合观察结果区。',
-        node: <SolidBox label="目标区域" />,
-      },
-      {
-        name: 'Arrow',
-        description: '用箭头说明移动、指向和对应关系。',
-        node: <Arrow label="指向" />,
-      },
-      {
-        name: 'Balance',
-        description: '适合比较差额、平衡和移多补少。',
-        node: <Balance left={3} right={5} />,
-      },
-      {
-        name: 'Bar',
-        description: '把数量关系转成长度关系。',
-        node: <Bar value={7} max={10} />,
-      },
-      {
-        name: 'Timeline',
-        description: '时间推进的观察骨架。',
-        node: <Timeline activeIndex={1} />,
-      },
-      {
-        name: 'NumberLine',
-        description: '数轴表达数量位置。',
-        node: <NumberLine marker={4} />,
-      },
-      {
-        name: 'PointSegment',
-        description: '点段图，用于观察点数与段数关系。',
-        node: <PointSegment start={2} end={7} />,
-      },
     ],
   },
   {
     key: 'discovery',
     title: '发现区组件',
-    subtitle: '负责“让孩子自己动手发现规律”。',
+    subtitle: '负责展示方式、操作方式和操作后的变化。',
     items: [
       {
         name: 'ClickControl',
@@ -884,6 +919,71 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
             <MButton variant="ghost">跳过</MButton>
           </div>
         ),
+      },
+      {
+        name: 'MInput',
+        description: '发现区里的可输入控件，常用于操作中的临时输入。',
+        node: <MInput value="在此输入文字..." />,
+      },
+      {
+        name: 'MProgress',
+        description: '发现过程中的进度和变化反馈。',
+        node: <MProgress value={68} />,
+      },
+      {
+        name: 'Counter',
+        description: '发现过程中的数字反馈。',
+        node: <Counter value={8} unit="步" />,
+      },
+      {
+        name: 'ItemGroup',
+        description: '配合交互展示多个对象的变化。',
+        node: <ItemGroup emoji="🍎" count={6} />,
+      },
+      {
+        name: 'Box',
+        description: '发现区里的基础展示盒子。',
+        node: <Box label="展示区" />,
+      },
+      {
+        name: 'DashedBox',
+        description: '发现区里的可操作空位。',
+        node: <DashedBox label="拖入这里" />,
+      },
+      {
+        name: 'SolidBox',
+        description: '发现区里的目标区域。',
+        node: <SolidBox label="目标区" />,
+      },
+      {
+        name: 'Arrow',
+        description: '表达移动和对应关系。',
+        node: <Arrow label="指向" />,
+      },
+      {
+        name: 'Balance',
+        description: '表达平衡、差额和移多补少。',
+        node: <Balance left={3} right={5} />,
+      },
+      {
+        name: 'Bar',
+        description: '把数量关系转成长度关系。',
+        node: <Bar value={7} max={10} />,
+      },
+      {
+        name: 'Timeline',
+        description: '时间推进和状态变化。',
+        node: <Timeline activeIndex={1} />,
+      },
+      {
+        name: 'NumberLine',
+        description: '数轴上的位置变化。',
+        node: <NumberLine marker={4} />,
+      },
+      {
+        name: 'PointSegment',
+        description: '点数和段数关系。',
+        node: <PointSegment start={2} end={7} />,
       },
       {
         name: 'Highlight',
@@ -940,7 +1040,7 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
   {
     key: 'challenge',
     title: '挑战区组件',
-    subtitle: '负责“输入、验证、回收答案”。',
+    subtitle: '负责输入答案、验证结果和回收结论。',
     items: [
       {
         name: 'AnswerInput',
@@ -951,23 +1051,6 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
         name: 'MResult',
         description: '把结果明确展示出来。',
         node: <MResult label="最终答案" value="4" unit="个" note="验证正确后再显示" />,
-      },
-      {
-        name: 'MProgress',
-        description: '挑战完成度。',
-        node: <MProgress value={86} />,
-      },
-      {
-        name: 'MCard',
-        description: '挑战区统一容器。',
-        node: (
-          <MCard title="验证结果" hint="输入答案后，系统给出即时反馈">
-            <div className="flex flex-wrap gap-2">
-              <MButton>验证</MButton>
-              <MButton variant="secondary">重来</MButton>
-            </div>
-          </MCard>
-        ),
       },
       {
         name: 'ChoiceControl',

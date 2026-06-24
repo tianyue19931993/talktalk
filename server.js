@@ -92,13 +92,15 @@ function createResponse(res) {
 }
 
 async function loadHandler(routePath) {
-  if (handlerCache.has(routePath)) return handlerCache.get(routePath)
   const rel = apiRoutes[routePath]
   if (!rel) return null
   const file = path.join(__dirname, rel)
-  const mod = await import(pathToFileURL(file).href)
+  const stamp = fs.statSync(file).mtimeMs
+  const cached = handlerCache.get(routePath)
+  if (cached && cached.stamp === stamp) return cached.handler
+  const mod = await import(`${pathToFileURL(file).href}?t=${stamp}`)
   const handler = mod.default || mod.handler || null
-  handlerCache.set(routePath, handler)
+  handlerCache.set(routePath, { stamp, handler })
   return handler
 }
 

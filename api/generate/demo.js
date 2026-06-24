@@ -1298,8 +1298,8 @@ export default async function handler(req, res) {
 
 内容：${questionText}`,
           temperature: 0,
-          maxTokens: 10,
-          timeoutSeconds: 5,
+          maxTokens: 200,
+          timeoutSeconds: 15,
         })
 
         if (!mathCheck.success) {
@@ -1391,12 +1391,12 @@ export default async function handler(req, res) {
 
       // ── Step 2: AI 识别题型 ──
       const typeSelectionPrompt = buildTypeSelectionPrompt(allTypes)
-      const identifyResult = await callAI({
-        prompt: `判断下面这道题最匹配哪个 core_discovery。\n\n可用配置：\n${typeSelectionPrompt}\n\n题目：${question.question_text}\n\n规则（严格遵循）：\n1. 如果匹配某一条配置 → 只返回该条配置的 core_discovery\n2. 如果不属于以上任何配置 → 只返回「不匹配」\n\n只返回一个词，不要任何其他文字。`,
-        temperature: 0,
-        maxTokens: 20,
-        timeoutSeconds: 5,
-      })
+        const identifyResult = await callAI({
+          prompt: `判断下面这道题最匹配哪个 core_discovery。\n\n可用配置：\n${typeSelectionPrompt}\n\n题目：${question.question_text}\n\n规则（严格遵循）：\n1. 如果匹配某一条配置 → 只返回该条配置的 core_discovery\n2. 如果不属于以上任何配置 → 只返回「不匹配」\n\n只返回一个词，不要任何其他文字。`,
+          temperature: 0,
+          maxTokens: 200,
+          timeoutSeconds: 15,
+        })
       if (!identifyResult.success) {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })
         await recordGenerationArtifacts({
@@ -1528,8 +1528,8 @@ export default async function handler(req, res) {
 ${question.question_text}`,
             responseFormat: 'json_object',
             temperature: 0.3,
-            maxTokens: 1200,
-            timeoutSeconds: 6,
+            maxTokens: 12000,
+            timeoutSeconds: 60,
           })
           let analysisJson = buildHeuristicFallbackAnalysis(
             question.question_text,
@@ -1736,8 +1736,8 @@ ${question.question_text}`,
             ].filter(Boolean).join('\n'),
             responseFormat: 'json_object',
             temperature: 0.5,
-            maxTokens: 2048,
-            timeoutSeconds: 5,
+            maxTokens: 12000,
+            timeoutSeconds: 60,
           })
           if (!analysisResult.success) {
             console.warn('[generate/demo] matched analysis AI failed, using heuristic analysis', analysisResult.error)
@@ -1907,8 +1907,8 @@ try{var r=data;if(r.hidden_data)answers=r.hidden_data.map(function(x){return x.l
         systemPrompt: htmlTemplate,
         prompt: `以下是题目的结构化分析数据、渲染计划，以及题目原文。请根据 prompt 的指示生成完整的互动 HTML 页面。\n\n分析数据：\n\`\`\`json\n${analysisJsonStr}\n\`\`\`\n\n渲染计划：\n\`\`\`json\n${renderPlanStr}\n\`\`\`\n\n题目原文：\n${question.question_text}`,
         temperature: 0.6,
-        maxTokens: 16384,
-        timeoutSeconds: 9,
+        maxTokens: 12000,
+        timeoutSeconds: 60,
       })
       if (!htmlResult.success || !htmlResult.content) {
         await patchQuestionFull(actualQuestionId, { status: 'pending' })

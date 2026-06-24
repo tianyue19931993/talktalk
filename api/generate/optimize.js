@@ -66,8 +66,8 @@ export default async function handler(req, res) {
       systemPrompt: '你是一个专业的前端工程师。用户会给你一个现有的 HTML 互动演示页面，以及他们的修改意见。请根据修改意见优化这个 HTML 文件。\n\n要求：\n- 保持原有交互逻辑和功能\n- 根据修改意见改进样式、布局或内容\n- 输出完整的 HTML 文件（包含 DOCTYPE html 标签）\n- 纯 HTML+CSS+JS，不要 React/Angular/Vue\n- 响应式设计，移动端适配\n- 使用中文',
       prompt: `以下是现有的 HTML 演示代码：\n\n\`\`\`html\n${currentHtml.slice(0, 30000)}\n\`\`\`\n\n用户的修改意见：\n${suggestions}\n\n请根据上述意见优化这个 HTML 文件，输出完整的 HTML 代码。`,
       temperature: 0.6,
-      maxTokens: 8192,
-      timeoutSeconds: 8,
+      maxTokens: 12000,
+      timeoutSeconds: 60,
     })
 
     if (!aiResult.success || !aiResult.content) {

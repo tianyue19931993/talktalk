@@ -1140,8 +1140,6 @@ function buildTypeContextSummary(typeContext) {
     typeContext.discoveryFlow ? `discovery_flow：${typeContext.discoveryFlow}` : '',
     typeContext.interactionFlow ? `interaction_flow：${typeContext.interactionFlow}` : '',
     typeContext.animationFlow ? `animation_flow：${typeContext.animationFlow}` : '',
-    typeContext.analysisPrompt ? `analysis_prompt：${typeContext.analysisPrompt}` : '',
-    typeContext.htmlPrompt ? `html_prompt：${typeContext.htmlPrompt}` : '',
     typeContext.fallbackStrategy ? `fallback_strategy：${JSON.stringify(typeContext.fallbackStrategy)}` : '',
   ].filter(Boolean).join('\n')
 }
@@ -1741,24 +1739,41 @@ component_rules 不是组件清单，而是这个题目在观察区、发现区�
             `规则请写成可直接给渲染器读取的结构化文本或对象。`,
           ].join('\n')
 
+          const analysisPromptText = [
+            `请分析以下数学题：`,
+            `题目原文：\n${question.question_text}`,
+            ``,
+            `--- 题型信息 ---`,
+            typeContextSummary,
+            flowInfo ? `\n${flowInfo}` : '',
+            ``,
+            analysisRulesHint,
+            ``,
+            `请结合上述题型信息和流程指导，对题目进行结构化分析，输出符合要求的 JSON。`,
+          ].filter(Boolean).join('\n')
+
+          console.info('[generate/demo] matched analysis prompt stats', {
+            questionId: actualQuestionId,
+            questionTypeId,
+            systemPromptChars: typeContext.analysisPrompt.length,
+            promptChars: analysisPromptText.length,
+            summaryChars: typeContextSummary.length,
+            flowChars: flowInfo.length,
+          })
+          const analysisStartAt = Date.now()
           const analysisResult = await callAI({
             systemPrompt: typeContext.analysisPrompt,
-            prompt: [
-              `请分析以下数学题：`,
-              `题目原文：\n${question.question_text}`,
-              ``,
-              `--- 题型信息 ---`,
-              typeContextSummary,
-              flowInfo ? `\n${flowInfo}` : '',
-              ``,
-              analysisRulesHint,
-              ``,
-              `请结合上述题型信息和流程指导，对题目进行结构化分析，输出符合要求的 JSON。`,
-            ].filter(Boolean).join('\n'),
+            prompt: analysisPromptText,
             responseFormat: 'json_object',
             temperature: 0.5,
             maxTokens: 12000,
             timeoutSeconds: 60,
+          })
+          console.info('[generate/demo] matched analysis AI finished', {
+            questionId: actualQuestionId,
+            questionTypeId,
+            ok: analysisResult.success,
+            elapsedMs: Date.now() - analysisStartAt,
           })
           if (!analysisResult.success) {
             console.warn('[generate/demo] matched analysis AI failed, using minimal fallback analysis', analysisResult.error)

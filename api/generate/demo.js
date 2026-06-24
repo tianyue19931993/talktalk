@@ -186,18 +186,84 @@ function extractJsonLikeText(text) {
   return source
 }
 
+function repairJsonText(text) {
+  let source = extractJsonLikeText(text).trim()
+  if (!source) return ''
+
+  source = source.replace(/^\uFEFF/, '').trim()
+  source = source.replace(/,\s*([}\]])/g, '$1')
+
+  if (
+    ((source.startsWith('"') && source.endsWith('"')) || (source.startsWith('“') && source.endsWith('”')))
+    && (source.includes('{') || source.includes('['))
+  ) {
+    source = source.slice(1, -1).trim()
+  }
+
+  const stack = []
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === '\\') {
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+
+    if (ch === '{' || ch === '[') {
+      stack.push(ch)
+      continue
+    }
+    if (ch === '}' || ch === ']') {
+      const last = stack[stack.length - 1]
+      if ((ch === '}' && last === '{') || (ch === ']' && last === '[')) {
+        stack.pop()
+      }
+    }
+  }
+
+  if (stack.length > 0) {
+    const closers = stack.reverse().map((ch) => (ch === '{' ? '}' : ']')).join('')
+    source += closers
+  }
+
+  return source
+}
+
 function parseAnalysisJson(content) {
   if (!content) return {}
   if (typeof content === 'object') return content
 
   const direct = safeJsonParse(content, null)
   if (direct && typeof direct === 'object') return direct
+  if (typeof direct === 'string') {
+    const parsedAgain = safeJsonParse(direct, null)
+    if (parsedAgain && typeof parsedAgain === 'object') return parsedAgain
+  }
 
   const extracted = extractJsonLikeText(content)
   const parsed = safeJsonParse(extracted, null)
   if (parsed && typeof parsed === 'object') return parsed
 
-  return { note: 'analysis_json_parse_failed', raw: String(content).slice(0, 4000) }
+  const repaired = repairJsonText(extracted || content)
+  const repairedParsed = safeJsonParse(repaired, null)
+  if (repairedParsed && typeof repairedParsed === 'object') return repairedParsed
+  if (typeof repairedParsed === 'string') {
+    const parsedAgain = safeJsonParse(repairedParsed, null)
+    if (parsedAgain && typeof parsedAgain === 'object') return parsedAgain
+  }
+
+  return null
 }
 
 function buildHeuristicFallbackAnalysis(questionText, coreDiscoveryHint = '') {
@@ -716,6 +782,7 @@ function buildStaticFallbackHtml(questionText, analysisJson, renderPlan) {
     ? normalizeList(analysis.known_conditions)
     : parseKnownData(analysis.known_data)
   const hiddenConditions = normalizeList(analysis.hidden_conditions)
+  const discoveryFlow = normalizeList(analysis.discovery_flow)
   const challengeSteps = normalizeList(analysis.challenge_steps)
   const interactionFlow = analysis.interaction_flow && typeof analysis.interaction_flow === 'object'
     ? analysis.interaction_flow
@@ -1672,9 +1739,21 @@ ${question.question_text}`,
             maxTokens: 2048,
             timeoutSeconds: 5,
           })
-          if (!analysisResult.success) throw new Error(`AI 分析失败: ${analysisResult.error}`)
-
-          analysisJson = parseAnalysisJson(analysisResult.content)
+          if (!analysisResult.success) {
+            console.warn('[generate/demo] matched analysis AI failed, using heuristic analysis', analysisResult.error)
+            analysisJson = buildHeuristicFallbackAnalysis(
+              question.question_text,
+              typeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
+            )
+          } else {
+            const parsedAnalysisJson = parseAnalysisJson(analysisResult.content)
+            analysisJson = parsedAnalysisJson && typeof parsedAnalysisJson === 'object'
+              ? parsedAnalysisJson
+              : buildHeuristicFallbackAnalysis(
+                  question.question_text,
+                  typeContext.coreDiscovery || questionCoreDiscovery || questionTypeName || ''
+                )
+          }
         }
 
         // 保存分析结果（即使后续 HTML 生成超时，分析结果已落库）

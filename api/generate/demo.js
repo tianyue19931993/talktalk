@@ -1786,6 +1786,71 @@ ${question.question_text}`,
       })
     }
 
+    if (!renderPlan) {
+      renderPlan = buildRenderPlan(typeContext, analysisJson, question.question_text)
+    }
+
+    // 直接走本地模板组装 HTML，不再进入 AI 现写整页 HTML 的慢路径
+    {
+      const generationResult = await consumeGeneration(question.user_id)
+      if (!generationResult.success) {
+        await recordGenerationArtifacts({
+          headers,
+          supabaseUrl: SUPABASE_URL,
+          runId: generationRunId,
+          questionId: actualQuestionId,
+          typeContext,
+          analysisJson,
+          renderPlan,
+          status: 'failed',
+        })
+        await patchQuestionFull(actualQuestionId, { status: 'pending' }).catch(() => {})
+        return res.status(200).json({
+          success: false,
+          error: generationResult.error === 'quota_exceeded'
+            ? '当前套餐生成次数已用完，请升级会员后再试'
+            : '当前套餐没有可用的生成次数',
+          questionId: actualQuestionId,
+        })
+      }
+
+      const htmlContent = buildStaticFallbackHtml(question.question_text, analysisJson, renderPlan)
+      const dataUrl = await saveHtmlToStorage(htmlContent, actualQuestionId)
+      const demoRes = await fetch(`${SUPABASE_URL}/rest/v1/question_demos`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          question_id: actualQuestionId,
+          html_url: dataUrl,
+          title: `演示 ${Date.now().toString().slice(-4)}`,
+        }),
+      })
+      if (!demoRes.ok) throw new Error('保存演示失败')
+      const demos = await demoRes.json()
+      const demo = demos?.[0] || {}
+
+      await patchQuestionFull(actualQuestionId, { status: 'completed' })
+      await recordGenerationArtifacts({
+        headers,
+        supabaseUrl: SUPABASE_URL,
+        runId: generationRunId,
+        questionId: actualQuestionId,
+        typeContext,
+        analysisJson,
+        renderPlan,
+        status: renderPlan?.fallbackUsed ? 'partial' : 'success',
+        htmlUrl: dataUrl,
+        demoId: demo.id,
+      })
+
+      return res.status(200).json({
+        success: true,
+        demoId: demo.id,
+        htmlUrl: dataUrl,
+        questionId: actualQuestionId,
+      })
+    }
+
     // ════════════════════════════════════════════════════════════
     // Step 4: 模板替换 — 用 analysis_json 填充 HTML 模板
     // ════════════════════════════════════════════════════════════
@@ -1801,10 +1866,6 @@ ${question.question_text}`,
           htmlTemplate = pt?.[0]?.html_prompt || ''
         }
       }
-    }
-
-    if (!renderPlan) {
-      renderPlan = buildRenderPlan(typeContext, analysisJson, question.question_text)
     }
 
     // 没有题型模板 → 使用内置通用模板（自适应多种 JSON 结构）

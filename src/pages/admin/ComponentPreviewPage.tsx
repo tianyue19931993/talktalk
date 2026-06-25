@@ -21,16 +21,19 @@ const observationData = {
 const challengeData = {
   challenge_steps: [
     {
+      step: 1,
       hint: '想一想，求一种商品的总价，可以用它的单价乘购买的数量。',
       question: '买12张课桌一共需要多少钱？',
       logic_type: '求总价',
     },
     {
+      step: 2,
       hint: '和求课桌总价的方法相同，用椅子的单价乘椅子的数量。',
       question: '买10把椅子一共需要多少钱？',
       logic_type: '求总价',
     },
     {
+      step: 3,
       hint: '把前面算出的课桌总价和椅子总价合在一起，就是一共需要的钱数。',
       question: '课桌和椅子的总花费合起来是多少元？',
       logic_type: '求和',

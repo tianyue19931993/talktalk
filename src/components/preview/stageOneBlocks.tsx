@@ -58,6 +58,7 @@ export type ObservationHintData = {
 
 export type ChallengeInfoData = {
   challenge_steps: Array<{
+    step?: number
     hint: string
     question: string
     logic_type: string
@@ -152,7 +153,14 @@ export function MInfo({ data, children }: { data?: ChallengeInfoData; children?:
       <div className="space-y-3 rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
         {data.challenge_steps.map((step, index) => (
           <div key={`${step.logic_type}-${index}`} className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
-            <div className="text-sm font-semibold text-[var(--color-ink)]">{step.question}</div>
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-[var(--color-body)]">
+                {step.step ?? index + 1}
+              </div>
+              <div className="min-w-0 flex-1 text-sm font-semibold leading-6 text-[var(--color-ink)]">
+                {step.question}
+              </div>
+            </div>
             <div className="mt-3 rounded-[var(--radius-md)] bg-white px-3 py-2 text-sm leading-6 text-[var(--color-body)]">
               {step.hint}
             </div>

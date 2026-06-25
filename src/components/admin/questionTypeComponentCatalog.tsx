@@ -40,7 +40,7 @@ export type ComponentChoice = {
 }
 
 export type ComponentGroup = {
-  id: 'scene' | 'look' | 'control' | 'visual' | 'animation' | 'challenge'
+  id: 'scene' | 'look' | 'control' | 'visual' | 'animation' | 'challenge' | 'math'
   label: string
   helper: string
   choices: ComponentChoice[]

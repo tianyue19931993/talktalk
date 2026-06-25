@@ -527,7 +527,6 @@ export function FallbackTemplatePreview({
   const hiddenConditions = normalizeList(analysis.hidden_conditions)
   const challengeSteps = normalizeList(analysis.challenge_steps)
   const feedbackItems = normalizeList(analysis.interaction_flow?.feedback)
-  const defaultAssets = normalizeList(analysis.default_assets)
   const componentRules = analysis.component_rules && typeof analysis.component_rules === 'object' ? analysis.component_rules : {}
   const discoverySource = [
     questionType,

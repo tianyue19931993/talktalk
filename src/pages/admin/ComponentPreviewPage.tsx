@@ -4,14 +4,12 @@ import { useMemo, useState } from 'react'
 import {
   ArrowRight,
   BadgeInfo,
-  FileCode2,
   Grid2x2,
   LayoutPanelTop,
   MonitorUp,
   Sparkles,
 } from 'lucide-react'
 import {
-  FallbackTemplatePreview,
   MotionStyles,
   PreviewCard,
   STAGE_ONE_SECTIONS,
@@ -20,7 +18,6 @@ import {
 
 export default function ComponentPreviewPage() {
   const [activeKey, setActiveKey] = useState(STAGE_ONE_SECTIONS[0]?.key ?? 'scene')
-  const [activeSheet, setActiveSheet] = useState<'components' | 'fallback'>('components')
 
   const activeSection = useMemo(
     () => STAGE_ONE_SECTIONS.find((section) => section.key === activeKey) ?? STAGE_ONE_SECTIONS[0],
@@ -71,189 +68,93 @@ export default function ComponentPreviewPage() {
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2 rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas)] p-2 shadow-[var(--shadow-l2)]">
-        <button
-          type="button"
-          onClick={() => setActiveSheet('components')}
-          className={`inline-flex items-center gap-2 rounded-[var(--radius-xl)] px-4 py-2 text-sm font-medium transition-all ${
-            activeSheet === 'components'
-              ? 'bg-[var(--color-link-bg-soft)] text-[var(--color-link)]'
-              : 'bg-transparent text-[var(--color-body)] hover:bg-[var(--color-canvas-soft)]'
-          }`}
-        >
-          <Grid2x2 className="h-4 w-4" />
-          组件展台
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSheet('fallback')}
-          className={`inline-flex items-center gap-2 rounded-[var(--radius-xl)] px-4 py-2 text-sm font-medium transition-all ${
-            activeSheet === 'fallback'
-              ? 'bg-[var(--color-link-bg-soft)] text-[var(--color-link)]'
-              : 'bg-transparent text-[var(--color-body)] hover:bg-[var(--color-canvas-soft)]'
-          }`}
-        >
-          <FileCode2 className="h-4 w-4" />
-          temp 兜底模板
-        </button>
+      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="space-y-4">
+          <PreviewCard title="预览分组" hint="点选后切换右侧演示内容">
+            <div className="space-y-2">
+              {STAGE_ONE_SECTIONS.map((section) => {
+                const isActive = section.key === activeSection.key
+                return (
+                  <button
+                    key={section.key}
+                    onClick={() => setActiveKey(section.key)}
+                    className={`w-full rounded-[var(--radius-xl)] border px-4 py-3 text-left transition-all ${
+                      isActive
+                        ? 'border-[var(--color-link)] bg-[var(--color-link-bg-soft)] shadow-[0_8px_24px_rgba(0,112,243,0.08)]'
+                        : 'border-[var(--color-hairline)] bg-white hover:border-[var(--color-link)]/50 hover:bg-[var(--color-canvas-soft)]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className={`text-sm font-semibold ${isActive ? 'text-[var(--color-link)]' : 'text-[var(--color-ink)]'}`}>
+                          {section.title}
+                        </div>
+                        <div className="mt-1 text-xs leading-5 text-[var(--color-mute)]">{section.subtitle}</div>
+                      </div>
+                      <ArrowRight className={`mt-0.5 h-4 w-4 ${isActive ? 'text-[var(--color-link)]' : 'text-[var(--color-mute)]'}`} />
+                    </div>
+                    <div className="mt-2 text-[11px] text-[var(--color-body)]">{section.items.length} 个积木</div>
+                  </button>
+                )
+              })}
+            </div>
+          </PreviewCard>
+
+          <PreviewCard title="三段式说明" hint="先把可复用的骨架搭稳">
+            <div className="space-y-3 text-sm text-[var(--color-body)]">
+              <div className="flex items-start gap-2">
+                <BadgeInfo className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
+                <p>Layout / Scene 只负责三段式页面骨架。</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <Grid2x2 className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
+                <p>观察、发现、挑战各自只保留自己的组件内容。</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <LayoutPanelTop className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
+                <p>后面生成 HTML 时，就按这三段式直接填组件。</p>
+              </div>
+            </div>
+          </PreviewCard>
+        </aside>
+
+        <main className="space-y-6">
+          <PreviewCard
+            title={activeSection.title}
+            hint={activeSection.subtitle}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-link-bg-soft)] px-3 py-1 text-xs text-[var(--color-link)]">
+                <Sparkles className="h-3.5 w-3.5" />
+                组件内容
+              </span>
+              <span className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1 text-xs text-[var(--color-body)]">
+                Layout / 观察区 / 发现区 / 挑战区
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {activeSection.items.map((item, index) => (
+                <div
+                  key={item.name}
+                  className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--color-ink)]">
+                        {index + 1}. {item.name}
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--color-mute)]">{item.description}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3">{item.node}</div>
+                </div>
+              ))}
+            </div>
+          </PreviewCard>
+        </main>
       </div>
-
-      {activeSheet === 'components' ? (
-        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="space-y-4">
-            <PreviewCard title="预览分组" hint="点选后切换右侧演示内容">
-              <div className="space-y-2">
-                {STAGE_ONE_SECTIONS.map((section) => {
-                  const isActive = section.key === activeSection.key
-                  return (
-                    <button
-                      key={section.key}
-                      onClick={() => setActiveKey(section.key)}
-                      className={`w-full rounded-[var(--radius-xl)] border px-4 py-3 text-left transition-all ${
-                        isActive
-                          ? 'border-[var(--color-link)] bg-[var(--color-link-bg-soft)] shadow-[0_8px_24px_rgba(0,112,243,0.08)]'
-                          : 'border-[var(--color-hairline)] bg-white hover:border-[var(--color-link)]/50 hover:bg-[var(--color-canvas-soft)]'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className={`text-sm font-semibold ${isActive ? 'text-[var(--color-link)]' : 'text-[var(--color-ink)]'}`}>
-                            {section.title}
-                          </div>
-                          <div className="mt-1 text-xs leading-5 text-[var(--color-mute)]">{section.subtitle}</div>
-                        </div>
-                        <ArrowRight className={`mt-0.5 h-4 w-4 ${isActive ? 'text-[var(--color-link)]' : 'text-[var(--color-mute)]'}`} />
-                      </div>
-                      <div className="mt-2 text-[11px] text-[var(--color-body)]">{section.items.length} 个积木</div>
-                    </button>
-                  )
-                })}
-              </div>
-            </PreviewCard>
-
-            <PreviewCard title="三段式说明" hint="先把可复用的骨架搭稳">
-              <div className="space-y-3 text-sm text-[var(--color-body)]">
-                <div className="flex items-start gap-2">
-                  <BadgeInfo className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
-                  <p>先做组件库，再让生成链路按区域吃这些组件。</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Grid2x2 className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
-                  <p>每个题型后面只需填数据和选组件，不用再让模型从零画界面。</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <LayoutPanelTop className="mt-0.5 h-4 w-4 text-[var(--color-link)]" />
-                  <p>如果这版样式确认没问题，下一步就可以开始把 analysis json 对到积木参数。</p>
-                </div>
-              </div>
-            </PreviewCard>
-          </aside>
-
-          <main className="space-y-6">
-            <PreviewCard
-              title={activeSection.title}
-              hint={activeSection.subtitle}
-              className="overflow-hidden"
-            >
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-link-bg-soft)] px-3 py-1 text-xs text-[var(--color-link)]">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  组合示例
-                </span>
-                <span className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1 text-xs text-[var(--color-body)]">
-                  用于 PC 端核对观察、发现和挑战
-                </span>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-                <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(244,247,251,1))] p-5 shadow-[var(--shadow-l2)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-medium text-[var(--color-link)]">示例场景</div>
-                      <h2 className="mt-1 text-xl font-semibold text-[var(--color-ink)]">把页面切成观察、发现、挑战三段</h2>
-                      <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--color-body)]">
-                        这里是一个小组合预览，展示积木在同一个页面里如何按区域协同工作。
-                      </p>
-                    </div>
-                    <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] px-4 py-3 text-right">
-                      <div className="text-[11px] text-[var(--color-mute)]">当前分区</div>
-                      <div className="text-sm font-semibold text-[var(--color-ink)]">{activeSection.title}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4">
-                      <div className="text-xs text-[var(--color-body)]">上：观察区</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--color-ink)]">题干 / 条件 / 数量</div>
-                      <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm text-[var(--color-body)]">
-                        这里只展示页面骨架，不放输入框和操作按钮。
-                      </div>
-                    </div>
-                    <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4">
-                      <div className="text-xs text-[var(--color-body)]">中：发现区</div>
-                      <div className="mt-3">
-                        <div className="rounded-[var(--radius-xl)] bg-gradient-to-r from-[rgba(121,40,202,0.08)] to-[rgba(255,0,128,0.08)] p-4">
-                          <div className="text-xs text-[var(--color-mute)]">规律发现</div>
-                          <div className="mt-1 text-3xl font-semibold text-[var(--color-ink)]">点击 / 拖拽 / 滑动</div>
-                          <div className="mt-1 text-xs text-[var(--color-body)]">先让孩子自己把关系动起来</div>
-                        </div>
-                      </div>
-                      <div className="mt-4">
-                        <div className="h-2 rounded-full bg-[var(--color-canvas-soft)] overflow-hidden">
-                          <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]" />
-                        </div>
-                        <div className="mt-2 text-xs text-[var(--color-body)]">探索完成度 68%</div>
-                      </div>
-                    </div>
-                    <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4">
-                      <div className="text-xs text-[var(--color-body)]">下：挑战区</div>
-                      <div className="mt-3 rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] p-4">
-                        <div className="text-xs text-[var(--color-link)]">验证答案</div>
-                        <div className="mt-1 text-lg font-semibold text-[var(--color-link)]">输入答案、核对结果</div>
-                        <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-4 py-3 text-sm text-[var(--color-ink)]">
-                          答案输入框 / 反馈 / 再试一次
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas)] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-[var(--color-body)]">当前分区节点</div>
-                      <div className="text-base font-semibold text-[var(--color-ink)]">{activeSection.title}</div>
-                    </div>
-                    <div className="rounded-full bg-white px-3 py-1 text-xs text-[var(--color-body)]">
-                      {activeSection.items.length} 个组件
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {activeSection.items.map((item, index) => (
-                      <div
-                        key={item.name}
-                        className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-[var(--color-ink)]">
-                              {index + 1}. {item.name}
-                            </div>
-                            <div className="mt-1 text-xs leading-5 text-[var(--color-mute)]">{item.description}</div>
-                          </div>
-                        </div>
-                        <div className="mt-3">{item.node}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </PreviewCard>
-          </main>
-        </div>
-      ) : (
-        <FallbackTemplatePreview />
-      )}
     </div>
   )
 }

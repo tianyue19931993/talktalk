@@ -384,34 +384,34 @@ export default function TypeManagePage() {
             />
             <ComponentMultiSelect
               label="观察区"
-              helper="题干、提示、数量和关系（只展示，不放操作控件）"
+              helper="题干、已知条件、隐含条件、求解目标（只展示，不放操作控件）"
               value={newLookComponents}
               onChange={setNewLookComponents}
               groupIndex={1}
             />
             <ComponentMultiSelect
-              label="发现区 · 操作"
-              helper="点击、拖拽、滑动、选择，负责孩子怎么做"
+              label="交互"
+              helper="交互"
               value={newControlComponents}
               onChange={setNewControlComponents}
               groupIndex={2}
             />
             <ComponentMultiSelect
-              label="发现区 · 展示"
+              label="交互 · 展示"
               helper="负责孩子看见什么，数量和关系怎么摆出来"
               value={newVisualComponents}
               onChange={setNewVisualComponents}
               groupIndex={3}
             />
             <ComponentMultiSelect
-              label="发现区 · 动画"
+              label="交互 · 动画"
               helper="负责操作后页面怎么演"
               value={newAnimationComponents}
               onChange={setNewAnimationComponents}
               groupIndex={4}
             />
             <ComponentMultiSelect
-              label="挑战区"
+              label="引导与思考"
               helper="系统给 challenge_steps，孩子写答案并验证"
               value={newChallengeComponents}
               onChange={setNewChallengeComponents}
@@ -528,16 +528,16 @@ export default function TypeManagePage() {
                           <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">观察区: {item}</span>
                         ))}
                         {visibleControlTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 操作: {item}</span>
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">交互: {item}</span>
                         ))}
                         {visibleVisualTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 展示: {item}</span>
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">交互 · 展示: {item}</span>
                         ))}
                         {visibleAnimationTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">发现区 · 动画: {item}</span>
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">交互 · 动画: {item}</span>
                         ))}
                         {visibleChallengeTags.map((item) => (
-                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">挑战区: {item}</span>
+                          <span key={item} className="rounded-full bg-[var(--color-canvas-soft)] px-2 py-1 text-[var(--color-body)]">引导与思考: {item}</span>
                         ))}
                         {!sceneTags.length && !visibleLookTags.length && !visibleControlTags.length && !visibleVisualTags.length && !visibleAnimationTags.length && !visibleChallengeTags.length && (
                           <span className="text-[var(--color-mute)]">暂无组件配置</span>
@@ -645,34 +645,34 @@ export default function TypeManagePage() {
                 />
                 <ComponentMultiSelect
                   label="观察区"
-                  helper="题干、提示、数量和关系（只展示，不放操作控件）"
+                  helper="题干、已知条件、隐含条件、求解目标（只展示，不放操作控件）"
                   value={editLookComponents}
                   onChange={setEditLookComponents}
                   groupIndex={1}
                 />
                 <ComponentMultiSelect
-                  label="发现区 · 操作"
-                  helper="点击、拖拽、滑动、选择，负责孩子怎么做"
+                  label="交互"
+                  helper="交互"
                   value={editControlComponents}
                   onChange={setEditControlComponents}
                   groupIndex={2}
                 />
                 <ComponentMultiSelect
-                  label="发现区 · 展示"
+                  label="交互 · 展示"
                   helper="负责孩子看见什么，数量和关系怎么摆出来"
                   value={editVisualComponents}
                   onChange={setEditVisualComponents}
                   groupIndex={3}
                 />
                 <ComponentMultiSelect
-                  label="发现区 · 动画"
+                  label="交互 · 动画"
                   helper="负责操作后页面怎么演"
                   value={editAnimationComponents}
                   onChange={setEditAnimationComponents}
                   groupIndex={4}
                 />
                 <ComponentMultiSelect
-                  label="挑战区"
+                  label="引导与思考"
                   helper="系统给 challenge_steps，孩子写答案并验证"
                   value={editChallengeComponents}
                   onChange={setEditChallengeComponents}

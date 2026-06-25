@@ -5,13 +5,10 @@ import {
 } from 'lucide-react'
 import {
   MButton,
-  MCard,
   MHint,
   MInput,
   MProgress,
   MResult,
-  MTitle,
-  ItemIcon,
   ItemGroup,
   Counter,
   Box,
@@ -68,13 +65,13 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
     id: 'scene',
     label: 'Layout / Scene',
-    helper: '唯一的页面骨架，先把观察 - 发现 - 挑战三段切好。',
+    helper: '唯一的页面骨架，先把观察 - 发现 - 引导与思考三段切好。',
     choices: [
       {
         key: 'ThreeZoneLayout',
         zh: '三区布局',
         en: 'ThreeZoneLayout',
-        description: '把一张页面固定切成观察区、发现区和挑战区。',
+        description: '把一张页面固定切成观察区、发现区和引导与思考区。',
         preview: miniCard('三区布局', 'ThreeZoneLayout', <div className="space-y-2"><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-link-bg-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /></div>),
       },
     ],
@@ -82,23 +79,35 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
     id: 'look',
     label: '观察区',
-    helper: '负责题干、提示、数量和关系的展示，只做观察，不放操作控件。',
+    helper: '只保留 MHint，用于展示已知条件、隐含关系和求解目标。',
     choices: [
-      { key: 'MTitle', zh: '标题组件', en: 'MTitle', description: '观察区的标题与题目氛围。', preview: <MTitle>成长表达实验室 M</MTitle> },
-      { key: 'MHint', zh: '提示标签', en: 'MHint', description: '给孩子看的观察提示。', preview: <MHint>先看条件</MHint> },
-      { key: 'MCard', zh: '内容卡片', en: 'MCard', description: '承载题干、图片和提示，只放展示内容。', preview: <MCard title="观察区" hint="把题目条件放在这里"><div className="text-xs text-[var(--color-body)]">示例内容</div></MCard> },
-      { key: 'Counter', zh: '数字计数', en: 'Counter', description: '数量一眼可见。', preview: <Counter value={12} unit="个" /> },
-      { key: 'ItemGroup', zh: '物体分组', en: 'ItemGroup', description: '把多个对象展示成组。', preview: <ItemGroup emoji="🍎" count={6} /> },
-      { key: 'PersonIcon', zh: '人物', en: 'PersonIcon', description: '小朋友 / 角色素材。', preview: <ItemIcon emoji="🧒" label="PersonIcon" tone="blue" /> },
-      { key: 'AppleIcon', zh: '苹果', en: 'AppleIcon', description: '常见数量对象。', preview: <ItemIcon emoji="🍎" label="AppleIcon" tone="pink" /> },
-      { key: 'TreeIcon', zh: '树', en: 'TreeIcon', description: '生长和规律场景。', preview: <ItemIcon emoji="🌳" label="TreeIcon" tone="green" /> },
-      { key: 'RoadIcon', zh: '道路', en: 'RoadIcon', description: '路径 / 时间 / 移动。', preview: <ItemIcon emoji="🛣️" label="RoadIcon" tone="blue" /> },
-      { key: 'MachineIcon', zh: '机器', en: 'MachineIcon', description: '变化与操作场景。', preview: <ItemIcon emoji="⚙️" label="MachineIcon" tone="purple" /> },
+      {
+        key: 'MHint',
+        zh: '提示标签',
+        en: 'MHint',
+        description: '展示已知条件、隐含关系和求解目标。',
+        preview: (
+          <MHint
+            data={{
+              goal: { text: '一共需要多少元？', target: '总花费金额' },
+              known_conditions: [
+                { text: '学校要买12张课桌', unit: '张', value: 12 },
+                { text: '学校要买10把椅子', unit: '把', value: 10 },
+                { text: '每张课桌90元', unit: '元/张', value: 90 },
+                { text: '每把椅子32元', unit: '元/把', value: 32 },
+              ],
+              hidden_conditions: [
+                { text: '总花费等于购买课桌的总价与购买椅子的总价之和' },
+              ],
+            }}
+          />
+        ),
+      },
     ],
   },
   {
     id: 'control',
-    label: '发现区 · 操作',
+    label: '交互',
     helper: '负责孩子怎么点、怎么拖、怎么选。',
     choices: [
       { key: 'ClickControl', zh: '点击按钮', en: 'ClickControl', description: '一步一步点，适合简单推进。', preview: <ClickControl label="点一下" helper="点击后继续" /> },
@@ -111,7 +120,7 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   },
   {
     id: 'visual',
-    label: '发现区 · 展示',
+    label: '交互 · 展示',
     helper: '负责孩子看见什么、数量关系怎么摆出来。',
     choices: [
       { key: 'MInput', zh: '输入框', en: 'MInput', description: '发现区里的可输入操作。', preview: <MInput value="在此输入文字..." /> },
@@ -132,7 +141,7 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   },
   {
     id: 'animation',
-    label: '发现区 · 动画',
+    label: '交互 · 动画',
     helper: '负责操作后页面怎么演。',
     choices: [
       { key: 'Highlight', zh: '高亮', en: 'Highlight', description: '强调关键位置。', preview: animationPill('Highlight', 'bg-[var(--color-link)]') },
@@ -149,7 +158,7 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   },
   {
     id: 'challenge',
-    label: '挑战区',
+    label: '引导与思考',
     helper: '负责系统给孩子 challenge_steps，孩子写答案并验证。',
     choices: [
       { key: 'AnswerInput', zh: '答案输入', en: 'AnswerInput', description: '孩子自己输入最终答案。', preview: <AnswerInput value="4" /> },
@@ -180,7 +189,7 @@ export function ComponentPickerPreviewHelp() {
         先按“观察 / 发现操作 / 发现展示 / 发现动画 / 挑战”分区，再在区内选择组件
       </div>
       <div className="mt-2 text-xs leading-5 text-[var(--color-body)]">
-        观察区只放展示类；发现区拆成操作、展示和动画三栏；挑战区放输入、验证和结果反馈。每个分区都支持多选，多个值会用英文逗号保存。
+        观察区只放展示类；交互区拆成操作、展示和动画三栏；引导与思考放输入、验证和结果反馈。每个分区都支持多选，多个值会用英文逗号保存。
       </div>
     </div>
   )

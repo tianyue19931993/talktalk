@@ -22,6 +22,7 @@ import OrderManagePage from './pages/admin/OrderManagePage'
 import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
 import ConfigsManagePage from './pages/admin/ConfigsManagePage'
 import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
+import DiscoveryComponentPage from './pages/admin/DiscoveryComponentPage'
 import MathComponentPreviewPage from './pages/admin/MathComponentPreviewPage'
 
 export default function App() {
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="configs" element={<ConfigsManagePage />} />
         <Route path="component-preview" element={<ComponentPreviewPage />} />
         <Route path="math-components" element={<MathComponentPreviewPage />} />
+        <Route path="discovery-components" element={<DiscoveryComponentPage />} />
       </Route>
 
       {/* Fallback */}

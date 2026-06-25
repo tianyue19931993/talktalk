@@ -41,6 +41,29 @@ type ResultProps = {
   note?: string
 }
 
+export type ObservationHintData = {
+  goal: {
+    text: string
+    target: string
+  }
+  known_conditions: Array<{
+    text: string
+    unit?: string
+    value?: string | number
+  }>
+  hidden_conditions: Array<{
+    text: string
+  }>
+}
+
+export type ChallengeInfoData = {
+  challenge_steps: Array<{
+    hint: string
+    question: string
+    logic_type: string
+  }>
+}
+
 type IconProps = {
   emoji: string
   label: string
@@ -77,13 +100,69 @@ export function MTitle({ children }: { children: ReactNode }) {
   return <h2 className="text-lg font-semibold text-[var(--color-ink)] tracking-tight">{children}</h2>
 }
 
-export function MHint({ children }: { children: ReactNode }) {
+export function MHint({ data, children }: { data?: ObservationHintData; children?: ReactNode }) {
+  if (data) {
+    return (
+      <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-4">
+            <div className="space-y-2">
+              {data.known_conditions.map((item, index) => (
+                <div key={`${item.text}-${index}`} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)]">
+                  {item.text}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-4">
+              <div className="space-y-2">
+                {data.hidden_conditions.map((item, index) => (
+                  <div key={`${item.text}-${index}`} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)]">
+                    {item.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] p-4">
+              <div className="rounded-[var(--radius-md)] border border-[var(--color-link)]/20 bg-white px-3 py-2">
+                <div className="text-sm font-medium text-[var(--color-ink)]">{data.goal.text}</div>
+                <div className="mt-1 text-xs text-[var(--color-link)]">{data.goal.target}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="inline-flex items-center gap-1 rounded-full bg-[var(--color-canvas-soft)] px-3 py-1 text-xs text-[var(--color-body)]">
       <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-link)]" />
       {children}
     </div>
   )
+}
+
+export function MInfo({ data, children }: { data?: ChallengeInfoData; children?: ReactNode }) {
+  if (data) {
+    return (
+      <div className="space-y-3 rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
+        {data.challenge_steps.map((step, index) => (
+          <div key={`${step.logic_type}-${index}`} className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
+            <div className="text-sm font-semibold text-[var(--color-ink)]">{step.question}</div>
+            <div className="mt-3 rounded-[var(--radius-md)] bg-white px-3 py-2 text-sm leading-6 text-[var(--color-body)]">
+              {step.hint}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }
 
 export function MCard({ title, hint, children, className = '' }: CardProps) {
@@ -499,12 +578,12 @@ const DEFAULT_FALLBACK_ANALYSIS = {
   },
   default_assets: ['乒乓球拍.png', '硬币.png'],
   component_rules: {
-    scene: '页面分为顶部观察区（展示题目条件）和底部发现区（交互操作）以及右侧挑战区（输入答案）',
+    scene: '页面分为顶部观察区（展示题目条件）和中部交互（交互）以及下方引导与思考（输入答案）',
     look: '观察区展示乒乓球拍图片、单价标签 37 元，李老师带的总钱数 280 元',
-    control: '发现区提供数量滑块和加减按钮，数量范围 0-10，滑块限制不超过最大可行数量',
-    visual: '发现区实时显示公式：37 × 数量 = 花费，以及剩余 = 280 - 花费，用数字和色块表示',
-    animation: '发现区根据数量变化，硬币从总数中减少，花费数字增大，剩余数字减小，超限时红色警示',
-    challenge: '挑战区提供两个输入框：第一问“最多可买多少副”，第二问“还剩多少元”，提交后验证答案，正确显示绿色勾，错误显示红色叉并提示',
+    control: '交互区提供数量滑块和加减按钮，数量范围 0-10，滑块限制不超过最大可行数量',
+    visual: '交互区实时显示公式：37 × 数量 = 花费，以及剩余 = 280 - 花费，用数字和色块表示',
+    animation: '交互区根据数量变化，硬币从总数中减少，花费数字增大，剩余数字减小，超限时红色警示',
+    challenge: '引导与思考区提供两个输入框：第一问“最多可买多少副”，第二问“还剩多少元”，提交后验证答案，正确显示绿色勾，错误显示红色叉并提示',
   },
 }
 
@@ -705,7 +784,7 @@ export function FallbackTemplatePreview({
               </div>
             </div>
             <div className="mt-4 text-xs text-[var(--color-body)]">
-              {quantity === 7 ? '已经到 7 副了，继续去挑战区验证答案。' : '继续调整，直到找到不超支的最大数量。'}
+              {quantity === 7 ? '已经到 7 副了，继续去引导与思考区验证答案。' : '继续调整，直到找到不超支的最大数量。'}
             </div>
           </div>
 
@@ -733,7 +812,7 @@ export function FallbackTemplatePreview({
         </div>
       </PreviewCard>
 
-      <PreviewCard title="3. 挑战区" hint="输入答案，真验证。">
+      <PreviewCard title="3. 引导与思考" hint="输入答案，真验证。">
         <div className="space-y-4">
           <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4 shadow-[var(--shadow-l2)]">
             <div className="text-sm font-semibold text-[var(--color-ink)]">挑战步骤</div>
@@ -792,284 +871,32 @@ export function FallbackTemplatePreview({
   )
 }
 
-export const STAGE_ONE_SECTIONS: StageOneSection[] = [
-  {
-    key: 'scene',
-    title: 'Layout / Scene',
-    subtitle: '唯一的页面骨架，固定分成「观察 - 发现 - 挑战」三段。',
-    items: [
-      {
-        name: 'ThreeZoneLayout',
-        description: '统一页面框架，把题目自然切成观察区、发现区和挑战区。',
-        node: (
-          <div className="space-y-3 rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-3">
-              <div className="text-xs text-[var(--color-body)]">上：观察区</div>
-              <div className="mt-2 text-sm text-[var(--color-ink)]">题干、条件、素材、数量关系</div>
-            </div>
-            <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-3">
-              <div className="text-xs text-[var(--color-body)]">中：发现区</div>
-              <div className="mt-2 text-sm text-[var(--color-ink)]">点击、拖拽、滑动、选择</div>
-            </div>
-            <div className="rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] p-3">
-              <div className="text-xs text-[var(--color-link)]">下：挑战区</div>
-              <div className="mt-2 text-sm font-medium text-[var(--color-link)]">输入、验证、得出答案</div>
-            </div>
-          </div>
-        ),
-      },
-    ],
+const OBSERVATION_HINT_SAMPLE: ObservationHintData = {
+  goal: {
+    text: '一共需要多少元？',
+    target: '总花费金额',
   },
+  known_conditions: [
+    { text: '学校要买12张课桌', unit: '张', value: 12 },
+    { text: '学校要买10把椅子', unit: '把', value: 10 },
+    { text: '每张课桌90元', unit: '元/张', value: 90 },
+    { text: '每把椅子32元', unit: '元/把', value: 32 },
+  ],
+  hidden_conditions: [
+    { text: '总花费等于购买课桌的总价与购买椅子的总价之和' },
+  ],
+}
+
+export const STAGE_ONE_SECTIONS: StageOneSection[] = [
   {
     key: 'observation',
     title: '观察区组件',
-    subtitle: '负责看见题目、条件和数量关系，只做展示，不做操作。',
+    subtitle: '只展示已知条件、隐含关系和求解目标。',
     items: [
-      {
-        name: 'MTitle',
-        description: '题目主标题，强调场景和任务。',
-        node: (
-          <div className="rounded-[var(--radius-2xl)] bg-[var(--color-canvas)] p-5">
-            <MTitle>成长表达实验室 M</MTitle>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <MHint>先看题目</MHint>
-              <MHint>再看条件</MHint>
-              <MHint>最后找关系</MHint>
-            </div>
-          </div>
-        ),
-      },
       {
         name: 'MHint',
-        description: '观察提示条，帮助孩子抓住关键字。',
-        node: (
-          <div className="flex flex-wrap gap-2">
-            <MHint>已知条件</MHint>
-            <MHint>隐含关系</MHint>
-            <MHint>验证目标</MHint>
-          </div>
-        ),
-      },
-      {
-        name: 'MCard',
-        description: '承载观察信息的统一卡片。',
-        node: (
-          <MCard title="观察区示例" hint="把题干、条件、提示放在同一个信息卡里">
-            <div className="rounded-[var(--radius-md)] bg-[var(--color-canvas-soft)] px-4 py-3 text-sm leading-7 text-[var(--color-ink)]">
-              题目条件与数量关系展示区
-            </div>
-          </MCard>
-        ),
-      },
-      {
-        name: 'Counter',
-        description: '把数量直接摆出来，让孩子一眼看到数。',
-        node: <Counter value={12} unit="个" />,
-      },
-      {
-        name: 'ItemIcon',
-        description: '单个素材图标，适合观察题目的角色/物体。',
-        node: <ItemIcon emoji="🍎" label="Apple" tone="pink" />,
-      },
-      {
-        name: 'ItemGroup',
-        description: '把多个物体直接组合展示出来。',
-        node: <ItemGroup emoji="🍎" count={6} />,
-      },
-    ],
-  },
-  {
-    key: 'discovery',
-    title: '发现区组件',
-    subtitle: '负责展示方式、操作方式和操作后的变化。',
-    items: [
-      {
-        name: 'ClickControl',
-        description: '点击推进一步。',
-        node: <ClickControl label="点一下" helper="点击后继续探索" />,
-      },
-      {
-        name: 'DragControl',
-        description: '拖拽去发现位置变化。',
-        node: <DragControl from="🍎 苹果" to="📦 盒子" />,
-      },
-      {
-        name: 'SliderControl',
-        description: '滑动选择数量变化。',
-        node: <SliderControl value={62} />,
-      },
-      {
-        name: 'StepButton',
-        description: '按步骤推进探索路径。',
-        node: <StepButton label="下一步" />,
-      },
-      {
-        name: 'ChoiceControl',
-        description: '适合选择判断和分组。',
-        node: <ChoiceControl options={['A', 'B', 'C', 'D']} activeIndex={2} />,
-      },
-      {
-        name: 'MButton',
-        description: '统一风格的操作按钮。',
-        node: (
-          <div className="flex flex-wrap gap-2">
-            <MButton>开始探索</MButton>
-            <MButton variant="secondary">重置</MButton>
-            <MButton variant="ghost">跳过</MButton>
-          </div>
-        ),
-      },
-      {
-        name: 'MInput',
-        description: '发现区里的可输入控件，常用于操作中的临时输入。',
-        node: <MInput value="在此输入文字..." />,
-      },
-      {
-        name: 'MProgress',
-        description: '发现过程中的进度和变化反馈。',
-        node: <MProgress value={68} />,
-      },
-      {
-        name: 'Counter',
-        description: '发现过程中的数字反馈。',
-        node: <Counter value={8} unit="步" />,
-      },
-      {
-        name: 'ItemGroup',
-        description: '配合交互展示多个对象的变化。',
-        node: <ItemGroup emoji="🍎" count={6} />,
-      },
-      {
-        name: 'Box',
-        description: '发现区里的基础展示盒子。',
-        node: <Box label="展示区" />,
-      },
-      {
-        name: 'DashedBox',
-        description: '发现区里的可操作空位。',
-        node: <DashedBox label="拖入这里" />,
-      },
-      {
-        name: 'SolidBox',
-        description: '发现区里的目标区域。',
-        node: <SolidBox label="目标区" />,
-      },
-      {
-        name: 'Arrow',
-        description: '表达移动和对应关系。',
-        node: <Arrow label="指向" />,
-      },
-      {
-        name: 'Balance',
-        description: '表达平衡、差额和移多补少。',
-        node: <Balance left={3} right={5} />,
-      },
-      {
-        name: 'Bar',
-        description: '把数量关系转成长度关系。',
-        node: <Bar value={7} max={10} />,
-      },
-      {
-        name: 'Timeline',
-        description: '时间推进和状态变化。',
-        node: <Timeline activeIndex={1} />,
-      },
-      {
-        name: 'NumberLine',
-        description: '数轴上的位置变化。',
-        node: <NumberLine marker={4} />,
-      },
-      {
-        name: 'PointSegment',
-        description: '点数和段数关系。',
-        node: <PointSegment start={2} end={7} />,
-      },
-      {
-        name: 'Highlight',
-        description: '高亮关键位置。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Highlight</div><div className="rounded-full bg-[var(--color-link-bg-soft)] px-4 py-2 text-[var(--color-link)]" style={{ animation: 'preview-glow 2s ease-in-out infinite' }}>关键数据</div></div>,
-      },
-      {
-        name: 'Move',
-        description: '移动动画，表达位置变化。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Move</div><div className="relative h-10 overflow-hidden rounded-full bg-[var(--color-canvas-soft)]"><div className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-[var(--color-gradient-start)] px-3 py-1.5 text-sm text-white" style={{ animation: 'preview-slide 2.2s ease-in-out infinite' }}>移动</div></div></div>,
-      },
-      {
-        name: 'Split',
-        description: '拆分变化。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Split</div><div className="flex items-center justify-center gap-3"><div className="rounded-full bg-[var(--color-link-bg-soft)] px-3 py-1.5 text-sm text-[var(--color-link)]" style={{ animation: 'preview-slide 2.2s ease-in-out infinite' }}>1份</div><div className="text-[var(--color-body)]">→</div><div className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1.5 text-sm text-[var(--color-body)]">2份</div></div></div>,
-      },
-      {
-        name: 'Merge',
-        description: '合并变化。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Merge</div><div className="flex items-center justify-center gap-2"><div className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1.5 text-sm">A</div><div className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1.5 text-sm">B</div><div className="text-[var(--color-body)]">→</div><div className="rounded-full bg-[var(--color-link-bg-soft)] px-3 py-1.5 text-sm text-[var(--color-link)]">AB</div></div></div>,
-      },
-      {
-        name: 'FadeOut',
-        description: '渐隐退场。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">FadeOut</div><div className="rounded-[var(--radius-md)] bg-[var(--color-canvas-soft)] px-4 py-3 text-center text-sm text-[var(--color-body)]" style={{ animation: 'preview-fade 2s ease-in-out infinite' }}>旧数据淡出</div></div>,
-      },
-      {
-        name: 'CountUp',
-        description: '数值跳动反馈。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">CountUp</div><div className="text-3xl font-semibold text-[var(--color-ink)]" style={{ animation: 'preview-countup 1.8s ease-in-out infinite alternate' }}>4</div></div>,
-      },
-      {
-        name: 'Shake',
-        description: '错误或提醒反馈。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Shake</div><div className="rounded-full bg-[var(--color-error-soft)] px-4 py-2 text-[var(--color-error)]" style={{ animation: 'preview-shake 1.2s ease-in-out infinite' }}>再试一次</div></div>,
-      },
-      {
-        name: 'Glow',
-        description: '关键状态发光。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">Glow</div><div className="rounded-full bg-[var(--color-gradient-start)] px-4 py-2 text-white" style={{ animation: 'preview-glow 2s ease-in-out infinite' }}>重点</div></div>,
-      },
-      {
-        name: 'ConnectLine',
-        description: '连线关系提示。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">ConnectLine</div><div className="relative h-14"><div className="absolute left-4 top-5 h-6 w-6 rounded-full bg-[var(--color-link)]" /><div className="absolute right-4 top-5 h-6 w-6 rounded-full bg-[var(--color-highlight-pink)]" /><div className="absolute left-10 right-10 top-1/2 h-px border-t border-dashed border-[var(--color-link)]" /></div></div>,
-      },
-      {
-        name: 'RevealGap',
-        description: '空位揭示。',
-        node: <div className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-white p-4"><div className="text-xs text-[var(--color-body)] mb-3">RevealGap</div><div className="rounded-[var(--radius-md)] border-2 border-dashed border-[var(--color-link)] bg-[var(--color-link-bg-soft)] px-4 py-3 text-center text-[var(--color-link)]" style={{ animation: 'preview-reveal 2s ease-in-out infinite alternate' }}>答案藏在这里</div></div>,
-      },
-    ],
-  },
-  {
-    key: 'challenge',
-    title: '挑战区组件',
-    subtitle: '负责输入答案、验证结果和回收结论。',
-    items: [
-      {
-        name: 'AnswerInput',
-        description: '孩子输入最终答案。',
-        node: <AnswerInput value="4" />,
-      },
-      {
-        name: 'MResult',
-        description: '把结果明确展示出来。',
-        node: <MResult label="最终答案" value="4" unit="个" note="验证正确后再显示" />,
-      },
-      {
-        name: 'ChoiceControl',
-        description: '也可用于挑战区的最终选择。',
-        node: <ChoiceControl options={['正确', '再想想', '看提示']} activeIndex={0} />,
-      },
-      {
-        name: 'StepButton',
-        description: '最后一步推进。',
-        node: <StepButton label="提交答案" />,
-      },
-      {
-        name: 'MButton',
-        description: '挑战区操作按钮。',
-        node: (
-          <div className="flex flex-wrap gap-2">
-            <MButton>提交</MButton>
-            <MButton variant="secondary">查看答案</MButton>
-          </div>
-        ),
+        description: '根据题目 JSON 展示已知条件、隐含关系和求解目标。',
+        node: <MHint data={OBSERVATION_HINT_SAMPLE} />,
       },
     ],
   },

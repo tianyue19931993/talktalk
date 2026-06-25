@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, NavLink, useLocation, Link, useNavigate } from 'react-router-dom'
-import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings, Eye, Sigma } from 'lucide-react'
+import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings, Eye, Sigma, Sparkles } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 
 interface SidebarItem {
@@ -19,8 +19,9 @@ const sidebarItems: SidebarItem[] = [
   { path: '/admin/subscriptions', label: '订阅管理', icon: Crown },
   { path: '/admin/orders', label: '订单管理', icon: Receipt },
   { path: '/admin/plans', label: '套餐管理', icon: Crown },
-  { path: '/admin/component-preview', label: '组件预览', icon: Eye },
+  { path: '/admin/component-preview', label: '页面组件', icon: Eye },
   { path: '/admin/math-components', label: '数学组件', icon: Sigma },
+  { path: '/admin/discovery-components', label: '发现区组件', icon: Sparkles },
   { path: '/admin/configs', label: '系统配置', icon: Settings },
 ]
 

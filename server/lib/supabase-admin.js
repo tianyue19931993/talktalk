@@ -62,3 +62,8 @@ export function updateWhere(table, filters, data) {
 export function update(table, idColumn, idValue, data) {
   return request(`/${table}?${idColumn}=eq.${idValue}`, { method: 'PATCH', body: data })
 }
+
+export function removeWhere(table, filters) {
+  const qs = Object.entries(filters).map(([k, v]) => `${k}=eq.${encodeURIComponent(v)}`).join('&')
+  return request(`/${table}?${qs}`, { method: 'DELETE' })
+}

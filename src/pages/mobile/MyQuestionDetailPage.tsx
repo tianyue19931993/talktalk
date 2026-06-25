@@ -5,8 +5,8 @@ import { getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: '生成中，请耐心等待 1～3 分钟', color: 'text-yellow-700 bg-yellow-50' },
-  completed: { label: '已生成', color: 'text-green-700 bg-green-50' },
+  pending: { label: '请耐心等待 1～3 分钟', color: 'text-yellow-700 bg-yellow-50' },
+  completed: { label: '基础分析已完成', color: 'text-green-700 bg-green-50' },
   uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50' },
 }
 

@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Sparkles, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
+import { FileText, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
 import { getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
-// import { optimizeDemo } from '../../lib/generate'
 import { useAuth } from '../../stores/authStore'
-import { generateDemo } from '../../lib/generate'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -22,8 +20,6 @@ export default function MyQuestionsPage() {
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [regenerating, setRegenerating] = useState<Set<string>>(new Set())
-  const [regenNotice, setRegenNotice] = useState('')
 
   const filteredQuestions = useMemo(() => {
     if (!search.trim()) return questions
@@ -54,38 +50,6 @@ export default function MyQuestionsPage() {
     setLoading(false)
   }
 
-  async function handleRegenerate(q: UserQuestion) {
-    setRegenNotice('正在生成中，请耐心等待 1～3 分钟，后刷新页面查看。')
-    window.alert('正在生成中，请耐心等待 1～3 分钟，后刷新页面查看。')
-    setRegenerating(prev => new Set(prev).add(q.id))
-    try {
-      const result = await generateDemo(q.id, { type: 'regenerate' })
-      if (result.timedOut || result.error === 'timeout') {
-        // 超时但后端可能还在跑 → 不报错，提示用户稍等
-        setTimeout(() => loadAll(), 5000)
-        return
-      }
-      if (result.success) {
-        await loadAll()
-        setRegenNotice('已收到重新生成请求，正在更新列表...')
-        setTimeout(() => setRegenNotice(''), 3000)
-      } else if (!result.timedOut) {
-        alert(result.error || '重新生成失败，请重试')
-        setRegenNotice('')
-      }
-    } catch {
-      // 网络错误也不弹窗，后端可能已接收请求
-      setTimeout(() => loadAll(), 3000)
-      setRegenNotice('请求已发出，稍后刷新查看结果')
-    } finally {
-      setRegenerating(prev => {
-        const next = new Set(prev)
-        next.delete(q.id)
-        return next
-      })
-    }
-  }
-
   const downloadHtml = async (url: string, label: string) => {
     try {
       let blobUrl: string | null = null
@@ -108,9 +72,10 @@ export default function MyQuestionsPage() {
       link.click()
       document.body.removeChild(link)
       if (blobUrl) URL.revokeObjectURL(blobUrl)
-    } catch (e: any) {
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '未知错误'
       console.error('[downloadHtml]', e)
-      alert('下载失败：' + (e.message || '未知错误'))
+      alert('下载失败：' + message)
     }
   }
 
@@ -139,11 +104,6 @@ export default function MyQuestionsPage() {
               刷新
             </button>
           </div>
-          {regenNotice && (
-            <div className="mb-3 rounded-[var(--radius-md)] border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-              {regenNotice}
-            </div>
-          )}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-mute)]" />
             <input
@@ -168,11 +128,10 @@ export default function MyQuestionsPage() {
             <div className="w-16 h-16 rounded-full bg-[var(--color-canvas-soft-2)] flex items-center justify-center mb-4">
               <FileText className="w-8 h-8 text-[var(--color-mute)]" />
             </div>
-            <p className="text-sm font-medium text-[var(--color-ink)] mb-1">还没有生成</p>
-            <p className="text-xs text-[var(--color-mute)] mb-6">在首页操作生成后，会在这里显示</p>
+            <p className="text-sm font-medium text-[var(--color-ink)] mb-1">还没有互动记录</p>
+            <p className="text-xs text-[var(--color-mute)] mb-6">生成入口重写完成后，这里会显示你创建的内容</p>
             <Button variant="primary" size="sm" onClick={() => navigate('/')}>
-              <Sparkles className="w-4 h-4" />
-              去生成
+              返回首页
             </Button>
           </div>
         ) : filteredQuestions.length === 0 ? (
@@ -183,10 +142,12 @@ export default function MyQuestionsPage() {
           filteredQuestions.map((q) => {
             const demos = demosMap[q.id] || []
             const latestDemo = demos[0]
-            // 有演示 → 已生成；无演示 → 统一显示生成中，避免首页/列表状态不一致
-            const st = demos.length > 0
-              ? { label: '已生成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
-              : { label: '生成中，请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+            const effectiveStatus = q.status === 'pending' && demos.length > 0 ? 'completed' : q.status
+            const st = effectiveStatus === 'completed'
+              ? { label: '基础分析已完成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
+              : effectiveStatus === 'uploaded'
+                ? { label: '已上传', color: 'text-blue-700 bg-blue-50', icon: Clock }
+                : { label: '请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
             const StatusIcon = st.icon
             return (
               <div
@@ -203,30 +164,16 @@ export default function MyQuestionsPage() {
                     {st.label}
                   </span>
                   <span className="text-[10px] text-[var(--color-mute)]">
-                    {demos.length > 0 && latestDemo
+                    {effectiveStatus === 'completed' && demos.length > 0 && latestDemo
                       ? `生成于 ${formatDateTime(latestDemo.createdAt)}`
                       : `提交于 ${formatDateTime(q.createdAt)}`
                     }
                   </span>
                 </div>
 
-                {/* action buttons row: regenerate + demos */}
+                {/* action buttons row: demos */}
                 <div className="pt-2 border-t border-[var(--color-hairline)]">
                   <div className="flex flex-wrap gap-2">
-                    {/* 重新生成 — 始终显示 */}
-                    <button
-                      onClick={() => handleRegenerate(q)}
-                      disabled={regenerating.has(q.id)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                        text-purple-600 bg-purple-50 border border-purple-200
-                        rounded-full hover:bg-purple-100 hover:scale-[1.02] active:scale-[0.98]
-                        disabled:opacity-40 disabled:cursor-not-allowed
-                        transition-all duration-200 cursor-pointer shrink-0"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${regenerating.has(q.id) ? 'animate-spin' : ''}`} />
-                      重新生成
-                    </button>
-
                     {/* demos */}
                     {demos.length > 0 ? (
                       demos.map((demo) => (

@@ -8,8 +8,7 @@ import { pathToFileURL } from 'node:url'
 
 const apiRoutes: Record<string, string> = {
   '/api/auth/reset-password': 'api/auth/reset-password.js',
-  '/api/generate/demo': 'api/generate/demo.js',
-  '/api/generate/optimize': 'api/generate/optimize.js',
+  '/api/user-questions/submit': 'api/user-questions/submit.js',
   '/api/pay/cancel': 'api/pay/cancel.js',
   '/api/pay/create-order': 'api/pay/create-order.js',
   '/api/pay/notify': 'api/pay/notify.js',

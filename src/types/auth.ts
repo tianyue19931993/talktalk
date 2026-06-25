@@ -68,6 +68,13 @@ export interface AuthSession {
   }
 }
 
+/** 可存储到 JSONB 的通用 JSON 类型 */
+export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[]
+
+export interface JsonObject {
+  [key: string]: JsonValue
+}
+
 /** 用户录入的题目（与题库 questions 表区分） */
 export interface UserQuestion {
   id: string
@@ -76,7 +83,10 @@ export interface UserQuestion {
   questionType: string
   questionTypeId: number | null
   coreDiscovery: string
-  analysisJson: any
+  analysisJson: JsonValue
+  mathAnalysisJson?: JsonValue
+  logicAnalysisJson?: JsonValue
+  tutorAnalysisJson?: JsonValue
   status: 'pending' | 'completed' | 'uploaded'
   createdAt: string
   updatedAt: string

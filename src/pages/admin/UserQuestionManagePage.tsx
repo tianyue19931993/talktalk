@@ -9,8 +9,8 @@ import type { UserQuestion, QuestionDemo } from '../../types/auth'
 const PAGE_SIZE = 20
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  pending: { label: '生成中，请耐心等待 1～3 分钟', color: 'bg-yellow-50 text-yellow-700' },
-  completed: { label: '已生成', color: 'bg-green-50 text-green-700' },
+  pending: { label: '请耐心等待 1～3 分钟', color: 'bg-yellow-50 text-yellow-700' },
+  completed: { label: '基础分析已完成', color: 'bg-green-50 text-green-700' },
   uploaded: { label: '已上传', color: 'bg-blue-50 text-blue-700' },
 }
 
@@ -27,7 +27,7 @@ export default function UserQuestionManagePage() {
   useEffect(() => {
     if (!isAdmin) { navigate('/admin/lessons'); return }
     loadData()
-  }, [isAdmin])
+  }, [isAdmin, navigate])
 
   async function loadData() {
     setLoading(true)
@@ -88,8 +88,6 @@ export default function UserQuestionManagePage() {
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE)
   const safePage = Math.min(page, Math.max(1, pageCount))
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
-  useEffect(() => { setPage(1) }, [search])
 
   if (loading) return <div className="text-center py-12 text-sm text-[var(--color-mute)]">加载中...</div>
 
@@ -163,7 +161,6 @@ export default function UserQuestionManagePage() {
                       <tr>
                         <td colSpan={5} className="px-4 py-4 bg-[var(--color-canvas-soft)] border-b border-[var(--color-hairline)]">
                           <InlineDemoManager
-                            question={q}
                             demos={demos}
                             onUpload={() => handleUploadHtml(q.id)}
                             onPreview={(url) => handlePreviewHtml(url)}
@@ -189,9 +186,8 @@ export default function UserQuestionManagePage() {
 
 // ─── 行内演示管理组件 ───────────────────────
 
-function InlineDemoManager({ question: _question, demos, onUpload, onPreview, onRemove }: {
-  question: any
-  demos: any[]
+function InlineDemoManager({ demos, onUpload, onPreview, onRemove }: {
+  demos: QuestionDemo[]
   onUpload: () => void
   onPreview: (url: string) => void
   onRemove: (id: string) => void

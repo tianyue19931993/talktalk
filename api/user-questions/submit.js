@@ -45,7 +45,7 @@ async function getConfigValue(key) {
 
 async function getLogicTypes() {
   const { data, error } = await query('logic_types', {
-    select: 'name,math_component',
+    select: 'name,math_component,component_props',
     order: 'name',
     ascending: true,
   })
@@ -55,6 +55,7 @@ async function getLogicTypes() {
     .map((row) => ({
       name: safeText(row?.name),
       mathComponent: safeText(row?.math_component),
+      componentProps: safeText(row?.component_props),
     }))
     .filter((item) => item.name && item.mathComponent)
 
@@ -63,6 +64,28 @@ async function getLogicTypes() {
   }
 
   return list
+}
+
+function parseComponentPropKeys(componentPropsText) {
+  const text = safeText(componentPropsText)
+  if (!text) return []
+
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => safeText(item)).filter(Boolean)
+    }
+    if (parsed && typeof parsed === 'object') {
+      return Object.keys(parsed).filter(Boolean)
+    }
+  } catch {
+    // ignore and fall back to plain-text parsing
+  }
+
+  return text
+    .split(/[,，、\n\r\t;；|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 function buildPrompt(configValue, questionText, context = {}) {
@@ -84,6 +107,16 @@ function buildPrompt(configValue, questionText, context = {}) {
   if (context.logicTypes) {
     sections.push('', 'logic_types 表候选列表：', JSON.stringify(context.logicTypes, null, 2))
     sections.push('', '允许的 type 值（只能从下面选择，必须原样返回）：', context.logicTypes.map((item) => item.name).join(' | '))
+    sections.push('', '每个 logic_type 对应的 component_props（必须严格遵守，props 的 key 只能来自这里）：', JSON.stringify(
+      context.logicTypes.map((item) => ({
+        name: item.name,
+        math_component: item.mathComponent,
+        component_props: item.componentProps,
+        component_props_keys: item.componentPropsKeys,
+      })),
+      null,
+      2,
+    ))
   }
 
   sections.push('', '要求：只输出 JSON，不要输出 markdown、解释或多余文本。')
@@ -118,12 +151,15 @@ function normalizeLogicAnalysis(result, logicTypes) {
       const rawType = safeText(block?.type)
       const rawComponent = safeText(block?.component)
       const matched = byName.get(rawType) || byComponent.get(rawComponent)
+      const rawProps = block && typeof block === 'object' && !Array.isArray(block) ? block.props : undefined
+      const props = rawProps && typeof rawProps === 'object' && !Array.isArray(rawProps) ? rawProps : {}
 
       if (matched) {
         return {
           ...block,
           type: matched.name,
           component: matched.mathComponent,
+          props,
         }
       }
 
@@ -139,12 +175,25 @@ function normalizeLogicAnalysis(result, logicTypes) {
 
 function validateLogicAnalysis(logicAnalysis, logicTypes) {
   const allowed = new Set(logicTypes.map((item) => item.name))
+  const byName = new Map(logicTypes.map((item) => [item.name, item]))
   const blocks = Array.isArray(logicAnalysis?.logic_blocks) ? logicAnalysis.logic_blocks : []
   if (blocks.length === 0) return false
 
   return blocks.every((block) => {
     const type = safeText(block?.type)
-    return allowed.has(type)
+    if (!allowed.has(type)) return false
+
+    const matched = byName.get(type)
+    const expectedKeys = parseComponentPropKeys(matched?.componentProps)
+    const props = block?.props
+    if (expectedKeys.length === 0) return props && typeof props === 'object' && !Array.isArray(props)
+
+    if (!props || typeof props !== 'object' || Array.isArray(props)) return false
+
+    const actualKeys = Object.keys(props)
+    if (actualKeys.length !== expectedKeys.length) return false
+
+    return expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(props, key))
   })
 }
 
@@ -157,7 +206,13 @@ async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes
       const raw = await runAnalysisStep({
         configKey: 'logic_analysis',
         questionText,
-        context: { mathAnalysisJson, logicTypes },
+        context: {
+          mathAnalysisJson,
+          logicTypes: logicTypes.map((item) => ({
+            ...item,
+            componentPropsKeys: parseComponentPropKeys(item.componentProps),
+          })),
+        },
       })
 
       const normalized = normalizeLogicAnalysis(raw, logicTypes)

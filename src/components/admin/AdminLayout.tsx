@@ -21,6 +21,7 @@ const sidebarItems: SidebarItem[] = [
   { path: '/admin/plans', label: '套餐管理', icon: Crown },
   { path: '/admin/component-preview', label: '页面组件', icon: Eye },
   { path: '/admin/math-components', label: '数学组件', icon: Sigma },
+  { path: '/admin/math-block-test', label: '数学测试', icon: Eye },
   { path: '/admin/configs', label: '系统配置', icon: Settings },
 ]
 

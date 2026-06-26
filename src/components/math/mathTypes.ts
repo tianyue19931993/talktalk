@@ -1,28 +1,13 @@
-export type MathBlock = {
+export type LogicBlock = {
+  step: number
   type: string
-  subject: string
-  math_component: string
+  component: string
+  math_object: string
+  visual_object: string
 }
 
-export type MathAnalysis = {
-  known_conditions?: Array<{
-    text: string
-    value?: number | null
-    unit?: string
-  }>
-  hidden_conditions?: Array<{
-    text: string
-  }>
-  goal?: {
-    text: string
-    target?: string
-  }
-}
-
-export type MathComponentMode = 'discover' | 'explain' | 'challenge' | 'review'
+export type MathBlock = LogicBlock
 
 export type MathComponentProps = {
-  block: MathBlock
-  mathAnalysis?: MathAnalysis
-  mode?: MathComponentMode
+  block: LogicBlock
 }

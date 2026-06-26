@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { PreviewCard } from '../../components/preview/stageOneBlocks'
-import { MATH_COMPONENT_CATALOG } from '../../components/math/catalog'
+import { MathComponentRenderer, MATH_COMPONENT_CATALOG } from '../../components/math'
 
 export default function MathComponentPreviewPage() {
   return <MathComponentPreviewPanel />
@@ -13,8 +13,6 @@ export function MathComponentPreviewPanel() {
     () => MATH_COMPONENT_CATALOG.find((item) => item.mathComponent === selected) ?? MATH_COMPONENT_CATALOG[0],
     [selected],
   )
-
-  const ActiveComponent = activeItem?.component
 
   return (
     <div className="space-y-6">
@@ -58,9 +56,9 @@ export function MathComponentPreviewPanel() {
         </aside>
 
         <main className="space-y-6">
-          {ActiveComponent && (
+          {activeItem && (
             <PreviewCard title={activeItem.title} hint={`${activeItem.mathComponent} · ${activeItem.blocks.join(' / ')}`}>
-              <ActiveComponent block={activeItem.block} mathAnalysis={activeItem.mathAnalysis} mode={activeItem.mode} />
+              <MathComponentRenderer block={activeItem.block} />
             </PreviewCard>
           )}
         </main>

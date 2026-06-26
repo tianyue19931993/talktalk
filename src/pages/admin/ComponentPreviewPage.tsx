@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
-import { MHint, MInfo } from '../../components/preview/stageOneBlocks'
+import BasicPage from '../../components/preview/BasicPage'
 
-const observationData = {
-  question_text: '学校要买12张课桌和10把椅子，每张课桌90元，每把椅子32元。一共需要多少元？',
+const questionText = '学校要买12张课桌和10把椅子，每张课桌90元，每把椅子32元。一共需要多少元？'
+
+const mathAnalysisJson = {
   goal: {
     text: '一共需要多少元？',
     target: '总花费金额',
@@ -18,7 +18,7 @@ const observationData = {
   ],
 }
 
-const challengeData = {
+const tutorAnalysisJson = {
   challenge_steps: [
     {
       step: 1,
@@ -41,71 +41,41 @@ const challengeData = {
   ],
 }
 
-function SectionCard({
-  title,
-  accent = 'pink',
-  children,
-}: {
-  title: string
-  accent?: 'pink' | 'blue'
-  children: ReactNode
-}) {
-  const accentClass =
-    accent === 'pink'
-      ? 'from-[#7928CA] to-[#FF0080]'
-      : 'from-[#0070F3] to-[#7928CA]'
-
-  return (
-    <section className="rounded-[28px] border border-[#E8E8E8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className={`inline-flex rounded-full bg-gradient-to-r ${accentClass} px-3 py-1 text-[11px] font-medium text-white`}>
-            {title}
-          </div>
-        </div>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  )
-}
-
-function EmptyCard() {
-  return (
-    <div className="min-h-[220px] rounded-[24px] border border-dashed border-[#D8D8D8] bg-[#FAFAFA]" />
-  )
+const logicAnalysisJson = {
+  logic_blocks: [
+    {
+      step: 1,
+      type: '求总价',
+      component: 'TotalAmountComponent',
+      math_object: '课桌总价',
+      visual_object: '课桌、钱币',
+    },
+    {
+      step: 2,
+      type: '求总价',
+      component: 'TotalAmountComponent',
+      math_object: '椅子总价',
+      visual_object: '椅子、钱币',
+    },
+    {
+      step: 3,
+      type: '求和',
+      component: 'GenericLogicComponent',
+      math_object: '课桌总价 + 椅子总价',
+      visual_object: '总金额',
+    },
+  ],
 }
 
 export default function ComponentPreviewPage() {
   return (
-    <div className="space-y-6 bg-[#FAFAFA] text-[#171717]">
-      <div className="grid gap-5">
-        <SectionCard
-          title="1. 观察区"
-          accent="pink"
-        >
-          <div className="mb-4 rounded-[24px] bg-[#FFFFFF] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-            <div className="text-xs font-medium text-[#888888]">question_text</div>
-            <div className="mt-2 text-sm leading-7 text-[#171717]">
-              {observationData.question_text}
-            </div>
-          </div>
-          <MHint data={observationData} />
-        </SectionCard>
-
-        <SectionCard
-          title="2. 发现区"
-          accent="blue"
-        >
-          <EmptyCard />
-        </SectionCard>
-
-        <SectionCard
-          title="3. 挑战区"
-          accent="pink"
-        >
-          <MInfo data={challengeData} />
-        </SectionCard>
-      </div>
+    <div className="bg-[#FAFAFA] p-0 text-[#171717]">
+      <BasicPage
+        question_text={questionText}
+        math_analysis_json={mathAnalysisJson}
+        logic_analysis_json={logicAnalysisJson}
+        tutor_analysis_json={tutorAnalysisJson}
+      />
     </div>
   )
 }

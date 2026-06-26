@@ -87,6 +87,13 @@ function rowToDemo(row: DbRow): QuestionDemo {
   }
 }
 
+export interface GenerateQuestionDemoResult {
+  success?: boolean
+  error?: string
+  demo?: QuestionDemo | null
+  htmlUrl?: string
+}
+
 /** 获取某个题目的所有演示记录 */
 export async function getQuestionDemos(questionId: string): Promise<QuestionDemo[]> {
   const { data } = await authedRequest<DbRow[]>(
@@ -124,6 +131,49 @@ export async function createQuestionDemo(questionId: string, htmlUrl: string, ti
 /** 删除一条演示记录 */
 export async function deleteQuestionDemo(id: string): Promise<void> {
   await authedRequest(`/question_demos?id=eq.${id}`, { method: 'DELETE' })
+}
+
+/** 为题目生成一条新的互动演示记录 */
+export async function generateQuestionDemo(questionId: string): Promise<GenerateQuestionDemoResult> {
+  const session = loadSession()
+  if (!session) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  try {
+    const res = await fetch('/api/user-questions/generate-interaction', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ questionId }),
+    })
+
+    const text = await res.text()
+    let data: GenerateQuestionDemoResult = {}
+    if (text) {
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = { success: false, error: text }
+      }
+    }
+
+    if (!res.ok) {
+      return {
+        success: false,
+        error: data.error || `HTTP ${res.status}`,
+      }
+    }
+
+    return data
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    }
+  }
 }
 
 /** Admin：上传 HTML 文件到题目的演示列表（优先 Kodo，降级 data:URL） */

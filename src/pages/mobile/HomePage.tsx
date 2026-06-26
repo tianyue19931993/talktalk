@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, BookOpen, Play, Clock, Send, Loader2 } from 'lucide-react'
+import { Sparkles, BookOpen, Play, Clock, Send, Loader2, CheckCircle } from 'lucide-react'
 import { useAuth, refreshUserData } from '../../stores/authStore'
 import { getRemainingGenerations } from '../../lib/supabase-auth'
-import { getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { generateQuestionDemo, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { submitQuestionForAnalysis } from '../../lib/question-submit'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -16,9 +16,18 @@ export default function HomePage() {
   const [statusKind, setStatusKind] = useState<'idle' | 'success' | 'error' | 'info'>('idle')
   const [latestQuestion, setLatestQuestion] = useState<UserQuestion | null>(null)
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
+  const [latestActionMessage, setLatestActionMessage] = useState('')
+  const [latestActionBusy, setLatestActionBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const remainingGenerations = getRemainingGenerations(subscription, generation)
+
+  function formatDateTime(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  }
 
   useEffect(() => {
     const run = async () => {
@@ -51,6 +60,32 @@ export default function HomePage() {
     } else {
       setLatestQuestion(null)
       setLatestDemos([])
+    }
+  }
+
+  const handleGenerateInteraction = async () => {
+    if (!latestQuestion || latestActionBusy) return
+
+    setLatestActionBusy(true)
+    setLatestActionMessage('请耐心等待 1～3 分钟')
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
+      const result = await generateQuestionDemo(latestQuestion.id)
+      if (result.success) {
+        setLatestActionMessage(`观看 ${result.demo?.title || '演示'}`)
+        await loadLatest()
+        window.setTimeout(() => {
+          setLatestActionMessage('')
+          setLatestActionBusy(false)
+        }, 2200)
+        return
+      }
+
+      setLatestActionMessage(result.error || '生成失败，请重试')
+    } finally {
+      window.setTimeout(() => {
+        setLatestActionBusy(false)
+      }, 2200)
     }
   }
 
@@ -124,6 +159,14 @@ export default function HomePage() {
   }
 
   const latestStatus = latestQuestion?.status || 'pending'
+  const latestIsCompleted = latestQuestion?.status === 'completed'
+  const latestHasDemo = latestDemos.length > 0 || latestQuestion?.status === 'uploaded'
+  const latestStatusMeta = latestHasDemo
+    ? { label: '已生成互动', color: 'text-blue-700 bg-blue-50', icon: Sparkles }
+    : latestIsCompleted
+      ? { label: '基础分析已完成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
+      : { label: '请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+  const LatestStatusIcon = latestStatusMeta.icon
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-5 pt-6">
@@ -212,57 +255,68 @@ export default function HomePage() {
       </div>
 
       {isLoggedIn && latestQuestion && (
-        <div
-          className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5 cursor-pointer hover:shadow-[var(--shadow-l3)] transition-all duration-200"
-          onClick={() => navigate('/my/questions')}
-        >
+        <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 mb-5 border border-[var(--color-hairline)]">
           <div className="flex items-center gap-2 mb-3">
             <BookOpen className="w-4 h-4 text-[var(--color-link)]" />
             <span className="text-xs font-medium text-[var(--color-body)]">最近处理的题目</span>
           </div>
+
           <p className="text-sm text-[var(--color-ink)] leading-relaxed line-clamp-2 whitespace-pre-wrap mb-3">
             {latestQuestion.questionText}
           </p>
 
-          <div className="flex items-center gap-2 pt-2 border-t border-[var(--color-hairline)]">
-            <span
-              className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
-                latestStatus === 'completed'
-                  ? 'text-green-700 bg-green-50'
-                  : latestStatus === 'pending'
-                    ? 'text-yellow-600 bg-yellow-50'
-                    : 'text-blue-700 bg-blue-50'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              {latestStatus === 'completed'
-                ? '基础分析已完成'
-                : latestStatus === 'pending'
-                  ? '请耐心等待 1～3 分钟'
-                  : '已上传'}
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${latestStatusMeta.color}`}>
+              <LatestStatusIcon className="w-3 h-3" />
+              {latestStatusMeta.label}
             </span>
             <span className="text-[10px] text-[var(--color-mute)]">
-              {latestDemos.length > 0 ? `已有 ${latestDemos.length} 个演示` : '暂未接入演示生成'}
+              {latestStatus === 'completed' && latestDemos.length > 0 && latestDemos[0]
+                ? `生成于 ${formatDateTime(latestDemos[0].createdAt)}`
+                : `提交于 ${formatDateTime(latestQuestion.createdAt)}`
+              }
             </span>
           </div>
 
-          {latestDemos.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-3">
-              {latestDemos.map((demo) => (
+          <div className="pt-2 border-t border-[var(--color-hairline)]">
+            <div className="flex flex-wrap items-center gap-2">
+              {latestIsCompleted && !latestHasDemo && (
                 <button
-                  key={demo.id}
-                  onClick={(e) => { e.stopPropagation(); navigate(`/my/demo/${demo.id}`) }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                    text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                    rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                  onClick={(e) => { e.stopPropagation(); void handleGenerateInteraction() }}
+                  disabled={latestActionBusy}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
+                    bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                    hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
                     transition-all duration-200 cursor-pointer"
                 >
-                  <Play className="w-3 h-3" />
-                  查看 {demo.title || '演示'}
+                  <Loader2 className={`w-3 h-3 ${latestActionBusy ? 'animate-spin' : ''}`} />
+                  {latestActionBusy ? '生成中...' : '生成互动'}
                 </button>
-              ))}
+              )}
+
+              {latestDemos.length > 0 ? (
+                latestDemos.map((demo) => (
+                  <button
+                    key={demo.id}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/my/demo/${demo.id}`) }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                      text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                      rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                      transition-all duration-200 cursor-pointer"
+                  >
+                    <Play className="w-3 h-3" />
+                    观看 {demo.title || '演示'}
+                  </button>
+                ))
+              ) : !latestIsCompleted ? (
+                <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
+              ) : null}
             </div>
-          )}
+
+            {latestActionMessage && (
+              <p className="mt-2 text-[10px] text-[var(--color-mute)]">{latestActionMessage}</p>
+            )}
+          </div>
         </div>
       )}
     </div>

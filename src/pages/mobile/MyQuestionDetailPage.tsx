@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Clock, Play } from 'lucide-react'
-import { getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
+import { ArrowLeft, Clock, Play, Sparkles, Loader2, CheckCircle } from 'lucide-react'
+import { generateQuestionDemo, getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: '请耐心等待 1～3 分钟', color: 'text-yellow-700 bg-yellow-50' },
   completed: { label: '基础分析已完成', color: 'text-green-700 bg-green-50' },
-  uploaded: { label: '已上传', color: 'text-blue-700 bg-blue-50' },
+  uploaded: { label: '已生成互动', color: 'text-blue-700 bg-blue-50' },
 }
 
 function formatDateTime(value: string) {
@@ -23,6 +23,8 @@ export default function MyQuestionDetailPage() {
   const [question, setQuestion] = useState<UserQuestion | null>(null)
   const [demos, setDemos] = useState<QuestionDemo[]>([])
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -44,17 +46,29 @@ export default function MyQuestionDetailPage() {
     return () => { cancelled = true }
   }, [id])
 
-  const downloadHtml = (url: string, label: string) => {
-    const link = document.createElement('a')
-    if (url.startsWith('data:text/html')) {
-      const content = decodeURIComponent(url.split(',')[1] || '')
-      const blob = new Blob([content], { type: 'text/html' })
-      link.href = URL.createObjectURL(blob)
-    } else {
-      link.href = url
+  const handleGenerateInteraction = async () => {
+    if (!question || generating) return
+
+    setGenerating(true)
+    setActionMessage('请耐心等待 1～3 分钟')
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
+      const result = await generateQuestionDemo(question.id)
+      if (result.success) {
+        setActionMessage(`观看 ${result.demo?.title || '演示'}`)
+        const next = await getQuestionDemos(question.id)
+        setDemos(next)
+        const nextQuestion = await getUserQuestion(question.id)
+        if (nextQuestion) setQuestion(nextQuestion)
+      } else {
+        setActionMessage(result.error || '生成失败，请重试')
+      }
+    } finally {
+      window.setTimeout(() => {
+        setGenerating(false)
+        setActionMessage('')
+      }, 2200)
     }
-    link.download = `${label || 'demo'}.html`
-    link.click()
   }
 
   if (loading) {
@@ -79,6 +93,13 @@ export default function MyQuestionDetailPage() {
   }
 
   const st = STATUS_MAP[question.status] || STATUS_MAP.pending
+  const hasDemo = demos.length > 0
+  const isCompleted = question.status === 'completed'
+  const StatusIcon = question.status === 'uploaded'
+    ? Sparkles
+    : question.status === 'completed'
+      ? CheckCircle
+      : Clock
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-canvas-soft)] px-4 pt-4 pb-8 max-w-lg mx-auto">
@@ -100,8 +121,47 @@ export default function MyQuestionDetailPage() {
       <section className="mt-4">
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
           <div className="flex items-center justify-between">
-            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>{st.label}</span>
+            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>
+              <StatusIcon className="w-3 h-3" />
+              {st.label}
+            </span>
             <span className="text-xs text-[var(--color-mute)]">提交于 {formatDateTime(question.createdAt)}</span>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-[var(--color-hairline)]">
+            <div className="flex flex-wrap items-center gap-2">
+              {isCompleted && !hasDemo && (
+                <button
+                  onClick={handleGenerateInteraction}
+                  disabled={generating}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
+                    bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                    hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-200 cursor-pointer"
+                >
+                  <Loader2 className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
+                  {generating ? '生成中...' : '生成互动'}
+                </button>
+              )}
+
+              {hasDemo ? demos.map((demo) => (
+                <button
+                  key={demo.id}
+                  onClick={() => navigate(`/my/demo/${demo.id}`)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                    text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                    rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                    transition-all duration-200 cursor-pointer"
+                >
+                  <Play className="w-3 h-3" />观看 {demo.title || '演示'}
+                </button>
+              )) : !isCompleted ? (
+                <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
+              ) : null}
+            </div>
+            {actionMessage && (
+              <p className="mt-2 text-[10px] text-[var(--color-mute)]">{actionMessage}</p>
+            )}
           </div>
         </div>
       </section>
@@ -123,14 +183,6 @@ export default function MyQuestionDetailPage() {
                       transition-all duration-200 cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />观看
-                  </button>
-                  <button
-                    onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                    className="inline-flex items-center gap-1 px-3 h-8 text-sm font-medium text-[var(--color-body)]
-                      bg-[var(--color-canvas-soft)] border border-[var(--color-hairline)] rounded-full
-                      hover:text-[var(--color-ink)] hover:border-[var(--color-mute)] transition-colors cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />下载
                   </button>
                 </div>
               </div>

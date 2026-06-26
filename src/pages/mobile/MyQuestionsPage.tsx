@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Clock, CheckCircle, Play, Download, Search, RefreshCw } from 'lucide-react'
-import { getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
+import { FileText, Clock, CheckCircle, Play, Search, RefreshCw, Sparkles } from 'lucide-react'
+import { generateQuestionDemo, getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -20,6 +20,8 @@ export default function MyQuestionsPage() {
   const [demosMap, setDemosMap] = useState<Record<string, QuestionDemo[]>>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [generateHint, setGenerateHint] = useState<{ id: string; text: string } | null>(null)
 
   const filteredQuestions = useMemo(() => {
     if (!search.trim()) return questions
@@ -50,33 +52,46 @@ export default function MyQuestionsPage() {
     setLoading(false)
   }
 
-  const downloadHtml = async (url: string, label: string) => {
+  const handleGenerateInteraction = async (question: UserQuestion) => {
+    if (generatingId) return
+
+    setGeneratingId(question.id)
+    setGenerateHint({ id: question.id, text: '请耐心等待 1～3 分钟' })
     try {
-      let blobUrl: string | null = null
-      if (url.startsWith('data:text/html')) {
-        const content = decodeURIComponent(url.split(',')[1] || '')
-        blobUrl = URL.createObjectURL(new Blob([content], { type: 'text/html' }))
-      } else if (url.startsWith('http')) {
-        // 七牛直链 → fetch 后下载（避免跨域问题）
-        const res = await fetch(url, { mode: 'cors' })
-        if (!res.ok) throw new Error(`下载失败: ${res.status}`)
-        const content = await res.text()
-        blobUrl = URL.createObjectURL(new Blob([content], { type: 'text/html' }))
-      } else {
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
+      const result = await generateQuestionDemo(question.id)
+      if (result.success) {
+        setGenerateHint({ id: question.id, text: `观看 ${result.demo?.title || '演示'}` })
+        await loadAll()
         return
       }
-      const link = document.createElement('a')
-      link.href = blobUrl || url
-      link.download = `${label || 'demo'}.html`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-    } catch (e) {
-      const message = e instanceof Error ? e.message : '未知错误'
-      console.error('[downloadHtml]', e)
-      alert('下载失败：' + message)
+
+      setGenerateHint({ id: question.id, text: result.error || '生成失败，请重试' })
+    } finally {
+      window.setTimeout(() => {
+        setGeneratingId(null)
+        setGenerateHint(null)
+      }, 2200)
     }
+  }
+
+  const openDemo = (demoId: string) => {
+    navigate(`/my/demo/${demoId}`)
+  }
+
+  const getStatusMeta = (q: UserQuestion, demos: QuestionDemo[]) => {
+    if (q.status === 'uploaded' || demos.length > 0) {
+      return { label: '已生成互动', color: 'text-blue-700 bg-blue-50', icon: Sparkles }
+    }
+    if (q.status === 'completed') {
+      return { label: '基础分析已完成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
+    }
+    return { label: '请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+  }
+
+  const formatStatusTime = (q: UserQuestion, demo?: QuestionDemo) => {
+    if (demo) return `生成于 ${formatDateTime(demo.createdAt)}`
+    return `提交于 ${formatDateTime(q.createdAt)}`
   }
 
   if (!isLoggedIn) return null
@@ -142,13 +157,10 @@ export default function MyQuestionsPage() {
           filteredQuestions.map((q) => {
             const demos = demosMap[q.id] || []
             const latestDemo = demos[0]
-            const effectiveStatus = q.status === 'pending' && demos.length > 0 ? 'completed' : q.status
-            const st = effectiveStatus === 'completed'
-              ? { label: '基础分析已完成', color: 'text-green-700 bg-green-50', icon: CheckCircle }
-              : effectiveStatus === 'uploaded'
-                ? { label: '已上传', color: 'text-blue-700 bg-blue-50', icon: Clock }
-                : { label: '请耐心等待 1～3 分钟', color: 'text-yellow-600 bg-yellow-50', icon: Clock }
+            const st = getStatusMeta(q, demos)
             const StatusIcon = st.icon
+            const canGenerateInteraction = q.status === 'completed' && demos.length === 0
+            const generatedLabel = generateHint?.id === q.id ? generateHint.text : ''
             return (
               <div
                 key={q.id}
@@ -164,43 +176,47 @@ export default function MyQuestionsPage() {
                     {st.label}
                   </span>
                   <span className="text-[10px] text-[var(--color-mute)]">
-                    {effectiveStatus === 'completed' && demos.length > 0 && latestDemo
-                      ? `生成于 ${formatDateTime(latestDemo.createdAt)}`
-                      : `提交于 ${formatDateTime(q.createdAt)}`
-                    }
+                    {q.status === 'completed' && demos.length > 0 && latestDemo
+                      ? formatStatusTime(q, latestDemo)
+                      : formatStatusTime(q)}
                   </span>
                 </div>
 
-                {/* action buttons row: demos */}
                 <div className="pt-2 border-t border-[var(--color-hairline)]">
-                  <div className="flex flex-wrap gap-2">
-                    {/* demos */}
-                    {demos.length > 0 ? (
-                      demos.map((demo) => (
-                        <React.Fragment key={demo.id}>
-                          <button
-                            onClick={() => navigate(`/my/demo/${demo.id}`)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                              text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                              rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                              transition-all duration-200 cursor-pointer"
-                          >
-                            <Play className="w-3 h-3" />
-                            观看 {demo.title || '演示'}
-                          </button>
-                          <button
-                            onClick={() => downloadHtml(demo.htmlUrl, demo.title || 'demo')}
-                            className="p-1.5 rounded-full text-[var(--color-mute)] hover:text-[var(--color-ink)] hover:bg-[var(--color-canvas-soft-2)] transition-colors cursor-pointer"
-                            title="下载 HTML"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </button>
-                        </React.Fragment>
-                      ))
-                    ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canGenerateInteraction && (
+                      <button
+                        onClick={() => handleGenerateInteraction(q)}
+                        disabled={generatingId === q.id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
+                          bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                          hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                          transition-all duration-200 cursor-pointer"
+                      >
+                        <Sparkles className={`w-3 h-3 ${generatingId === q.id ? 'animate-pulse' : ''}`} />
+                        {generatingId === q.id ? '生成中...' : '生成互动'}
+                      </button>
+                    )}
+
+                    {demos.length > 0 ? demos.map((demo) => (
+                      <button
+                        key={demo.id}
+                        onClick={() => openDemo(demo.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                          text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                          rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                          transition-all duration-200 cursor-pointer"
+                      >
+                        <Play className="w-3 h-3" />
+                        观看 {demo.title || '演示'}
+                      </button>
+                    )) : !canGenerateInteraction && (
                       <span className="text-[10px] text-[var(--color-mute)] self-center">暂无演示动画</span>
                     )}
                   </div>
+                  {generatedLabel && (
+                    <p className="mt-2 text-[10px] text-[var(--color-mute)]">{generatedLabel}</p>
+                  )}
                 </div>
             </div>
           )

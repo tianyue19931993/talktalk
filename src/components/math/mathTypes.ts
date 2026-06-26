@@ -4,6 +4,7 @@ export type LogicBlock = {
   component: string
   math_object: string
   visual_object: string
+  props?: Record<string, unknown>
 }
 
 export type MathBlock = LogicBlock

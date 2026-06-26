@@ -5,38 +5,32 @@ const DEFAULT_JSON = `{
   "logic_blocks": [
     {
       "step": 1,
-      "type": "求经过时间",
-      "component": "TimeComponent",
-      "math_object": "出发时刻9:00到11:15的时间差",
-      "visual_object": "钟表"
+      "type": "求总量",
+      "props": {
+        "unit": "米",
+        "count": 15,
+        "perValue": 60,
+        "stepLabel": "每天铺的米数",
+        "buttonText": "",
+        "totalLabel": "煤气管道总长度"
+      },
+      "component": "TotalAmountComponent",
+      "math_object": "总长度",
+      "visual_object": "煤气管道"
     },
     {
       "step": 2,
-      "type": "统一时间单位",
-      "component": "UnitConvertComponent",
-      "math_object": "停车时间15分钟转换为小时",
-      "visual_object": "单位换算表"
-    },
-    {
-      "step": 3,
-      "type": "求差",
-      "component": "DifferenceComponent",
-      "math_object": "经过时间减去停车时间得到行驶时间",
-      "visual_object": "数轴"
-    },
-    {
-      "step": 4,
-      "type": "求差",
-      "component": "DifferenceComponent",
-      "math_object": "总路程171千米减去剩余39千米得到已行驶路程",
-      "visual_object": "线段图"
-    },
-    {
-      "step": 5,
-      "type": "求速度",
-      "component": "DistanceSpeedTimeComponent",
-      "math_object": "已行驶路程除以行驶时间",
-      "visual_object": "行程线段图"
+      "type": "求每份数",
+      "props": {
+        "unit": "米",
+        "total": 900,
+        "stepLabel": "12天",
+        "stepValue": 12,
+        "buttonText": ""
+      },
+      "component": "PartitionComponent",
+      "math_object": "平均每天铺的米数",
+      "visual_object": "每天铺的米数"
     }
   ]
 }`
@@ -137,6 +131,7 @@ export default function MathBlockTestPage() {
                         component: String(block.component ?? 'GenericLogicComponent'),
                         math_object: String(block.math_object ?? ''),
                         visual_object: String(block.visual_object ?? ''),
+                        props: (block.props && typeof block.props === 'object' && !Array.isArray(block.props)) ? block.props as Record<string, unknown> : undefined,
                       }
                     }
                   />

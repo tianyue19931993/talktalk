@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { query, insert, updateWhere } from '../../server/lib/supabase-admin.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 
@@ -14,12 +15,80 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;')
 }
 
-function toPrettyJson(value) {
-  try {
-    return JSON.stringify(value ?? {}, null, 2)
-  } catch {
-    return '{}'
+function normalizeArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function getObservationData(question) {
+  const mathAnalysis = question.math_analysis_json || {}
+  const goal = mathAnalysis.goal && typeof mathAnalysis.goal === 'object' ? mathAnalysis.goal : {}
+  return {
+    questionText: safeText(question.question_text || ''),
+    goalText: safeText(goal.text || question.question_text || ''),
+    goalTarget: safeText(goal.target || '求解目标'),
+    knownConditions: normalizeArray(mathAnalysis.known_conditions).map((item) => ({
+      text: safeText(item?.text || ''),
+      unit: safeText(item?.unit || ''),
+      value: item?.value,
+    })).filter((item) => item.text),
+    hiddenConditions: normalizeArray(mathAnalysis.hidden_conditions).map((item) => ({
+      text: safeText(item?.text || ''),
+    })).filter((item) => item.text),
   }
+}
+
+function getChallengeData(question) {
+  const tutorAnalysis = question.tutor_analysis_json || {}
+  return {
+    steps: normalizeArray(tutorAnalysis.challenge_steps).map((item, index) => ({
+      step: item?.step ?? index + 1,
+      hint: safeText(item?.hint || ''),
+      question: safeText(item?.question || ''),
+    })).filter((item) => item.hint || item.question),
+  }
+}
+
+function urlsafe(value) {
+  const buffer = typeof value === 'string' ? Buffer.from(value) : value
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
+}
+
+async function uploadHtmlContent(content, refId) {
+  const ak = process.env.QINIU_ACCESS_KEY
+  const sk = process.env.QINIU_SECRET_KEY
+  const domain = process.env.QINIU_DOMAIN
+  const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
+  const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
+
+  if (!ak || !sk || !domain) {
+    return `data:text/html;charset=utf-8,${encodeURIComponent(content)}`
+  }
+
+  const key = `MHTML/user/${refId || 'unknown'}/${Date.now()}.html`
+  const putPolicy = JSON.stringify({ scope: `${bucket}:${key}`, deadline: Math.floor(Date.now() / 1000) + 3600 })
+  const encodedPolicy = urlsafe(putPolicy)
+  const sign = crypto.createHmac('sha1', sk).update(encodedPolicy).digest()
+  const token = `${ak}:${urlsafe(sign)}:${encodedPolicy}`
+  const boundary = `----QiniuFormBoundary${Date.now()}`
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="token"\r\n\r\n${token}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="key"\r\n\r\n${key}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${Date.now()}.html"\r\nContent-Type: text/html; charset=utf-8\r\n\r\n`),
+    Buffer.from(content, 'utf-8'),
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ])
+
+  const res = await fetch(host, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    body,
+  })
+
+  if (!res.ok) {
+    return `data:text/html;charset=utf-8,${encodeURIComponent(content)}`
+  }
+
+  return `${domain}/${key}`
 }
 
 async function getCurrentUser(authHeader) {
@@ -43,32 +112,32 @@ async function getCurrentUser(authHeader) {
 }
 
 function buildDemoHtml(question) {
-  const questionText = escapeHtml(question.question_text || '')
-  const logicAnalysis = question.logic_analysis_json || {}
-  const tutorAnalysis = question.tutor_analysis_json || {}
-  const mathAnalysis = question.math_analysis_json || {}
-  const logicBlocks = Array.isArray(logicAnalysis.logic_blocks) ? logicAnalysis.logic_blocks : []
+  const observation = getObservationData(question)
+  const challenge = getChallengeData(question)
 
-  const blockCards = logicBlocks.length > 0
-    ? logicBlocks.map((block, index) => {
-        const step = escapeHtml(String(block?.step ?? index + 1))
-        const type = escapeHtml(block?.type || '逻辑块')
-        const mathObject = escapeHtml(block?.math_object || '')
-        const visualObject = escapeHtml(block?.visual_object || '')
-        return `
-          <div class="block-card">
-            <div class="block-head">
-              <span class="step">${step}</span>
-              <span class="type">${type}</span>
-            </div>
-            <div class="block-body">
-              <div><span class="label">数学对象</span><span>${mathObject || '未提供'}</span></div>
-              <div><span class="label">素材</span><span>${visualObject || '未提供'}</span></div>
-            </div>
-          </div>
-        `
-      }).join('')
-    : '<div class="empty">当前题目还没有可视化的逻辑块</div>'
+  const knownConditionCards = observation.knownConditions.length > 0
+    ? observation.knownConditions.map((item) => `
+      <div class="condition-card">${escapeHtml(item.text)}</div>
+    `).join('')
+    : '<div class="empty-card">暂无已知条件</div>'
+
+  const hiddenConditionCards = observation.hiddenConditions.length > 0
+    ? observation.hiddenConditions.map((item) => `
+      <div class="condition-card">${escapeHtml(item.text)}</div>
+    `).join('')
+    : '<div class="empty-card">暂无隐含条件</div>'
+
+  const challengeCards = challenge.steps.length > 0
+    ? challenge.steps.map((step, index) => `
+      <div class="challenge-card">
+        <div class="challenge-head">
+          <span class="challenge-step">步骤 ${escapeHtml(String(step.step ?? index + 1))}</span>
+          <span class="challenge-question">${escapeHtml(step.question || '未提供问题')}</span>
+        </div>
+        <div class="challenge-hint">${escapeHtml(step.hint || '未提供提示')}</div>
+      </div>
+    `).join('')
+    : '<div class="empty-card">暂无挑战步骤</div>'
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -95,17 +164,17 @@ function buildDemoHtml(question) {
       color: var(--text);
     }
     .wrap {
-      max-width: 760px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 24px 18px 40px;
     }
-    .hero, .panel, .block-card {
+    .zone, .panel, .condition-card, .challenge-card, .empty-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 18px;
+      border-radius: 24px;
       box-shadow: 0 10px 30px rgba(17,17,17,0.04);
     }
-    .hero {
+    .zone {
       padding: 20px;
       margin-bottom: 16px;
     }
@@ -141,199 +210,164 @@ function buildDemoHtml(question) {
       margin: 0 0 12px;
       font-size: 15px;
     }
-    .meta-grid {
+    .layout {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
+      gap: 16px;
     }
-    .meta-item {
-      padding: 12px 14px;
-      border-radius: 14px;
-      background: #FAFAFA;
-      color: var(--body);
-      font-size: 13px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-    }
-    .block-list {
-      display: grid;
-      gap: 12px;
-    }
-    .block-card {
-      padding: 14px;
-      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-    }
-    .block-card.active {
-      border-color: rgba(0,112,243,0.45);
-      box-shadow: 0 16px 34px rgba(0,112,243,0.12);
-      transform: translateY(-1px);
-    }
-    .block-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    .step {
+    .zone-title {
       display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 28px;
-      height: 28px;
       border-radius: 999px;
-      background: rgba(121,40,202,0.08);
-      color: #7928CA;
-      font-weight: 700;
-      font-size: 13px;
-      padding: 0 10px;
-    }
-    .type {
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .block-body {
-      display: grid;
-      gap: 8px;
-      color: var(--body);
-      font-size: 13px;
-      line-height: 1.7;
-    }
-    .label {
-      display: inline-block;
-      margin-right: 8px;
-      color: var(--mute);
-      font-size: 12px;
-    }
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-    }
-    .btn {
-      border: 0;
-      border-radius: 999px;
-      padding: 12px 18px;
-      font-size: 14px;
+      padding: 6px 12px;
+      font-size: 11px;
       font-weight: 600;
       color: #fff;
-      background: var(--blue);
-      cursor: pointer;
-      transition: transform .2s ease, opacity .2s ease;
+      background: linear-gradient(135deg, #7928CA 0%, #FF0080 100%);
     }
-    .btn:active { transform: scale(0.98); }
-    .btn.secondary {
-      background: var(--gradient);
+    .subcard {
+      margin-top: 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: #FAFAFA;
+      padding: 16px;
     }
-    .status {
-      margin-top: 10px;
+    .subcard-title {
+      font-size: 12px;
       color: var(--mute);
-      font-size: 13px;
+      font-weight: 600;
     }
-    .pulse {
-      animation: pulse 1.4s ease-in-out infinite;
+    .subcard-body {
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: .7; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.02); }
+    .hint-list {
+      display: grid;
+      gap: 10px;
     }
-    .empty {
+    .condition-card {
+      padding: 12px 14px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .empty-card {
       padding: 18px;
-      border-radius: 14px;
-      background: #FAFAFA;
-      color: var(--mute);
       font-size: 13px;
-    }
-    pre {
-      margin: 0;
-      padding: 14px;
-      border-radius: 14px;
+      color: var(--mute);
       background: #FAFAFA;
-      color: #333;
+      border-style: dashed;
+    }
+    .challenge-list {
+      display: grid;
+      gap: 12px;
+    }
+    .challenge-card {
+      padding: 16px;
+    }
+    .challenge-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+    }
+    .challenge-step {
+      flex-shrink: 0;
+      border-radius: 999px;
+      background: rgba(0,112,243,0.08);
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+    }
+    .challenge-question {
+      flex: 1;
+      min-width: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-align: left;
+      line-height: 1.6;
+    }
+    .challenge-hint {
+      margin-top: 10px;
+      border-radius: 16px;
+      background: #FAFAFA;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--body);
+    }
+    .logic-json {
+      margin-top: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: #FAFAFA;
+      padding: 14px;
+    }
+    .logic-json pre {
+      margin: 0;
       overflow: auto;
       font-size: 12px;
       line-height: 1.6;
+      color: #333;
+      white-space: pre-wrap;
+    }
+    .goal-target {
+      margin-top: 4px;
+      color: var(--blue);
+      font-size: 12px;
+      text-align: left;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <section class="hero">
-      <div class="eyebrow">互动演示 · 自动生成</div>
-      <h1 class="title">题目互动预览</h1>
-      <p class="desc">${questionText}</p>
-      <div class="toolbar">
-        <button class="btn" id="toggleBtn">开始互动</button>
-        <button class="btn secondary" id="stepBtn">查看步骤</button>
+    <section class="zone">
+      <div class="zone-title">1. 观察区</div>
+      <div class="subcard">
+        <div class="subcard-title">题目原文</div>
+        <div class="subcard-body">${escapeHtml(observation.questionText)}</div>
       </div>
-      <div class="status pulse" id="statusText">点击按钮后会高亮每一步逻辑块</div>
+
+      <div class="subcard">
+        <div class="subcard-title">已知条件</div>
+        <div class="hint-list">
+          ${knownConditionCards}
+        </div>
+      </div>
+
+      <div class="subcard">
+        <div class="subcard-title">隐含条件</div>
+        <div class="hint-list">
+          ${hiddenConditionCards}
+        </div>
+      </div>
+
+      <div class="subcard">
+        <div class="subcard-title">求解目标</div>
+        <div class="subcard-body">
+          ${escapeHtml(observation.goalText)}
+          <div class="goal-target">${escapeHtml(observation.goalTarget)}</div>
+        </div>
+      </div>
     </section>
 
-    <section class="panel">
-      <h2>分析摘要</h2>
-      <div class="meta-grid">
-        <div class="meta-item"><strong>math_analysis_json</strong><pre>${escapeHtml(toPrettyJson(mathAnalysis))}</pre></div>
-        <div class="meta-item"><strong>tutor_analysis_json</strong><pre>${escapeHtml(toPrettyJson(tutorAnalysis))}</pre></div>
+    <section class="zone">
+      <div class="zone-title" style="background: linear-gradient(135deg, #0070F3 0%, #7928CA 100%);">2. 发现区</div>
+      <div class="empty-card" style="min-height: 180px; display: flex; align-items: center; justify-content: center; text-align: center;">
+        先留空白，后续再填发现区组件
       </div>
     </section>
 
-    <section class="panel">
-      <h2>逻辑步骤</h2>
-      <div class="block-list" id="blockList">
-        ${blockCards}
+    <section class="zone">
+      <div class="zone-title">3. 挑战区</div>
+      <div class="challenge-list">
+        ${challengeCards}
       </div>
     </section>
   </div>
-
-  <script>
-    const blocks = Array.from(document.querySelectorAll('.block-card'))
-    const toggleBtn = document.getElementById('toggleBtn')
-    const stepBtn = document.getElementById('stepBtn')
-    const statusText = document.getElementById('statusText')
-    let index = -1
-    let timer = null
-
-    function clearActive() {
-      blocks.forEach((node) => node.classList.remove('active'))
-    }
-
-    function stop() {
-      if (timer) clearInterval(timer)
-      timer = null
-      index = -1
-      clearActive()
-      statusText.textContent = '已停止互动预览'
-    }
-
-    function nextStep() {
-      if (!blocks.length) return
-      index = (index + 1) % blocks.length
-      clearActive()
-      const node = blocks[index]
-      if (node) node.classList.add('active')
-      statusText.textContent = '当前高亮第 ' + (index + 1) + ' 步'
-    }
-
-    toggleBtn.addEventListener('click', () => {
-      if (timer) {
-        stop()
-        toggleBtn.textContent = '开始互动'
-        return
-      }
-      nextStep()
-      timer = setInterval(nextStep, 1400)
-      toggleBtn.textContent = '停止互动'
-      statusText.textContent = '正在播放互动演示...'
-    })
-
-    stepBtn.addEventListener('click', () => {
-      if (!timer) {
-        nextStep()
-      }
-    })
-  </script>
 </body>
 </html>`
 }
@@ -408,7 +442,7 @@ export default async function handler(req, res) {
 
     const title = `演示 ${Array.isArray(demoRows) ? demoRows.length + 1 : 1}`
     const html = buildDemoHtml(question)
-    const htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html)
+    const htmlUrl = await uploadHtmlContent(html, questionId)
 
     const demoInsert = await insert('question_demos', {
       question_id: questionId,

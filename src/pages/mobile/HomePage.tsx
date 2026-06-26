@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, BookOpen, Play, Clock, Send, Loader2, CheckCircle } from 'lucide-react'
+import { Sparkles, BookOpen, Play, Clock, Send, Loader2, CheckCircle, Download, RefreshCw } from 'lucide-react'
 import { useAuth, refreshUserData } from '../../stores/authStore'
 import { getRemainingGenerations } from '../../lib/supabase-auth'
-import { generateQuestionDemo, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { downloadQuestionDemo, generateQuestionDemo, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
 import { submitQuestionForAnalysis } from '../../lib/question-submit'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -89,6 +89,14 @@ export default function HomePage() {
     }
   }
 
+  const handleDownloadDemo = async (demoId: string, title?: string) => {
+    try {
+      await downloadQuestionDemo(demoId, title || '演示')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '下载失败')
+    }
+  }
+
   const handleSubmit = async () => {
     const text = questionText.trim()
     if (!text || submitting) return
@@ -161,6 +169,7 @@ export default function HomePage() {
   const latestStatus = latestQuestion?.status || 'pending'
   const latestIsCompleted = latestQuestion?.status === 'completed'
   const latestHasDemo = latestDemos.length > 0 || latestQuestion?.status === 'uploaded'
+  const latestGenerateLabel = latestHasDemo ? '重新生成' : '生成互动'
   const latestStatusMeta = latestHasDemo
     ? { label: '已生成互动', color: 'text-blue-700 bg-blue-50', icon: Sparkles }
     : latestIsCompleted
@@ -265,48 +274,63 @@ export default function HomePage() {
             {latestQuestion.questionText}
           </p>
 
-          <div className="flex items-center gap-2 mb-3">
-            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${latestStatusMeta.color}`}>
-              <LatestStatusIcon className="w-3 h-3" />
-              {latestStatusMeta.label}
-            </span>
-            <span className="text-[10px] text-[var(--color-mute)]">
-              {latestStatus === 'completed' && latestDemos.length > 0 && latestDemos[0]
-                ? `生成于 ${formatDateTime(latestDemos[0].createdAt)}`
-                : `提交于 ${formatDateTime(latestQuestion.createdAt)}`
-              }
-            </span>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className={`inline-flex items-center gap-1 shrink-0 text-[10px] px-2 py-0.5 rounded-full ${latestStatusMeta.color}`}>
+                <LatestStatusIcon className="w-3 h-3" />
+                {latestStatusMeta.label}
+              </span>
+              <span className="shrink-0 text-[10px] text-[var(--color-mute)] whitespace-nowrap">
+                {latestStatus === 'completed' && latestDemos.length > 0 && latestDemos[0]
+                  ? `生成于 ${formatDateTime(latestDemos[0].createdAt)}`
+                  : `提交于 ${formatDateTime(latestQuestion.createdAt)}`
+                }
+              </span>
+            </div>
+            {latestQuestion?.status !== 'pending' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); void handleGenerateInteraction() }}
+                disabled={latestActionBusy}
+                className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
+                  bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                  hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-all duration-200 cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${latestActionBusy ? 'animate-spin' : ''}`} />
+                {latestActionBusy ? '生成中...' : latestGenerateLabel}
+              </button>
+            )}
           </div>
 
           <div className="pt-2 border-t border-[var(--color-hairline)]">
             <div className="flex flex-wrap items-center gap-2">
-              {latestIsCompleted && !latestHasDemo && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); void handleGenerateInteraction() }}
-                  disabled={latestActionBusy}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
-                    bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                    hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                    transition-all duration-200 cursor-pointer"
-                >
-                  <Loader2 className={`w-3 h-3 ${latestActionBusy ? 'animate-spin' : ''}`} />
-                  {latestActionBusy ? '生成中...' : '生成互动'}
-                </button>
-              )}
-
               {latestDemos.length > 0 ? (
                 latestDemos.map((demo) => (
-                  <button
+                  <div
                     key={demo.id}
-                    onClick={(e) => { e.stopPropagation(); navigate(`/my/demo/${demo.id}`) }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                      text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                      rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                      transition-all duration-200 cursor-pointer"
+                    className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-2 py-1"
                   >
-                    <Play className="w-3 h-3" />
-                    观看 {demo.title || '演示'}
-                  </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/my/demo/${demo.id}`) }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                        text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                        rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                        transition-all duration-200 cursor-pointer"
+                    >
+                      <Play className="w-3 h-3" />
+                      观看 {demo.title || '演示'}
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); void handleDownloadDemo(demo.id, demo.title) }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
+                        text-[var(--color-body)] bg-white border border-[var(--color-hairline)]
+                        rounded-full hover:border-[var(--color-mute)] hover:text-[var(--color-ink)]
+                        transition-all duration-200 cursor-pointer"
+                    >
+                      <Download className="w-3 h-3" />
+                      下载
+                    </button>
+                  </div>
                 ))
               ) : !latestIsCompleted ? (
                 <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>

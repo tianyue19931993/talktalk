@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, Play, Sparkles, Loader2, CheckCircle } from 'lucide-react'
-import { generateQuestionDemo, getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
+import { ArrowLeft, Clock, Play, Sparkles, CheckCircle, Download, RefreshCw } from 'lucide-react'
+import { downloadQuestionDemo, generateQuestionDemo, getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -71,6 +71,14 @@ export default function MyQuestionDetailPage() {
     }
   }
 
+  const handleDownloadDemo = async (demo: QuestionDemo) => {
+    try {
+      await downloadQuestionDemo(demo.id, demo.title || '演示')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '下载失败')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--color-canvas-soft)]">
@@ -120,30 +128,31 @@ export default function MyQuestionDetailPage() {
 
       <section className="mt-4">
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between gap-3">
             <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>
               <StatusIcon className="w-3 h-3" />
               {st.label}
             </span>
-            <span className="text-xs text-[var(--color-mute)]">提交于 {formatDateTime(question.createdAt)}</span>
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-[var(--color-hairline)]">
-            <div className="flex flex-wrap items-center gap-2">
-              {isCompleted && !hasDemo && (
+            <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
+              <span className="shrink-0 text-xs text-[var(--color-mute)]">提交于 {formatDateTime(question.createdAt)}</span>
+              {question.status !== 'pending' && (
                 <button
                   onClick={handleGenerateInteraction}
                   disabled={generating}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
+                  className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
                     bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
                     hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
                     transition-all duration-200 cursor-pointer"
                 >
-                  <Loader2 className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
-                  {generating ? '生成中...' : '生成互动'}
+                  <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
+                  {generating ? '生成中...' : hasDemo ? '重新生成' : '生成互动'}
                 </button>
               )}
+            </div>
+          </div>
 
+          <div className="mt-3 pt-3 border-t border-[var(--color-hairline)]">
+            <div className="flex flex-wrap items-center gap-2">
               {hasDemo ? demos.map((demo) => (
                 <button
                   key={demo.id}
@@ -174,7 +183,7 @@ export default function MyQuestionDetailPage() {
               <div key={demo.id} className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
                 <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || '演示'}</p>
                 <p className="text-[10px] text-[var(--color-mute)] mb-3">生成于 {formatDateTime(demo.createdAt)}</p>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     onClick={() => navigate(`/my/demo/${demo.id}`)}
                     className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium text-white rounded-full
@@ -183,6 +192,15 @@ export default function MyQuestionDetailPage() {
                       transition-all duration-200 cursor-pointer"
                   >
                     <Play className="w-3.5 h-3.5" />观看
+                  </button>
+                  <button
+                    onClick={() => void handleDownloadDemo(demo)}
+                    className="inline-flex items-center gap-1.5 px-4 h-8 text-sm font-medium text-[var(--color-body)] rounded-full
+                      bg-[var(--color-canvas)] border border-[var(--color-hairline)] hover:border-[var(--color-mute)] hover:text-[var(--color-ink)]
+                      transition-all duration-200 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    下载
                   </button>
                 </div>
               </div>

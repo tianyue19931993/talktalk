@@ -15,6 +15,8 @@ const apiRoutes: Record<string, string> = {
   '/api/pay/query': 'api/pay/query.js',
   '/api/subscription/check': 'api/subscription/check.js',
   '/api/upload-html': 'api/upload-html.js',
+  '/api/user-questions/generate-interaction': 'api/user-questions/generate-interaction.js',
+  '/api/user-questions/download-demo': 'api/user-questions/download-demo.js',
 }
 
 function createResponse(res: any) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Lock, Crown } from 'lucide-react'
+import { ArrowLeft, Lock, Crown, Download } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
 import { getUserQuestion } from '../../lib/user-questions'
@@ -77,6 +77,39 @@ export default function MyDemoPage() {
     return () => { cancelled = true }
   }, [demoId, isLoading, isLoggedIn, subscription, user])
 
+  const handleDownload = async () => {
+    const content = htmlContent
+    const url = htmlUrl
+    let finalHtml = content || ''
+
+    if (!finalHtml && url) {
+      if (url.startsWith('data:text/html')) {
+        const encoded = url.split(',')[1] || ''
+        finalHtml = decodeURIComponent(encoded)
+      } else {
+        const res = await fetch(url)
+        if (!res.ok) {
+          alert('下载失败')
+          return
+        }
+        finalHtml = await res.text()
+      }
+    }
+
+    if (!finalHtml) {
+      alert('下载失败')
+      return
+    }
+
+    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' })
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = '演示.html'
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+  }
+
   // 权限不足 → 锁定页面
   if (!isLoading && loadState === 'locked') {
     return (
@@ -140,6 +173,15 @@ export default function MyDemoPage() {
         <ArrowLeft className="w-3.5 h-3.5" />
         返回
       </button>
+      {(htmlContent || htmlUrl) && loadState === 'ready' && (
+        <button
+          onClick={handleDownload}
+          className="absolute top-4 right-4 z-50 inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full transition-colors cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" />
+          下载
+        </button>
+      )}
 
       {htmlContent && (
         <iframe

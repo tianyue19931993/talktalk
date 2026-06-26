@@ -176,6 +176,43 @@ export async function generateQuestionDemo(questionId: string): Promise<Generate
   }
 }
 
+/** 下载题目的某条演示 HTML */
+export async function downloadQuestionDemo(demoId: string, filename = '演示.html'): Promise<void> {
+  const session = loadSession()
+  if (!session) {
+    throw new Error('Not authenticated')
+  }
+
+  const res = await fetch(`/api/user-questions/download-demo?demoId=${encodeURIComponent(demoId)}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${session.accessToken}`,
+    },
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    let error = `HTTP ${res.status}`
+    if (text) {
+      try {
+        const parsed = JSON.parse(text)
+        error = parsed.error || error
+      } catch {
+        error = text
+      }
+    }
+    throw new Error(error)
+  }
+
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename.endsWith('.html') ? filename : `${filename}.html`
+  a.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 /** Admin：上传 HTML 文件到题目的演示列表（优先 Kodo，降级 data:URL） */
 export async function adminUploadUserQuestionHtml(questionId: string, file: File): Promise<void> {
   return new Promise((resolve, reject) => {

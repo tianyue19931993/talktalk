@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Clock, CheckCircle, Play, Search, RefreshCw, Sparkles } from 'lucide-react'
-import { generateQuestionDemo, getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
+import { FileText, Clock, CheckCircle, Play, Search, RefreshCw, Sparkles, Download } from 'lucide-react'
+import { downloadQuestionDemo, generateQuestionDemo, getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -72,6 +72,14 @@ export default function MyQuestionsPage() {
         setGeneratingId(null)
         setGenerateHint(null)
       }, 2200)
+    }
+  }
+
+  const handleDownloadDemo = async (demo: QuestionDemo) => {
+    try {
+      await downloadQuestionDemo(demo.id, demo.title || '演示')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '下载失败')
     }
   }
 
@@ -159,8 +167,9 @@ export default function MyQuestionsPage() {
             const latestDemo = demos[0]
             const st = getStatusMeta(q, demos)
             const StatusIcon = st.icon
-            const canGenerateInteraction = q.status === 'completed' && demos.length === 0
+            const canGenerateInteraction = q.status !== 'pending'
             const generatedLabel = generateHint?.id === q.id ? generateHint.text : ''
+            const generateButtonLabel = demos.length > 0 ? '重新生成' : '生成互动'
             return (
               <div
                 key={q.id}
@@ -170,46 +179,61 @@ export default function MyQuestionsPage() {
                   {q.questionText}
                 </p>
 
-                <div className="flex items-center gap-2 mb-3">
-                  <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${st.color}`}>
-                    <StatusIcon className="w-3 h-3" />
-                    {st.label}
-                  </span>
-                  <span className="text-[10px] text-[var(--color-mute)]">
-                    {q.status === 'completed' && demos.length > 0 && latestDemo
-                      ? formatStatusTime(q, latestDemo)
-                      : formatStatusTime(q)}
-                  </span>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 shrink-0 text-[10px] px-2 py-0.5 rounded-full ${st.color}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {st.label}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-[var(--color-mute)] whitespace-nowrap">
+                      {q.status === 'completed' && demos.length > 0 && latestDemo
+                        ? formatStatusTime(q, latestDemo)
+                        : formatStatusTime(q)}
+                    </span>
+                  </div>
+                  {canGenerateInteraction && (
+                    <button
+                      onClick={() => handleGenerateInteraction(q)}
+                      disabled={generatingId === q.id}
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
+                        bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                        hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                        transition-all duration-200 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${generatingId === q.id ? 'animate-spin' : ''}`} />
+                      {generatingId === q.id ? '生成中...' : generateButtonLabel}
+                    </button>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-[var(--color-hairline)]">
                   <div className="flex flex-wrap items-center gap-2">
-                    {canGenerateInteraction && (
-                      <button
-                        onClick={() => handleGenerateInteraction(q)}
-                        disabled={generatingId === q.id}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
-                          bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                          hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                          transition-all duration-200 cursor-pointer"
-                      >
-                        <Sparkles className={`w-3 h-3 ${generatingId === q.id ? 'animate-pulse' : ''}`} />
-                        {generatingId === q.id ? '生成中...' : '生成互动'}
-                      </button>
-                    )}
-
                     {demos.length > 0 ? demos.map((demo) => (
-                      <button
+                      <div
                         key={demo.id}
-                        onClick={() => openDemo(demo.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
-                          text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
-                          rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
-                          transition-all duration-200 cursor-pointer"
+                        className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] px-2 py-1"
                       >
-                        <Play className="w-3 h-3" />
-                        观看 {demo.title || '演示'}
-                      </button>
+                        <button
+                          onClick={() => openDemo(demo.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium
+                            text-[var(--color-link)] bg-[var(--color-link-bg-soft)]
+                            rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
+                            transition-all duration-200 cursor-pointer"
+                        >
+                          <Play className="w-3 h-3" />
+                          观看 {demo.title || '演示'}
+                        </button>
+                        <button
+                          onClick={() => void handleDownloadDemo(demo)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium
+                            text-[var(--color-body)] bg-white border border-[var(--color-hairline)]
+                            rounded-full hover:border-[var(--color-mute)] hover:text-[var(--color-ink)]
+                            transition-all duration-200 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" />
+                          下载
+                        </button>
+                      </div>
                     )) : !canGenerateInteraction && (
                       <span className="text-[10px] text-[var(--color-mute)] self-center">暂无演示动画</span>
                     )}

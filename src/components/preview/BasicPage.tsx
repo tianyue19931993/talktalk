@@ -99,12 +99,10 @@ function ThreeZoneLayout({
 export default function BasicPage({
   question_text,
   math_analysis_json,
-  logic_analysis_json,
   tutor_analysis_json,
 }: BasicPageProps) {
   const observationData = toObservationHintData(math_analysis_json, question_text)
   const challengeData = toChallengeInfoData(tutor_analysis_json)
-  const discoveryData = isRecord(logic_analysis_json) ? logic_analysis_json : {}
 
   return (
     <ThreeZoneLayout
@@ -121,18 +119,7 @@ export default function BasicPage({
         </div>
       )}
       discovery={(
-        <div className="min-h-[220px] rounded-[24px] border border-dashed border-[#D8D8D8] bg-[#FAFAFA] p-4">
-          <div className="text-xs font-medium text-[#888888]">暂留空白</div>
-          <div className="mt-2 text-sm leading-7 text-[#B0B0B0]">
-            这里后面会放 discovery 相关互动组件
-          </div>
-          <div className="mt-4 rounded-[20px] border border-white/70 bg-white/70 p-3">
-            <div className="text-[11px] font-medium text-[#888888]">logic_analysis_json</div>
-            <pre className="mt-2 overflow-auto text-[11px] leading-6 text-[#4D4D4D] whitespace-pre-wrap">
-              {JSON.stringify(discoveryData, null, 2)}
-            </pre>
-          </div>
-        </div>
+        <div className="min-h-[220px] rounded-[24px] border border-dashed border-[#D8D8D8] bg-[#FAFAFA]" />
       )}
       challenge={(
         <MInfo data={challengeData} />

@@ -70,16 +70,32 @@ function parseComponentPropKeys(componentPropsText) {
   const text = safeText(componentPropsText)
   if (!text) return []
 
-  try {
-    const parsed = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => safeText(item)).filter(Boolean)
+  const candidates = [
+    text,
+    `{${text}}`,
+    text.replace(/^\{([\s\S]*)\}$/, '$1'),
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => safeText(item)).filter(Boolean)
+      }
+      if (parsed && typeof parsed === 'object') {
+        return Object.keys(parsed).filter(Boolean)
+      }
+    } catch {
+      // continue
     }
-    if (parsed && typeof parsed === 'object') {
-      return Object.keys(parsed).filter(Boolean)
-    }
-  } catch {
-    // ignore and fall back to plain-text parsing
+  }
+
+  const keyMatches = [...text.matchAll(/["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?\s*:/g)]
+    .map((match) => safeText(match[1]))
+    .filter(Boolean)
+
+  if (keyMatches.length > 0) {
+    return Array.from(new Set(keyMatches))
   }
 
   return text
@@ -152,7 +168,23 @@ function normalizeLogicAnalysis(result, logicTypes) {
       const rawComponent = safeText(block?.component)
       const matched = byName.get(rawType) || byComponent.get(rawComponent)
       const rawProps = block && typeof block === 'object' && !Array.isArray(block) ? block.props : undefined
-      const props = rawProps && typeof rawProps === 'object' && !Array.isArray(rawProps) ? rawProps : {}
+      let props = {}
+
+      if (rawProps && typeof rawProps === 'object' && !Array.isArray(rawProps)) {
+        props = rawProps
+      } else if (typeof rawProps === 'string') {
+        try {
+          const parsed = JSON.parse(rawProps)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            props = parsed
+          }
+        } catch {
+          const parsed = parseComponentPropKeys(rawProps)
+          if (parsed.length > 0) {
+            props = Object.fromEntries(parsed.map((key) => [key, null]))
+          }
+        }
+      }
 
       if (matched) {
         return {
@@ -177,24 +209,76 @@ function validateLogicAnalysis(logicAnalysis, logicTypes) {
   const allowed = new Set(logicTypes.map((item) => item.name))
   const byName = new Map(logicTypes.map((item) => [item.name, item]))
   const blocks = Array.isArray(logicAnalysis?.logic_blocks) ? logicAnalysis.logic_blocks : []
-  if (blocks.length === 0) return false
+  if (blocks.length === 0) {
+    return {
+      ok: false,
+      kind: 'structure',
+      message: 'logic_analysis 中没有 logic_blocks',
+    }
+  }
 
-  return blocks.every((block) => {
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index]
     const type = safeText(block?.type)
-    if (!allowed.has(type)) return false
+    if (!allowed.has(type)) {
+      return {
+        ok: false,
+        kind: 'type',
+        index,
+        step: block?.step ?? index + 1,
+        type,
+        message: `第 ${block?.step ?? index + 1} 步的 type 非法：${type || '空'}`,
+      }
+    }
 
     const matched = byName.get(type)
     const expectedKeys = parseComponentPropKeys(matched?.componentProps)
     const props = block?.props
-    if (expectedKeys.length === 0) return props && typeof props === 'object' && !Array.isArray(props)
+    if (expectedKeys.length === 0) {
+      if (props && typeof props === 'object' && !Array.isArray(props)) continue
+      return {
+        ok: false,
+        kind: 'props',
+        index,
+        step: block?.step ?? index + 1,
+        type,
+        expectedKeys,
+        actualKeys: [],
+        message: `第 ${block?.step ?? index + 1} 步的 props 不是对象`,
+      }
+    }
 
-    if (!props || typeof props !== 'object' || Array.isArray(props)) return false
+    if (!props || typeof props !== 'object' || Array.isArray(props)) {
+      return {
+        ok: false,
+        kind: 'props',
+        index,
+        step: block?.step ?? index + 1,
+        type,
+        expectedKeys,
+        actualKeys: [],
+        message: `第 ${block?.step ?? index + 1} 步的 props 不是对象`,
+      }
+    }
 
     const actualKeys = Object.keys(props)
-    if (actualKeys.length !== expectedKeys.length) return false
+    if (actualKeys.length !== expectedKeys.length || !expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(props, key))) {
+      return {
+        ok: false,
+        kind: 'props',
+        index,
+        step: block?.step ?? index + 1,
+        type,
+        expectedKeys,
+        actualKeys,
+        message: `第 ${block?.step ?? index + 1} 步的 props 字段不匹配`,
+      }
+    }
+  }
 
-    return expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(props, key))
-  })
+  return {
+    ok: true,
+  }
 }
 
 async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes) {
@@ -216,11 +300,20 @@ async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes
       })
 
       const normalized = normalizeLogicAnalysis(raw, logicTypes)
-      if (validateLogicAnalysis(normalized, logicTypes)) {
+      const validation = validateLogicAnalysis(normalized, logicTypes)
+      if (validation.ok) {
         return normalized
       }
 
-      lastError = new Error(`logic_analysis 输出包含非法 type，允许值只有：${allowedNames.join(', ')}`)
+      if (validation.kind === 'props') {
+        lastError = new Error(
+          `${validation.message}，要求字段：${validation.expectedKeys.join(', ') || '无'}，实际字段：${validation.actualKeys.join(', ') || '无'}`,
+        )
+      } else if (validation.kind === 'type') {
+        lastError = new Error(`logic_analysis 输出包含非法 type：${validation.type || '空'}，允许值只有：${allowedNames.join(', ')}`)
+      } else {
+        lastError = new Error(validation.message || 'logic_analysis 结构不合法')
+      }
     } catch (error) {
       lastError = error
     }

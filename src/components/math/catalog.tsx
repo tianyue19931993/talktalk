@@ -4,7 +4,6 @@ export type MathComponentCatalogItem = {
   mathComponent: string
   title: string
   blocks: string[]
-  description: string
   block: LogicBlock
 }
 
@@ -13,7 +12,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'TotalAmountComponent',
     title: 'TotalAmountComponent',
     blocks: ['求总量'],
-    description: '用总量关系把几份内容合在一起看。',
     block: {
       step: 1,
       type: '求总量',
@@ -26,7 +24,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'PartitionComponent',
     title: 'PartitionComponent',
     blocks: ['求每份数', '求份数'],
-    description: '把整体拆开，观察分组后的样子。',
     block: {
       step: 1,
       type: '求份数',
@@ -36,10 +33,67 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     },
   },
   {
+    mathComponent: 'SumComponent',
+    title: 'SumComponent',
+    blocks: ['求和'],
+    block: {
+      step: 1,
+      type: '求和',
+      component: 'SumComponent',
+      math_object: '15本，20本，12本',
+      visual_object: '图书、合并',
+    },
+  },
+  {
+    mathComponent: 'AverageComponent',
+    title: 'AverageComponent',
+    blocks: ['平均数'],
+    block: {
+      step: 1,
+      type: '平均数',
+      component: 'AverageComponent',
+      math_object: '总身高60厘米，3人',
+      visual_object: '柱状图、均分',
+    },
+  },
+  {
+    mathComponent: 'FractionComponent',
+    title: 'FractionComponent',
+    blocks: ['分数意义', '求部分量'],
+    block: {
+      step: 1,
+      type: '分数意义',
+      component: 'FractionComponent',
+      math_object: '把12个苹果平均分成4份，取其中3份',
+      visual_object: '苹果、分数条',
+    },
+  },
+  {
+    mathComponent: 'PatternCycleComponent',
+    title: 'PatternCycleComponent',
+    blocks: ['周期规律', '余数'],
+    block: {
+      step: 1,
+      type: '求第N个',
+      component: 'PatternCycleComponent',
+      math_object: '圆、三角、方块循环',
+      visual_object: '周期图形、扫描',
+      props: {
+        type: '',
+        targetN: 1,
+        cycleLength: 1,
+        cycleItems: ['', ''],
+        fullCycles: 1,
+        perCycleCount: 1,
+        remainderCount: 1,
+        buttonText: '',
+      },
+    },
+  },
+  {
     mathComponent: 'DifferenceComponent',
     title: 'DifferenceComponent',
     blocks: ['求差', '比较大小'],
-    description: '把两个量并排比较，突出差出来的部分。',
     block: {
       step: 1,
       type: '求差',
@@ -52,7 +106,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'RemainderComponent',
     title: 'RemainderComponent',
     blocks: ['求剩余'],
-    description: '把完整部分和剩余尾巴分开看。',
     block: {
       step: 1,
       type: '求剩余',
@@ -65,7 +118,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'MultipleComponent',
     title: 'MultipleComponent',
     blocks: ['求倍数', '求一个数的几倍'],
-    description: '把同一个单位反复出现，强调倍数关系。',
     block: {
       step: 1,
       type: '求倍数',
@@ -75,10 +127,57 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     },
   },
   {
+    mathComponent: 'ReverseComponent',
+    title: 'ReverseComponent',
+    blocks: ['逆运算', '倒推'],
+    block: {
+      step: 1,
+      type: '逆运算',
+      component: 'ReverseComponent',
+      math_object: '结果为18，先加5',
+      visual_object: '流程图、回推',
+    },
+  },
+  {
+    mathComponent: 'CompareComponent',
+    title: 'CompareComponent',
+    blocks: ['大小比较', '够不够'],
+    block: {
+      step: 1,
+      type: '大小比较',
+      component: 'CompareComponent',
+      math_object: '18和12比较',
+      visual_object: '天平、比较',
+    },
+  },
+  {
+    mathComponent: 'EstimateComponent',
+    title: 'EstimateComponent',
+    blocks: ['四舍五入', '估算'],
+    block: {
+      step: 1,
+      type: '四舍五入',
+      component: 'EstimateComponent',
+      math_object: '73靠近70',
+      visual_object: '数轴、磁吸',
+    },
+  },
+  {
+    mathComponent: 'NumberSenseComponent',
+    title: 'NumberSenseComponent',
+    blocks: ['位数估算', '数感'],
+    block: {
+      step: 1,
+      type: '位数估算',
+      component: 'NumberSenseComponent',
+      math_object: '432 × 21',
+      visual_object: '雷达、位数槽',
+    },
+  },
+  {
     mathComponent: 'UnitConvertComponent',
     title: 'UnitConvertComponent',
     blocks: ['统一时间单位', '统一长度单位', '统一面积单位', '统一质量单位'],
-    description: '把不同单位先统一到同一把尺上。',
     block: {
       step: 1,
       type: '统一时间单位',
@@ -91,7 +190,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'PointSegmentComponent',
     title: 'PointSegmentComponent',
     blocks: ['求间隔段数', '求棵数（两端都种）', '求棵数（封闭图形）', '识别为封闭图形植树'],
-    description: '点和段按顺序摆出来。',
     block: {
       step: 1,
       type: '求间隔段数',
@@ -104,7 +202,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'PriceQuantityComponent',
     title: 'PriceQuantityComponent',
     blocks: ['求总价', '求单价', '求数量'],
-    description: '单价、数量、总价三者并排展示。',
     block: {
       step: 1,
       type: '求总价',
@@ -117,7 +214,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'DistanceSpeedTimeComponent',
     title: 'DistanceSpeedTimeComponent',
     blocks: ['求路程', '求速度', '求时间', '求经过时间'],
-    description: '路程、速度、时间建立连接。',
     block: {
       step: 1,
       type: '求路程',
@@ -130,7 +226,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'GeometryAreaComponent',
     title: 'GeometryAreaComponent',
     blocks: ['求长方形面积', '求正方形面积', '求长方形周长', '求正方形周长', '求剩余部分面积', '求各部分面积之和', '求平移后周长', '分割成标准图形', '补成完整图形', '识别为L形', '识别为凹形'],
-    description: '先看图形轮廓，再看边和面。',
     block: {
       step: 1,
       type: '求长方形面积',
@@ -143,7 +238,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'TimeComponent',
     title: 'TimeComponent',
     blocks: ['求经过时间', '求开始时刻', '求结束时刻'],
-    description: '把起点和终点放到同一条时间线上。',
     block: {
       step: 1,
       type: '求经过时间',
@@ -153,10 +247,21 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     },
   },
   {
+    mathComponent: 'AgeComponent',
+    title: 'AgeComponent',
+    blocks: ['年龄差', '倍数契合'],
+    block: {
+      step: 1,
+      type: '年龄推演',
+      component: 'AgeComponent',
+      math_object: '甲12岁，乙9岁',
+      visual_object: '双轴、年龄条',
+    },
+  },
+  {
     mathComponent: 'RoundingComponent',
     title: 'RoundingComponent',
     blocks: ['进一法取整', '去尾法取整'],
-    description: '先看余数，再决定怎么处理尾巴。',
     block: {
       step: 1,
       type: '进一法取整',
@@ -169,7 +274,6 @@ export const MATH_COMPONENT_CATALOG: MathComponentCatalogItem[] = [
     mathComponent: 'GenericLogicComponent',
     title: 'GenericLogicComponent',
     blocks: ['其他逻辑块'],
-    description: '兜底通用组件，先保持可预览。',
     block: {
       step: 1,
       type: '通用逻辑块',

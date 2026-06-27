@@ -48,32 +48,15 @@ export function buildVisualMeta(raw: string): VisualMeta {
   }
 }
 
-const componentNarrationMap: Record<string, string> = {
-  TotalAmountComponent: '把每份数和份数组合起来，看成一个整体的总量。',
-  PartitionComponent: '把整体拆开，先看每次分一组会出现什么样子。',
-  DifferenceComponent: '把两个量对齐比较，差出来的部分会更醒目。',
-  RemainderComponent: '先看完整部分，再把剩下的尾巴单独提出来。',
-  MultipleComponent: '让同一个单位反复出现，突出“几倍”的关系。',
-  UnitConvertComponent: '把不同单位摆在一起，先统一到同一把尺上。',
-  PointSegmentComponent: '点和线段按顺序排列，关系一眼就能看见。',
-  PriceQuantityComponent: '单价、数量、总价并排展示，三者关系更清楚。',
-  DistanceSpeedTimeComponent: '路程、时间、速度建立连接，路线关系更直观。',
-  GeometryAreaComponent: '图形先露出轮廓，再看边、面、形之间的关系。',
-  TimeComponent: '把时间放到一条线上，起点和终点更容易对照。',
-  RoundingComponent: '先看余数怎么留，再决定是补一组还是舍掉尾巴。',
-  GenericLogicComponent: '先把这一步的关系看懂，再继续往下走。',
-}
-
-export function getComponentNarration(block: LogicBlock) {
-  return componentNarrationMap[block.component] || componentNarrationMap.GenericLogicComponent
-}
-
 const toneByComponent: Record<string, MathTone> = {
   TotalAmountComponent: 'purple',
   PartitionComponent: 'blue',
+  SumComponent: 'purple',
   DifferenceComponent: 'pink',
   RemainderComponent: 'green',
   MultipleComponent: 'purple',
+  FractionComponent: 'amber',
+  AverageComponent: 'blue',
   UnitConvertComponent: 'blue',
   PointSegmentComponent: 'purple',
   PriceQuantityComponent: 'pink',
@@ -81,6 +64,12 @@ const toneByComponent: Record<string, MathTone> = {
   GeometryAreaComponent: 'green',
   TimeComponent: 'amber',
   RoundingComponent: 'amber',
+  PatternCycleComponent: 'purple',
+  ReverseComponent: 'blue',
+  CompareComponent: 'pink',
+  EstimateComponent: 'amber',
+  NumberSenseComponent: 'purple',
+  AgeComponent: 'green',
   GenericLogicComponent: 'purple',
 }
 

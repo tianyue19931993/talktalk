@@ -2,37 +2,7 @@ import { useMemo, useState } from 'react'
 import { MathComponentRenderer } from '../../components/math'
 
 const DEFAULT_JSON = `{
-  "logic_blocks": [
-    {
-      "step": 1,
-      "type": "求总量",
-      "props": {
-        "unit": "米",
-        "count": 15,
-        "perValue": 60,
-        "stepLabel": "每天铺的米数",
-        "buttonText": "",
-        "totalLabel": "煤气管道总长度"
-      },
-      "component": "TotalAmountComponent",
-      "math_object": "总长度",
-      "visual_object": "煤气管道"
-    },
-    {
-      "step": 2,
-      "type": "求每份数",
-      "props": {
-        "unit": "米",
-        "total": 900,
-        "stepLabel": "12天",
-        "stepValue": 12,
-        "buttonText": ""
-      },
-      "component": "PartitionComponent",
-      "math_object": "平均每天铺的米数",
-      "visual_object": "每天铺的米数"
-    }
-  ]
+  "logic_blocks": []
 }`
 
 type ParsedPayload = {
@@ -103,7 +73,7 @@ export default function MathBlockTestPage() {
 
           {parsed.ok &&
             parsed.blocks.map((block, index) => {
-              const title = `${String(block.step ?? index + 1)} · ${String(block.component ?? 'GenericLogicComponent')}`
+              const title = `${String(block.step ?? index + 1)} · ${String(block.component ?? '未命名组件')}`
               return (
                 <section key={`${String(block.component ?? 'block')}-${index}`} className="space-y-3">
                   <div className="rounded-[24px] border border-[var(--color-hairline)] bg-white p-4">
@@ -128,7 +98,7 @@ export default function MathBlockTestPage() {
                       {
                         step: Number(block.step ?? index + 1),
                         type: String(block.type ?? ''),
-                        component: String(block.component ?? 'GenericLogicComponent'),
+                        component: String(block.component ?? '未命名组件'),
                         math_object: String(block.math_object ?? ''),
                         visual_object: String(block.visual_object ?? ''),
                         props: (block.props && typeof block.props === 'object' && !Array.isArray(block.props)) ? block.props as Record<string, unknown> : undefined,

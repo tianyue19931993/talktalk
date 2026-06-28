@@ -1,1837 +1,4280 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import type { MathComponentProps } from './mathTypes'
 import { MathComponentShell } from './MathComponentShell'
-import { buildVisualMeta, getToneForComponent, splitMathObject } from './mathHelpers'
+import { buildVisualMeta } from './mathHelpers'
 
-function phraseChips(text: string) {
-  return splitMathObject(text).slice(0, 4)
+interface CalcTotalMulProps {
+  count?: number
+  perValue?: number
+  unit?: string
+  stepLabel?: string
+  totalLabel?: string
+  buttonText?: string
 }
 
-function scenePill(text: string, active = false) {
+interface CalcPartDivProps {
+  total?: number
+  stepValue?: number
+  unit?: string
+  stepLabel?: string
+  buttonText?: string
+}
+
+interface CalcUnitDivProps {
+  total?: number
+  stepValue?: number
+  unit?: string
+  stepLabel?: string
+  buttonText?: string
+}
+
+interface CalcPriceMulProps {
+  type?: string
+  totalPrice?: number
+  price?: number
+  quantity?: number
+  unit?: string
+  itemLabel?: string
+  buttonText?: string
+}
+
+interface CalcUnitPriceDivProps {
+  type?: string
+  totalPrice?: number
+  price?: number
+  quantity?: number
+  unit?: string
+  itemLabel?: string
+  buttonText?: string
+}
+
+interface CalcQtyDivProps {
+  type?: string
+  totalPrice?: number
+  price?: number
+  quantity?: number
+  unit?: string
+  itemLabel?: string
+  buttonText?: string
+}
+
+interface CalcDistMulProps {
+  type?: string
+  distance?: number
+  speed?: number
+  time?: number
+  speedUnit?: string
+  timeUnit?: string
+  distanceUnit?: string
+  itemLabel?: string
+  buttonText?: string
+}
+
+interface CalcSpeedDivProps {
+  type?: string
+  distance?: number
+  speed?: number
+  time?: number
+  speedUnit?: string
+  timeUnit?: string
+  distanceUnit?: string
+  buttonText?: string
+}
+
+interface CalcTimeDivProps {
+  type?: string
+  distance?: number
+  speed?: number
+  time?: number
+  speedUnit?: string
+  timeUnit?: string
+  distanceUnit?: string
+  buttonText?: string
+}
+
+interface CalcDiffSubProps {
+  numA?: number
+  numB?: number
+  unit?: string
+  labelA?: string
+  labelB?: string
+  buttonText?: string
+}
+
+interface CalcSumAddProps {
+  parts?: number[]
+  unit?: string
+  labels?: string[]
+  buttonText?: string
+}
+
+interface DragState {
+  isDragging: boolean
+  x: number
+  y: number
+  startX: number
+  startY: number
+  isSnapped: boolean
+}
+
+interface CalcRemainSubProps {
+  total?: number
+  used?: number
+  unit?: string
+  totalLabel?: string
+  usedLabel?: string
+  buttonText?: string
+}
+
+interface CalcTimesDivProps {
+  type?: string
+  numA?: number
+  numB?: number
+  baseNum?: number
+  multiple?: number
+  unit?: string
+  labelA?: string
+  labelB?: string
+  labelBase?: string
+  buttonText?: string
+}
+
+const timesDivStyles: { [key: string]: React.CSSProperties } = {
+  uiCard: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+    border: '1px solid #f0f0f0',
+    padding: '32px',
+    maxWidth: '540px',
+    width: '100%',
+    boxSizing: 'border-box',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+  stage: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    padding: '64px 24px',
+    marginBottom: '24px',
+    border: '1px solid #e5e5e5',
+    minHeight: '200px',
+    display: 'flex',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+  },
+  interactionZone: {
+    position: 'relative',
+    width: '100%',
+    height: '64px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  stageWrapper: {
+    position: 'relative',
+    width: '100%',
+    height: '64px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  knivesLayer: {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    zIndex: 20,
+  },
+  knifeLine: {
+    position: 'absolute',
+    top: 0,
+    width: '2px',
+    height: '20px',
+    backgroundColor: '#0070F3',
+    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+  },
+  segmentsContainer: {
+    display: 'flex',
+    width: '100%',
+    alignItems: 'center',
+    transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    zIndex: 10,
+  },
+  baseLine: {
+    background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+    height: '16px',
+    width: '100%',
+    borderRadius: '9999px',
+  },
+  subSegment: {
+    background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+    height: '16px',
+    flex: 1,
+    borderRadius: '9999px',
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    left: '50%',
+    backgroundColor: '#ffffff',
+    border: '1px solid #e5e5e5',
+    padding: '4px 10px',
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+  },
+  badgeTop: {
+    bottom: '28px',
+    color: '#0070F3',
+  },
+  badgeFinal: {
+    position: 'absolute',
+    top: '28px',
+    left: '50%',
+    backgroundColor: '#0070F3',
+    color: '#ffffff',
+    border: '1px solid #0070F3',
+    padding: '4px 10px',
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap',
+    boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    zIndex: 40,
+  },
+  btnRow: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'flex-start',
+  },
+  btnReset: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    border: '1px solid #e5e5e5',
+    background: '#f5f5f5',
+    color: '#525252',
+    transition: 'background 0.2s',
+  },
+  btnAction: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    border: 'none',
+    background: '#0070F3',
+    color: '#ffffff',
+    transition: 'background 0.2s',
+  },
+}
+
+interface CalcTimesMulProps {
+  type?: string
+  numA?: number
+  numB?: number
+  baseNum?: number
+  multiple?: number
+  unit?: string
+  labelA?: string
+  labelB?: string
+  labelBase?: string
+  buttonText?: string
+}
+
+interface CalcFracPartProps {
+  type?: string
+  total?: number
+  part?: number
+  numerator?: number
+  denominator?: number
+  unit?: string
+  buttonText?: string
+}
+
+interface CalcFracRateProps {
+  type?: string
+  total?: number
+  part?: number
+  numerator?: number
+  denominator?: number
+  unit?: string
+  buttonText?: string
+}
+
+interface CalcAvgDivProps {
+  total?: number
+  count?: number
+  unit?: string
+  totalLabel?: string
+  buttonText?: string
+}
+
+interface CalcMultiSumProps {
+  parts?: number[]
+  unit?: string
+  labels?: string[]
+  buttonText?: string
+}
+
+interface TimeSubSpanProps {
+  type?: string
+  startTime?: string
+  endTime?: string
+  pauseMinutes?: number
+  durationMinutes?: number
+  buttonText?: string
+}
+
+interface TimeAddPassProps {
+  type?: string
+  startTime?: string
+  endTime?: string
+  pauseMinutes?: number
+  durationMinutes?: number
+  buttonText?: string
+}
+
+export function CalcTotalMul({
+  count = 4,
+  perValue = 10,
+  unit = '个',
+  stepLabel = '每组10个，共4组',
+  totalLabel = '共40个',
+  buttonText = '求总量',
+}: CalcTotalMulProps) {
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [droppedRows, setDroppedRows] = useState<number[]>([])
+  const [isShellActive, setIsShellActive] = useState<boolean>(false)
+  const [showTotal, setShowTotal] = useState<boolean>(false)
+  const timerRefs = useRef<number[]>([])
+
+  const clearAllTimers = () => {
+    timerRefs.current.forEach((timerId) => window.clearTimeout(timerId))
+    timerRefs.current = []
+  }
+
+  const startAnimation = async () => {
+    if (isAnimating) return
+    setIsAnimating(true)
+    setDroppedRows([])
+    setIsShellActive(false)
+    setShowTotal(false)
+    clearAllTimers()
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    for (let i = 0; i < count; i += 1) {
+      setDroppedRows((prev) => [...prev, i])
+      await sleep(250)
+    }
+
+    await sleep(200)
+    setIsShellActive(true)
+    await sleep(150)
+
+    setShowTotal(true)
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    clearAllTimers()
+    setDroppedRows([])
+    setIsShellActive(false)
+    setShowTotal(false)
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [count, perValue])
+
+  const cubeArray = Array.from({ length: perValue })
+  const rowArray = Array.from({ length: count })
+
   return (
-    <span
-      className={`rounded-full border px-3 py-1 text-xs transition-all duration-300 ${
-        active
-          ? 'border-[rgba(0,112,243,0.24)] bg-[rgba(0,112,243,0.08)] text-[var(--color-link)]'
-          : 'border-[var(--color-hairline)] bg-white text-[var(--color-body)]'
-      }`}
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '600px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
     >
-      {text}
-    </span>
-  )
-}
-
-function renderTokens(tokens: string[], active: boolean, dense = false) {
-  return (
-    <div className={`flex flex-wrap gap-2 ${dense ? 'items-center' : ''}`}>
-      {tokens.map((token, index) => (
-        <span
-          key={`${token}-${index}`}
-          className={`rounded-full px-3 py-1 text-xs transition-all duration-300 ${active ? 'bg-[var(--color-link)] text-white' : 'bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}
-        >
-          {token}
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function extractTimes(text: string) {
-  const matches = text.match(/\b\d{1,2}:\d{2}\b/g)
-  return matches && matches.length > 0 ? matches.slice(0, 2) : ['开始时刻', '结束时刻']
-}
-
-export interface PartitionProps {
-  total: number
-  stepValue: number
-  unit: string
-  stepLabel: string
-  buttonText: string
-}
-
-export interface TotalAmountProps {
-  count: number
-  perValue: number
-  unit: string
-  stepLabel: string
-  totalLabel: string
-  buttonText: string
-}
-
-export interface RoundingProps {
-  strategy: 'ceil' | 'floor'
-  remainderValue: number
-  unit: string
-  remainderLabel: string
-  buttonText: string
-}
-
-export interface PatternCycleProps {
-  type: 'find_position' | 'count_total'
-  targetN: number
-  cycleLength: number
-  cycleItems: string[]
-  fullCycles: number
-  perCycleCount: number
-  remainderCount: number
-  buttonText: string
-}
-
-function readBlockProps(block: MathComponentProps['block']) {
-  const props = (block as MathComponentProps['block'] & { props?: Record<string, unknown> })?.props
-  return props && typeof props === 'object' && !Array.isArray(props) ? props : {}
-}
-
-function toText(value: unknown, fallback = '') {
-  if (typeof value === 'string') return value
-  if (value === null || value === undefined) return fallback
-  return String(value)
-}
-
-function toNumber(value: unknown, fallback = 0) {
-  const next = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(next) ? next : fallback
-}
-
-function extractTotalAmountProps(block: MathComponentProps['block']): TotalAmountProps {
-  const props = readBlockProps(block)
-  const source = String(block.math_object || '')
-  const numbers = extractAllNumbers(source)
-  const countMatch = source.match(/共\s*(\d+(?:\.\d+)?)\s*([^\d\s，,。；;]*)/)
-  const perMatch = source.match(/每[^0-9]*?(\d+(?:\.\d+)?)\s*([^\d\s，,。；;]*)/)
-  const count = toNumber(props.count, countMatch ? Number(countMatch[1]) : (numbers[1] ?? numbers[0] ?? 1))
-  const perValue = toNumber(props.perValue, perMatch ? Number(perMatch[1]) : (numbers[0] ?? 1))
-  const unit = toText(props.unit, perMatch?.[2] || countMatch?.[2] || extractUnit(source) || '个')
-
-  return {
-    count: count > 0 ? count : 1,
-    perValue: perValue > 0 ? perValue : 1,
-    unit,
-    stepLabel: toText(props.stepLabel, `每组 ${perValue > 0 ? perValue : 1}${unit}`),
-    totalLabel: toText(props.totalLabel, '一共有'),
-    buttonText: toText(props.buttonText, '聚合总量') || '聚合总量',
-  }
-}
-
-function extractRoundingProps(block: MathComponentProps['block']): RoundingProps {
-  const props = readBlockProps(block)
-  const source = String(block.math_object || '')
-  const numbers = extractAllNumbers(source)
-  const strategy: 'ceil' | 'floor' = String(props.strategy || '').toLowerCase() === 'ceil' || /进一|ceil/i.test(block.type) ? 'ceil' : 'floor'
-  const remainderValue = toNumber(props.remainderValue, numbers.length > 0 ? numbers[numbers.length - 1] : 0)
-  const unit = toText(props.unit, extractUnit(source) || '个')
-
-  return {
-    strategy,
-    remainderValue,
-    unit,
-    remainderLabel: toText(props.remainderLabel, strategy === 'ceil'
-      ? `还差 ${remainderValue}${unit}，需要再来一次`
-      : `剩余 ${remainderValue}${unit}，先把尾巴去掉`),
-    buttonText: toText(props.buttonText, strategy === 'ceil' ? '再运一次' : '去掉尾巴') || (strategy === 'ceil' ? '再运一次' : '去掉尾巴'),
-  }
-}
-
-function extractPatternCycleProps(block: MathComponentProps['block']): PatternCycleProps {
-  const props = readBlockProps(block)
-  const cycleItems = readStringArray(props.cycleItems, ['图形'])
-  const normalizedItems = cycleItems.length > 0 ? cycleItems : ['图形']
-  const cycleLength = Math.max(1, toNumber(props.cycleLength, normalizedItems.length))
-  const targetN = Math.max(1, toNumber(props.targetN, extractAllNumbers(block.math_object)[0] ?? cycleLength))
-  const fullCycles = Math.max(0, toNumber(props.fullCycles, Math.floor(targetN / cycleLength)))
-  const remainderCount = Math.max(0, toNumber(props.remainderCount, targetN % cycleLength))
-  const queue = Array.from({ length: targetN }, (_, index) => normalizedItems[index % normalizedItems.length] || '图形')
-  const targetToken = queue[targetN - 1] || normalizedItems[0] || '图形'
-  const derivedPerCycleCount = normalizedItems.slice(0, cycleLength).filter((item) => item === targetToken).length
-  const perCycleCount = Math.max(0, toNumber(props.perCycleCount, derivedPerCycleCount))
-  const rawType = toText(props.type, block.type && /count|总|数/i.test(block.type) ? 'count_total' : 'find_position')
-  const type: PatternCycleProps['type'] = rawType === 'count_total' ? 'count_total' : 'find_position'
-
-  return {
-    type,
-    targetN,
-    cycleLength,
-    cycleItems: normalizedItems,
-    fullCycles,
-    perCycleCount,
-    remainderCount,
-    buttonText: toText(props.buttonText, '开始探究') || '开始探究',
-  }
-}
-
-function extractAllNumbers(text: string) {
-  return String(text || '')
-    .match(/\d+(?:\.\d+)?/g)
-    ?.map((item) => Number(item))
-    .filter((item) => Number.isFinite(item) && item > 0) ?? []
-}
-
-function extractUnit(text: string) {
-  const source = String(text || '')
-  const candidates = [
-    '千米', '公里', '小时', '分钟', '秒', '元/张', '元/把', '元/个', '元/件', '元',
-    '米', '厘米', '毫米', '吨', '千克', '克', '瓶', '张', '把', '个', '套', '只', '次', '份', '组',
-  ]
-
-  for (const unit of candidates) {
-    if (source.includes(unit)) return unit
-  }
-
-  return ''
-}
-
-function toPartitionProps(blockText: string): PartitionProps {
-  const numbers = extractAllNumbers(blockText)
-  const total = numbers[0] ?? 0
-  const stepValue = numbers[1] ?? 1
-  const unit = extractUnit(blockText)
-
-  return {
-    total,
-    stepValue: stepValue > 0 ? stepValue : 1,
-    unit,
-    stepLabel: unit ? `每次 ${stepValue} ${unit}` : `每次 ${stepValue}`,
-    buttonText: '开始分',
-  }
-}
-
-function getButtonText(block: MathComponentProps['block'], fallback: string) {
-  const props = readBlockProps(block)
-  return toText(props.buttonText, fallback) || fallback
-}
-
-function readNumberArray(value: unknown, fallback: number[] = []) {
-  if (Array.isArray(value)) {
-    return value.map((item) => toNumber(item, 0)).filter((item) => Number.isFinite(item) && item >= 0)
-  }
-
-  if (typeof value === 'number') {
-    return [value]
-  }
-
-  return fallback
-}
-
-function readStringArray(value: unknown, fallback: string[] = []) {
-  if (Array.isArray(value)) {
-    return value.map((item) => toText(item, '')).filter(Boolean)
-  }
-
-  if (typeof value === 'string') {
-    return value.split(/[,，、/|]/).map((item) => item.trim()).filter(Boolean)
-  }
-
-  return fallback
-}
-
-function joinUnit(value: number, unit: string) {
-  return `${value}${unit || ''}`
-}
-
-type MaterialLiteShellProps = {
-  block: MathComponentProps['block']
-  buttonLabel: string
-  children: (active: boolean, visual: ReturnType<typeof buildVisualMeta>) => ReactNode
-}
-
-function MaterialLiteShell({ block, buttonLabel, children }: MaterialLiteShellProps) {
-  const [active, setActive] = useState(false)
-
-  return (
-    <div className="rounded-[22px] border border-[#EAEAEA] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-      <div className="rounded-[18px] border border-[#EAEAEA] bg-[#FAFAFA] p-3">
-        {children(active, buildVisualMeta(block.visual_object))}
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcTotalMul 乘法求总数组件
       </div>
 
-      <div className="mt-3 flex items-center justify-start gap-2">
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '60px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '260px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="global-shell"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            padding: '16px',
+            borderRadius: '20px',
+            border: isShellActive ? '2px solid #0070F3' : '2px dashed transparent',
+            background: isShellActive ? 'rgba(0, 112, 243, 0.01)' : 'transparent',
+            boxShadow: isShellActive ? '0 12px 24px rgba(0, 112, 243, 0.05)' : 'none',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+          }}
+        >
+          <div
+            className="badge badge-total"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '-44px',
+              transform: showTotal ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+              opacity: showTotal ? 1 : 0,
+              backgroundColor: '#0070F3',
+              color: '#ffffff',
+              border: '1px solid #0070F3',
+              padding: '4px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+              zIndex: 30,
+              transition: 'all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+            }}
+          >
+            {totalLabel} <span style={{ fontSize: '10px' }}>↑</span>
+          </div>
+
+          {rowArray.map((_, rowIndex) => {
+            const isDropped = droppedRows.includes(rowIndex)
+            return (
+              <div
+                key={rowIndex}
+                className="group-row"
+                style={{
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center',
+                  position: 'relative',
+                  opacity: isDropped ? 1 : 0,
+                  transform: isDropped ? 'translateY(0)' : 'translateY(-40px)',
+                  transition: 'all 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+                }}
+              >
+                <div
+                  className="group-label"
+                  style={{
+                    marginRight: '8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#888',
+                    background: '#eee',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {perValue}
+                  {unit}
+                </div>
+
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', maxWidth: '380px' }}>
+                  {cubeArray.map((_, cubeIndex) => (
+                    <div
+                      key={cubeIndex}
+                      className="mini-cube"
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        background: 'linear-gradient(135deg, #7928CA 0%, #FF0080 100%)',
+                        borderRadius: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          <div
+            className="badge badge-bottom"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: '-44px',
+              transform: 'translateX(-50%) scale(1)',
+              background: '#ffffff',
+              border: '1px solid #e5e5e5',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              color: '#888',
+              opacity: 1,
+              zIndex: 30,
+            }}
+          >
+            {stepLabel || `每组 ${perValue} ${unit}，共 ${count} 组`}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
         <button
-          type="button"
-          onClick={() => setActive(false)}
-          className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
         >
           重置
         </button>
         <button
-          type="button"
-          onClick={() => setActive((v) => !v)}
-          className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95"
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || droppedRows.length === count}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating || droppedRows.length === count ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: isAnimating || droppedRows.length === count ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
         >
-          {buttonLabel}
+          {buttonText}
         </button>
       </div>
     </div>
   )
 }
 
-export function TotalAmountComponent({ block }: MathComponentProps) {
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isFinished, setIsFinished] = useState(false)
-  const [droppedCount, setDroppedCount] = useState(0)
-  const [isPopping, setIsPopping] = useState(false)
-  const timerRef = useRef<number | null>(null)
-  const popTimerRef = useRef<number | null>(null)
+export function CalcPartDiv({
+  total = 60,
+  stepValue = 15,
+  unit = '厘米',
+  stepLabel = '4份',
+  buttonText = '求份数',
+}: CalcPartDivProps) {
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges' | 'final'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<number[]>([])
 
-  const totalProps = useMemo(() => extractTotalAmountProps(block), [block])
+  const finalCount = Math.floor(total / stepValue) || 1
+  const segmentArray = Array.from({ length: finalCount })
 
-  const totalValue = totalProps.count * totalProps.perValue
-  const stepWidth = totalProps.count > 0 ? 100 / totalProps.count : 100
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-  useEffect(() => {
-    setIsAnimating(false)
-    setIsFinished(false)
-    setDroppedCount(0)
-    setIsPopping(false)
-    if (timerRef.current !== null) window.clearInterval(timerRef.current)
-    if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-  }, [block.math_object, block.visual_object, block.component])
+  const startAnimation = async () => {
+    if (isAnimating || finalCount <= 1) return
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) window.clearInterval(timerRef.current)
-      if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-    }
-  }, [])
-
-  const startAggregation = () => {
-    if (isAnimating || isFinished || totalProps.count <= 0) return
     setIsAnimating(true)
-    setIsFinished(false)
-    setDroppedCount(0)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges([])
 
-    let next = 0
-    if (timerRef.current !== null) window.clearInterval(timerRef.current)
-    timerRef.current = window.setInterval(() => {
-      next += 1
-      setDroppedCount(next)
+    for (let i = 1; i < finalCount; i += 1) {
+      await sleep(150)
+      setActiveKnives((prev) => [...prev, i])
+    }
 
-      if (next >= totalProps.count) {
-        if (timerRef.current !== null) window.clearInterval(timerRef.current)
-        timerRef.current = null
-        setTimeout(() => {
-          setIsAnimating(false)
-          setIsFinished(true)
-          setIsPopping(true)
-          popTimerRef.current = window.setTimeout(() => setIsPopping(false), 260)
-        }, 180)
-      }
-    }, 420)
+    await sleep(450)
+
+    setAnimationStage('split')
+    await sleep(400)
+
+    setAnimationStage('badges')
+    for (let i = 0; i < finalCount; i += 1) {
+      setActiveBadges((prev) => [...prev, i])
+      await sleep(120)
+    }
+    await sleep(300)
+
+    setAnimationStage('final')
+    setIsAnimating(false)
   }
 
-  const resultText = `${totalValue}${totalProps.unit}`
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges([])
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [total, stepValue])
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-[#EAEAEA] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-      <div className="grid gap-4 md:grid-rows-[auto_auto]">
-        <div className="relative rounded-[22px] border border-[#EAEAEA] bg-[#FAFAFA] p-4">
-          <div className="mb-3 flex items-center justify-between text-xs text-[#888888]">
-            <span>{totalProps.totalLabel || '总量'}</span>
-            <span>{totalValue}{totalProps.unit}</span>
-          </div>
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes reactJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
 
-          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${totalProps.count}, minmax(0, 1fr))` }}>
-            {Array.from({ length: totalProps.count }).map((_, index) => {
-              const isDropped = droppedCount > index || isFinished
-              const isCurrent = droppedCount === index + 1 && isAnimating
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcPartDiv 用除法求份数组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '64px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '200px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总量: {total} {unit}
+        </div>
+
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: finalCount - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / finalCount) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
               return (
                 <div
-                  key={index}
-                  className={`flex min-h-[100px] flex-col justify-between rounded-[18px] border-r-2 border-white px-3 py-3 text-left text-white transition-all duration-500 ease-out ${
-                    isDropped || isCurrent
-                      ? 'bg-gradient-to-br from-[#7928CA] to-[#FF0080]'
-                      : 'bg-[#D9D9D9]'
-                  } ${isPopping && isFinished ? 'scale-[1.03]' : 'scale-100'} ${isCurrent ? 'translate-y-1' : isDropped ? 'translate-y-0' : '-translate-y-0'}`}
+                  key={knifeIndex}
+                  className="knife-line"
                   style={{
-                    transform: `translateY(${isDropped ? '0' : isCurrent ? '8px' : '-8px'}) scale(${isPopping && isFinished ? 1.03 : 1})`,
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
                   }}
-                >
-                  <div className="text-[11px] font-medium opacity-90">{totalProps.stepLabel || '每份数'}</div>
-                  <div className="text-sm font-semibold">{totalProps.perValue}{totalProps.unit}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-[22px] border border-[#EAEAEA] bg-[#FAFAFA] p-4">
-          <div className="flex items-center justify-between text-xs text-[#888888]">
-            <span>Track</span>
-            <span>{isFinished ? resultText : '?'}</span>
-          </div>
-
-          <div className={`relative mt-3 h-[88px] overflow-hidden rounded-[20px] border-2 border-dashed border-[#D9D9D9] bg-white transition-all duration-300 ${isPopping && isFinished ? 'scale-[1.01]' : 'scale-100'}`}>
-            <div className="absolute inset-2 overflow-hidden rounded-[16px] bg-[#F5F5F5]">
-              <div className="relative flex h-full w-full">
-                {Array.from({ length: totalProps.count }).map((_, index) => {
-                  const filled = droppedCount > index || isFinished
-                  return (
-                    <div
-                      key={index}
-                      className={`h-full border-r-2 border-white transition-all duration-500 ${
-                        filled ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]' : 'bg-transparent'
-                      }`}
-                      style={{ width: `${stepWidth}%`, opacity: filled ? 1 : 0.2 }}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-3xl font-semibold text-[#888888] transition-all duration-300">
-              {isFinished ? resultText : '?'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-start gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setIsAnimating(false)
-              setIsFinished(false)
-              setDroppedCount(0)
-              setIsPopping(false)
-              if (timerRef.current !== null) window.clearInterval(timerRef.current)
-              if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-            }}
-            className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
-          >
-            重置
-          </button>
-          <button
-            type="button"
-            disabled={isAnimating || isFinished || totalProps.count <= 0}
-            onClick={startAggregation}
-            className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isFinished ? '已完成' : isAnimating ? '播放中' : (totalProps.buttonText || '聚合总量')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function PartitionComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const visual = buildVisualMeta(block.visual_object)
-  const { total, stepValue, unit, stepLabel, buttonText } = useMemo(() => {
-    const fallback = toPartitionProps(block.math_object)
-    return {
-      total: toNumber(props.total, fallback.total),
-      stepValue: toNumber(props.stepValue, fallback.stepValue),
-      unit: toText(props.unit, fallback.unit),
-      stepLabel: toText(props.stepLabel, fallback.stepLabel),
-      buttonText: toText(props.buttonText, fallback.buttonText) || fallback.buttonText,
-    }
-  }, [block.math_object, props.buttonText, props.stepLabel, props.stepValue, props.total, props.unit])
-  const quotient = useMemo(() => (stepValue > 0 ? Math.floor(total / stepValue) : 0), [total, stepValue])
-  const remainder = useMemo(() => (stepValue > 0 ? total % stepValue : 0), [total, stepValue])
-  const segmentWidth = total > 0 ? (stepValue / total) * 100 : 0
-  const [currentCutCount, setCurrentCutCount] = useState(0)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isFinished, setIsFinished] = useState(false)
-  const intervalRef = useRef<number | null>(null)
-  const timeoutRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current !== null) window.clearInterval(intervalRef.current)
-      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
-    }
-  }, [])
-
-  useEffect(() => {
-    setCurrentCutCount(0)
-    setIsAnimating(false)
-    setIsFinished(false)
-    if (intervalRef.current !== null) window.clearInterval(intervalRef.current)
-    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
-  }, [block.component, block.math_object, block.visual_object])
-
-  const startCutting = () => {
-    if (isAnimating || isFinished || quotient <= 0) return
-    setCurrentCutCount(0)
-    setIsAnimating(true)
-    setIsFinished(false)
-
-    let nextCut = 0
-
-    intervalRef.current = window.setInterval(() => {
-      nextCut += 1
-      setCurrentCutCount(nextCut)
-
-      if (nextCut >= quotient) {
-        if (intervalRef.current !== null) window.clearInterval(intervalRef.current)
-        intervalRef.current = null
-        timeoutRef.current = window.setTimeout(() => {
-          setIsAnimating(false)
-          setIsFinished(true)
-        }, 420)
-      }
-    }, 760)
-  }
-
-  const cutterLeft = `${Math.min(currentCutCount * segmentWidth, 100)}%`
-
-  return (
-    <div className="rounded-[24px] border border-[#EAEAEA] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between text-xs text-[#888888]">
-        <span>0</span>
-        <span>{total}{unit}</span>
-      </div>
-
-      <div className="relative mt-4">
-        <div className="relative h-16 overflow-hidden rounded-[18px] bg-[#E5E5E5]">
-          <div className="absolute inset-y-0 left-0 flex h-full w-full">
-            {Array.from({ length: quotient }).map((_, index) => {
-              const filled = currentCutCount > index || (isFinished && index < quotient)
-              return (
-                <div
-                  key={index}
-                  className={`h-full border-r-2 border-white transition-all duration-500 ${
-                    filled ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]' : 'bg-[#D9D9D9]'
-                  }`}
-                  style={{ width: `${segmentWidth}%` }}
                 />
               )
             })}
-            {remainder > 0 && (
-              <div
-                className={`h-full border-r-2 border-white transition-all duration-500 ${
-                  isFinished ? 'bg-[rgba(217,217,217,0.45)]' : 'bg-[#D9D9D9]'
-                }`}
-                style={{ width: `${total > 0 ? (remainder / total) * 100 : 0}%` }}
-              />
-            )}
           </div>
 
           <div
-            className={`absolute top-[-6px] z-10 transition-all duration-500 ease-out ${
-              isAnimating || currentCutCount > 0 || isFinished ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{ left: cutterLeft, transform: 'translateX(-50%)' }}
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
           >
-            <div className="mx-auto h-0 w-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent border-t-[#0070F3]" />
-            <div className="mx-auto mt-[-1px] h-12 w-[2px] rounded-full bg-[#0070F3]" />
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const isActiveBadge = activeBadges.includes(i)
+                const isCenter = i === Math.floor(finalCount / 2)
+                const showFinalBadge = animationStage === 'final'
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        bottom: '28px',
+                        left: '50%',
+                        transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: isActiveBadge ? 1 : 0,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e5e5',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        color: '#0070F3',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        animation: isActiveBadge ? 'reactJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {stepValue} {unit}
+                    </div>
+
+                    {isCenter && (
+                      <div
+                        className="badge-final"
+                        style={{
+                          position: 'absolute',
+                          top: '28px',
+                          left: '50%',
+                          transform: showFinalBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                          opacity: showFinalBadge ? 1 : 0,
+                          backgroundColor: '#0070F3',
+                          color: '#ffffff',
+                          border: '1px solid #0070F3',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+                          transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          zIndex: 40,
+                          animation: showFinalBadge ? 'reactJelly 0.5s ease-in-out' : 'none',
+                        }}
+                      >
+                        {stepLabel} <span style={{ fontSize: '10px' }}>↑</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
-
       </div>
 
-      <div className="mt-4 flex items-center justify-start gap-2">
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
         <button
-          type="button"
-          onClick={() => {
-            setCurrentCutCount(0)
-            setIsAnimating(false)
-            setIsFinished(false)
-            if (intervalRef.current !== null) window.clearInterval(intervalRef.current)
-            if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
           }}
-          className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
         >
           重置
         </button>
         <button
-          type="button"
-          disabled={isAnimating || isFinished || quotient <= 0}
-          onClick={startCutting}
-          className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || animationStage === 'final'}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || animationStage === 'final') ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || animationStage === 'final') ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
         >
-          {isFinished ? '已完成' : isAnimating ? '播放中' : (buttonText || '开始分')}
+          {buttonText}
         </button>
       </div>
     </div>
   )
 }
 
-export function DifferenceComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const phrases = phraseChips(block.math_object)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="对齐比较">
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">两个量</div>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="w-16 text-xs text-[var(--color-body)]">{phrases[0] || '量 A'}</div>
-                <div className={`h-4 flex-1 rounded-full transition-all duration-300 ${active ? 'bg-[var(--color-link)]' : 'bg-[var(--color-canvas-soft)]'}`} />
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-16 text-xs text-[var(--color-body)]">{phrases[1] || '量 B'}</div>
-                <div className="h-4 flex-1 rounded-full bg-[var(--color-canvas-soft)]" />
-              </div>
-            </div>
-          </div>
-          <div className={`rounded-[20px] border p-4 transition-all duration-300 ${active ? 'border-[var(--color-highlight-pink)] bg-[rgba(255,0,128,0.06)]' : 'border-[var(--color-hairline)] bg-white'}`}>
-            <div className="text-[11px] text-[var(--color-mute)]">比较感</div>
-            <div className="mt-2 text-sm text-[var(--color-ink)]">把差出来的那一段轻轻高亮。</div>
-            <div className="mt-3 flex items-center gap-2 text-2xl">{active ? '↔️' : '↔'}</div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
+export function CalcUnitDiv({
+  total = 60,
+  stepValue = 15,
+  unit = '个',
+  stepLabel = '15个',
+  buttonText = '求每份数',
+}: CalcUnitDivProps) {
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<number[]>([])
 
-export function RemainderComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const phrases = phraseChips(block.math_object)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="看看剩下的">
-      {(active, visual) => (
-        <div className="grid gap-3 md:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">完整部分</div>
-            <div className="mt-3 flex items-center gap-2">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className={`h-10 flex-1 rounded-[14px] transition-all duration-300 ${index < 4 ? 'bg-[var(--color-link)]/20' : active ? 'bg-[var(--color-highlight-pink)]/25' : 'bg-[var(--color-canvas-soft)]'}`} />
-              ))}
-            </div>
-            <div className="mt-3 text-sm text-[var(--color-body)]">{phrases[0] || block.math_object}</div>
-          </div>
-          <div className={`rounded-[20px] border p-4 transition-all duration-300 ${active ? 'border-green-300 bg-[rgba(34,197,94,0.08)]' : 'border-[var(--color-hairline)] bg-white'}`}>
-            <div className="text-[11px] text-[var(--color-mute)]">剩余尾巴</div>
-            <div className="mt-2 flex items-center gap-3 text-2xl">{visual.emoji}<span className="text-sm text-[var(--color-body)]">{active ? '剩下的部分单独亮出来' : '点击后看剩余怎么被提取'}</span></div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
+  const finalCount = Math.floor(total / stepValue) || 1
+  const segmentArray = Array.from({ length: finalCount })
 
-export function MultipleComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const tokens = buildVisualMeta(block.visual_object).tokens
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="展示倍数">
-      {(active, visual) => (
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">基础单位</div>
-            <div className="mt-2 text-lg font-semibold text-[var(--color-ink)]">{block.math_object}</div>
-          </div>
-          <div className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${active ? 'bg-[var(--color-link)] text-white' : 'bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}>
-            × 倍数
-          </div>
-          <div className={`rounded-[20px] border p-4 transition-all duration-300 ${active ? 'border-[var(--color-gradient-start)] bg-[rgba(121,40,202,0.06)]' : 'border-[var(--color-hairline)] bg-white'}`}>
-            <div className="text-[11px] text-[var(--color-mute)]">放大后的排布</div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {Array.from({ length: active ? 6 : 3 }).map((_, index) => (
-                <div key={index} className="rounded-[14px] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-3 text-center text-xl">
-                  {tokens[index % tokens.length] || visual.emoji}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export function UnitConvertComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const phrases = phraseChips(block.math_object)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="统一单位">
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">原单位</div>
-            <div className="mt-2">{scenePill(phrases[0] || '原单位', false)}</div>
-          </div>
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">统一后</div>
-            <div className="mt-2">{scenePill(phrases[1] || '统一单位', active)}</div>
-          </div>
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">关系提示</div>
-            <div className="mt-2 text-sm text-[var(--color-ink)]">{active ? '现在看起来像同一种单位了' : '点击后标签会更统一'}</div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
+  const startAnimation = async () => {
+    if (isAnimating || finalCount <= 1) return
 
-export function PointSegmentComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="点亮点段">
-      {(active, visual) => (
-        <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-          <div className="text-[11px] text-[var(--color-mute)]">点段关系</div>
-          <div className="mt-4 flex items-center gap-2">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full transition-all duration-300 ${active && index <= 2 ? 'bg-[var(--color-link)]' : 'bg-[var(--color-canvas-soft-2)]'}`} />
-                {index < 4 && <div className={`h-1 w-12 rounded-full transition-all duration-300 ${active && index < 3 ? 'bg-[var(--color-gradient-start)]' : 'bg-[var(--color-canvas-soft)]'}`} />}
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 text-sm text-[var(--color-body)]">{active ? '点和段的对应关系已轻量高亮' : '点击按钮让点和段更醒目'}</div>
-          <div className="mt-3 flex items-center gap-2 text-xl">{visual.emoji}</div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
-
-export function PriceQuantityComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const phrases = phraseChips(block.math_object)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="查看价格关系">
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { label: '单价', value: phrases[0] || '每个多少钱' },
-            { label: '数量', value: phrases[1] || '有几个' },
-            { label: '总价', value: phrases[2] || '合起来多少钱' },
-          ].map((item, index) => (
-            <div
-              key={item.label}
-              className={`rounded-[20px] border p-4 transition-all duration-300 ${
-                active && index === 2 ? 'border-[var(--color-highlight-pink)] bg-[rgba(255,0,128,0.06)]' : 'border-[var(--color-hairline)] bg-white'
-              }`}
-            >
-              <div className="text-[11px] text-[var(--color-mute)]">{item.label}</div>
-              <div className="mt-2 text-sm font-medium text-[var(--color-ink)]">{item.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
-
-export function DistanceSpeedTimeComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="建立关系">
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { label: '路程', value: '走了多远' },
-            { label: '时间', value: '走了多久' },
-            { label: '速度', value: '每小时多快' },
-          ].map((item, index) => (
-            <div
-              key={item.label}
-              className={`rounded-[20px] border p-4 transition-all duration-300 ${
-                active && index === 1 ? 'border-[var(--color-link)] bg-[rgba(0,112,243,0.06)]' : 'border-[var(--color-hairline)] bg-white'
-              }`}
-            >
-              <div className="text-[11px] text-[var(--color-mute)]">{item.label}</div>
-              <div className="mt-2 text-sm font-medium text-[var(--color-ink)]">{item.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
-
-export function GeometryAreaComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="切换图形">
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">图形轮廓</div>
-            <div className={`mt-3 h-24 rounded-[24px] border-2 transition-all duration-300 ${active ? 'border-green-400 bg-green-50' : 'border-[var(--color-canvas-soft-2)] bg-[var(--color-canvas-soft)]'}`} />
-          </div>
-          <div className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${active ? 'bg-green-600 text-white' : 'bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}>
-            面积 / 周长
-          </div>
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">基础关系</div>
-            <div className="mt-2 text-sm text-[var(--color-ink)]">长、宽、边长只做展示</div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
-
-export function TimeComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
-  const times = extractTimes(block.math_object)
-  return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="让时间走一走">
-      {(active, visual) => (
-        <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-[11px] text-[var(--color-mute)]">时间轴</div>
-            <div className="mt-4 flex items-center gap-3">
-              <div className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1 text-xs text-[var(--color-body)]">{times[0]}</div>
-              <div className={`h-1 flex-1 rounded-full transition-all duration-300 ${active ? 'bg-[var(--color-link)]' : 'bg-[var(--color-canvas-soft)]'}`} />
-              <div className="rounded-full bg-[var(--color-canvas-soft)] px-3 py-1 text-xs text-[var(--color-body)]">{times[1]}</div>
-            </div>
-            <div className="mt-3 text-sm text-[var(--color-body)]">{active ? '指针从起点向终点走了一段' : '点击后让时间线动起来'}</div>
-          </div>
-          <div className={`rounded-[20px] border p-4 transition-all duration-300 ${active ? 'border-[var(--color-gradient-start)] bg-[rgba(121,40,202,0.06)]' : 'border-[var(--color-hairline)] bg-white'}`}>
-            <div className="text-[11px] text-[var(--color-mute)]">钟表感</div>
-            <div className="mt-3 text-4xl">{visual.emoji}</div>
-          </div>
-        </div>
-      )}
-    </MathComponentShell>
-  )
-}
-
-export function RoundingComponent({ block }: MathComponentProps) {
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isFinished, setIsFinished] = useState(false)
-  const [showPop, setShowPop] = useState(false)
-  const [removing, setRemoving] = useState(false)
-  const timerRef = useRef<number | null>(null)
-  const popTimerRef = useRef<number | null>(null)
-
-  const roundingProps = useMemo(() => extractRoundingProps(block), [block])
-  const completeCount = useMemo(() => {
-    const firstNumber = extractAllNumbers(block.math_object)[0] ?? roundingProps.remainderValue
-    return Math.max(1, Math.floor(firstNumber || 1))
-  }, [block.math_object, roundingProps.remainderValue])
-  const resultCount = roundingProps.strategy === 'ceil' ? completeCount + 1 : completeCount
-
-  useEffect(() => {
-    setIsAnimating(false)
-    setIsFinished(false)
-    setShowPop(false)
-    setRemoving(false)
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-  }, [block.type, block.math_object, block.visual_object])
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-      if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-    }
-  }, [])
-
-  const startRound = () => {
-    if (isAnimating || isFinished) return
     setIsAnimating(true)
-    setRemoving(false)
-    setShowPop(false)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges([])
 
-    timerRef.current = window.setTimeout(() => {
-      if (roundingProps.strategy === 'ceil') {
-        setShowPop(true)
-        popTimerRef.current = window.setTimeout(() => {
-          setShowPop(false)
-          setIsAnimating(false)
-          setIsFinished(true)
-        }, 320)
-      } else {
-        setRemoving(true)
-        popTimerRef.current = window.setTimeout(() => {
-          setRemoving(false)
-          setIsAnimating(false)
-          setIsFinished(true)
-        }, 260)
-      }
-    }, 420)
+    for (let i = 1; i < finalCount; i += 1) {
+      await sleep(120)
+      setActiveKnives((prev) => [...prev, i])
+    }
+
+    await sleep(420)
+
+    setAnimationStage('split')
+    await sleep(400)
+
+    setAnimationStage('badges')
+    for (let i = 0; i < finalCount; i += 1) {
+      setActiveBadges((prev) => [...prev, i])
+      await sleep(150)
+    }
+
+    setIsAnimating(false)
   }
 
-  const resultText = `${resultCount}${roundingProps.unit}`
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges([])
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [total, stepValue])
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-[#EAEAEA] bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between text-xs text-[#888888]">
-        <span>{roundingProps.strategy === 'ceil' ? '进一法' : '去尾法'}</span>
-        <span>{isFinished ? resultText : '?'}</span>
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes unitJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcUnitDiv 用除法求每份数组件
       </div>
 
-      <div className="rounded-[22px] border border-[#EAEAEA] bg-[#FAFAFA] p-4">
-        <div className="flex items-center justify-between text-sm text-[#888888]">
-          <span>{roundingProps.strategy === 'ceil' ? '完整块 + 尾巴' : '完整块 + 余数块'}</span>
-          <span className={`rounded-full px-3 py-1 text-xs ${roundingProps.strategy === 'ceil' ? 'bg-[rgba(255,0,128,0.08)] text-[var(--color-highlight-pink)]' : 'bg-[var(--color-canvas-soft)] text-[var(--color-body)]'}`}>
-            {roundingProps.remainderLabel}
-          </span>
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '54px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总量: {total} {unit}
         </div>
 
-        <div className="mt-4 flex items-end gap-2">
-          {Array.from({ length: completeCount }).map((_, index) => (
-            <div
-              key={index}
-              className={`h-14 flex-1 rounded-[16px] border-r-2 border-white bg-gradient-to-br from-[#7928CA] to-[#FF0080] transition-all duration-300 ${
-                isAnimating ? 'opacity-60' : 'opacity-35'
-              }`}
-            />
-          ))}
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: finalCount - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / finalCount) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
+              return (
+                <div
+                  key={knifeIndex}
+                  className="knife-line"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+
           <div
-            className={`flex h-12 w-12 items-center justify-center rounded-[16px] border-r-2 border-white text-sm font-semibold transition-all duration-300 ${
-              roundingProps.strategy === 'ceil'
-                ? (showPop || isFinished)
-                  ? 'bg-gradient-to-br from-[#7928CA] to-[#FF0080] text-white scale-105'
-                  : 'animate-pulse bg-[rgba(255,0,128,0.18)] text-[var(--color-highlight-pink)]'
-                : removing
-                  ? 'translate-y-8 bg-[#EAEAEA] text-[var(--color-body)] opacity-0'
-                  : 'bg-[#EAEAEA] text-[var(--color-body)]'
-            }`}
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
           >
-            {roundingProps.strategy === 'ceil' ? '+' : roundingProps.remainderValue}
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const isActiveBadge = activeBadges.includes(i)
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        top: '28px',
+                        left: '50%',
+                        transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: isActiveBadge ? 1 : 0,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e5e5',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        color: '#0070F3',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        zIndex: 40,
+                        animation: isActiveBadge ? 'unitJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {stepLabel} <span style={{ fontSize: '10px' }}>↑</span>
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
       </div>
 
-      <div className={`rounded-[22px] border border-[#EAEAEA] bg-[#FAFAFA] p-4 transition-all duration-300 ${isFinished ? 'ring-2 ring-[rgba(0,112,243,0.14)]' : ''}`}>
-        <div className="flex items-center justify-between text-xs text-[#888888]">
-          <span>整除结果</span>
-          <span className="text-lg font-semibold text-[#171717]">{isFinished ? resultText : '?'}</span>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setIsAnimating(false)
-              setIsFinished(false)
-              setShowPop(false)
-              setRemoving(false)
-              if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-              if (popTimerRef.current !== null) window.clearTimeout(popTimerRef.current)
-            }}
-            className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
-          >
-            重置
-          </button>
-          <button
-            type="button"
-            disabled={isAnimating || isFinished}
-            onClick={startRound}
-            className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isFinished ? '已完成' : isAnimating ? '播放中' : (roundingProps.buttonText || '去尾/进一')}
-          </button>
-        </div>
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || animationStage === 'badges'}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || animationStage === 'badges') ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || animationStage === 'badges') ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
       </div>
     </div>
   )
 }
 
-export function SumComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const fallbackParts = extractAllNumbers(block.math_object).slice(0, 4)
-  const parts = readNumberArray(props.parts, fallbackParts.length > 0 ? fallbackParts : [12, 18])
-  const labels = readStringArray(props.labels, parts.map((_, index) => `部分 ${index + 1}`))
-  const unit = toText(props.unit, extractUnit(block.math_object) || '个')
-  const total = parts.reduce((sum, value) => sum + value, 0)
+export function CalcPriceMul({
+  type = 'CalcPriceMul',
+  totalPrice = 20,
+  price = 5,
+  quantity = 4,
+  unit = '元',
+  itemLabel = '总价模型探究',
+  buttonText = '求总价',
+}: CalcPriceMulProps) {
+  void type
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [droppedRows, setDroppedRows] = useState<number[]>([])
+  const [isShellActive, setIsShellActive] = useState<boolean>(false)
+  const [showTotal, setShowTotal] = useState<boolean>(false)
 
-  const [placed, setPlaced] = useState<boolean[]>(() => Array.from({ length: parts.length }, () => false))
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [dragPos, setDragPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dropZoneRect, setDropZoneRect] = useState<DOMRect | null>(null)
-  const [overDropZone, setOverDropZone] = useState(false)
-  const boardRef = useRef<HTMLDivElement | null>(null)
-  const dropRef = useRef<HTMLDivElement | null>(null)
-  const itemRefs = useRef<Array<HTMLDivElement | null>>([])
+  const startAnimation = async () => {
+    if (isAnimating) return
+    setIsAnimating(true)
+    setDroppedRows([])
+    setIsShellActive(false)
+    setShowTotal(false)
 
-  useEffect(() => {
-    setPlaced(Array.from({ length: parts.length }, () => false))
-    setDragIndex(null)
-    setIsDragging(false)
-    setDragPos({ x: 0, y: 0 })
-    setOverDropZone(false)
-  }, [block.component, block.math_object, block.visual_object, parts.length])
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-  useEffect(() => {
-    const updateRects = () => {
-      if (dropRef.current) setDropZoneRect(dropRef.current.getBoundingClientRect())
+    for (let i = 0; i < quantity; i += 1) {
+      setDroppedRows((prev) => [...prev, i])
+      await sleep(250)
     }
-    updateRects()
-    window.addEventListener('resize', updateRects)
-    return () => window.removeEventListener('resize', updateRects)
-  }, [])
 
-  const allPlaced = placed.every(Boolean)
-  const sumText = joinUnit(total, unit)
+    await sleep(200)
+    setIsShellActive(true)
+    await sleep(150)
 
-  const startDrag = (index: number, event: React.PointerEvent<HTMLDivElement>) => {
-    if (placed[index] || !boardRef.current) return
-    const boardRect = boardRef.current.getBoundingClientRect()
-    const current = itemRefs.current[index]?.getBoundingClientRect()
-    if (!current) return
-    setDragIndex(index)
-    setIsDragging(true)
-    setDragPos({
-      x: current.left - boardRect.left,
-      y: current.top - boardRect.top,
-    })
-    event.currentTarget.setPointerCapture(event.pointerId)
+    setShowTotal(true)
+    setIsAnimating(false)
   }
 
-  const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragIndex === null || !boardRef.current) return
-    const boardRect = boardRef.current.getBoundingClientRect()
-    const currentRef = itemRefs.current[dragIndex]?.getBoundingClientRect()
-    const width = currentRef?.width ?? 120
-    const height = currentRef?.height ?? 56
-    const nextPos = {
-      x: event.clientX - boardRect.left - width / 2,
-      y: event.clientY - boardRect.top - height / 2,
+  const resetDemo = () => {
+    if (isAnimating) return
+    setDroppedRows([])
+    setIsShellActive(false)
+    setShowTotal(false)
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [price, quantity, totalPrice])
+
+  const cubeArray = Array.from({ length: price })
+  const rowArray = Array.from({ length: quantity })
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '600px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcPriceMul 乘法求总价组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '60px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '260px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="global-shell"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            padding: '16px',
+            borderRadius: '20px',
+            border: isShellActive ? '2px solid #0070F3' : '2px dashed transparent',
+            background: isShellActive ? 'rgba(0, 112, 243, 0.01)' : 'transparent',
+            boxShadow: isShellActive ? '0 12px 24px rgba(0, 112, 243, 0.05)' : 'none',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+          }}
+        >
+          <div
+            className="badge badge-total"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '-44px',
+              transform: showTotal ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+              opacity: showTotal ? 1 : 0,
+              backgroundColor: '#0070F3',
+              color: '#ffffff',
+              border: '1px solid #0070F3',
+              padding: '4px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+              zIndex: 30,
+              transition: 'all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+            }}
+          >
+            总价: {totalPrice}{unit} <span style={{ fontSize: '10px' }}>↑</span>
+          </div>
+
+          {rowArray.map((_, rowIndex) => {
+            const isDropped = droppedRows.includes(rowIndex)
+            return (
+              <div
+                key={rowIndex}
+                className="group-row"
+                style={{
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center',
+                  position: 'relative',
+                  opacity: isDropped ? 1 : 0,
+                  transform: isDropped ? 'translateY(0)' : 'translateY(-40px)',
+                  transition: 'all 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+                }}
+              >
+                <div
+                  className="group-label"
+                  style={{
+                    marginRight: '8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#888',
+                    background: '#eee',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {price}{unit}
+                </div>
+
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '380px' }}>
+                  {cubeArray.map((_, cubeIndex) => (
+                    <div
+                      key={cubeIndex}
+                      className="mini-cube"
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        background: 'linear-gradient(135deg, #7928CA 0%, #FF0080 100%)',
+                        borderRadius: '5px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          <div
+            className="badge badge-bottom"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: '-44px',
+              transform: 'translateX(-50%) scale(1)',
+              background: '#ffffff',
+              border: '1px solid #e5e5e5',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              color: '#888',
+              opacity: 1,
+              zIndex: 30,
+            }}
+          >
+            {itemLabel || `单价 ${price}${unit}，数量 ${quantity}`}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || droppedRows.length === quantity}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating || droppedRows.length === quantity ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: isAnimating || droppedRows.length === quantity ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcUnitPriceDiv({
+  type = 'CalcUnitPriceDiv',
+  totalPrice = 20,
+  price = 5,
+  quantity = 4,
+  unit = '元',
+  itemLabel = '单价: 5元',
+  buttonText = '求单价',
+}: CalcUnitPriceDivProps) {
+  void type
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<number[]>([])
+
+  const segmentArray = Array.from({ length: quantity })
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const startAnimation = async () => {
+    if (isAnimating || quantity <= 1) return
+
+    setIsAnimating(true)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges([])
+
+    for (let i = 1; i < quantity; i += 1) {
+      await sleep(120)
+      setActiveKnives((prev) => [...prev, i])
     }
-    setDragPos(nextPos)
-    if (dropZoneRect) {
-      setOverDropZone(
-        event.clientX >= dropZoneRect.left &&
-        event.clientX <= dropZoneRect.right &&
-        event.clientY >= dropZoneRect.top &&
-        event.clientY <= dropZoneRect.bottom,
+
+    await sleep(420)
+
+    setAnimationStage('split')
+    await sleep(400)
+
+    setAnimationStage('badges')
+    for (let i = 0; i < quantity; i += 1) {
+      setActiveBadges((prev) => [...prev, i])
+      await sleep(150)
+    }
+
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges([])
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [totalPrice, quantity, price])
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes priceDivJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcUnitPriceDiv 除法求单价组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '54px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总价: {totalPrice} {unit}
+        </div>
+
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: quantity - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / quantity) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
+              return (
+                <div
+                  key={knifeIndex}
+                  className="knife-line"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const isActiveBadge = activeBadges.includes(i)
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        top: '28px',
+                        left: '50%',
+                        transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: isActiveBadge ? 1 : 0,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e5e5',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        color: '#0070F3',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        zIndex: 40,
+                        animation: isActiveBadge ? 'priceDivJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {itemLabel || `${price}${unit}`} <span style={{ fontSize: '10px' }}>↑</span>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || (animationStage === 'badges' && activeBadges.length === quantity)}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || (animationStage === 'badges' && activeBadges.length === quantity)) ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || (animationStage === 'badges' && activeBadges.length === quantity)) ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcQtyDiv({
+  type = 'CalcQtyDiv',
+  totalPrice = 20,
+  price = 5,
+  quantity = 4,
+  unit = '元',
+  itemLabel = '4个',
+  buttonText = '求数量',
+}: CalcQtyDivProps) {
+  void type
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges' | 'done'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<boolean>(false)
+  const [activeFinalBadge, setActiveFinalBadge] = useState<boolean>(false)
+
+  const segmentArray = Array.from({ length: quantity })
+  const middleIndex = Math.floor(quantity / 2)
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const startAnimation = async () => {
+    if (isAnimating || quantity <= 1) return
+
+    setIsAnimating(true)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges(false)
+    setActiveFinalBadge(false)
+
+    for (let i = 1; i < quantity; i += 1) {
+      await sleep(120)
+      setActiveKnives((prev) => [...prev, i])
+    }
+
+    await sleep(300)
+    setAnimationStage('split')
+    await sleep(400)
+
+    setActiveBadges(true)
+    await sleep(quantity * 120 + 300)
+
+    setAnimationStage('done')
+    setActiveFinalBadge(true)
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges(false)
+    setActiveFinalBadge(false)
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [totalPrice, price, quantity])
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes qtyDivJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcQtyDiv 除法求数量组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '54px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总价: {totalPrice} {unit}
+        </div>
+
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: quantity - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / quantity) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
+              return (
+                <div
+                  key={knifeIndex}
+                  className="knife-line"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const isActiveBadge = activeBadges
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        top: '28px',
+                        left: '50%',
+                        transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: isActiveBadge ? 1 : 0,
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e5e5',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        color: '#0070F3',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        zIndex: 40,
+                        animation: isActiveBadge ? 'qtyDivJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {price}{unit}
+                    </div>
+
+                    {i === middleIndex && (
+                      <div
+                        className="badge-final"
+                        style={{
+                          position: 'absolute',
+                          top: '58px',
+                          left: '50%',
+                          transform: activeFinalBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                          opacity: activeFinalBadge ? 1 : 0,
+                          backgroundColor: '#0070F3',
+                          color: '#ffffff',
+                          border: '1px solid #0070F3',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+                          transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          zIndex: 40,
+                          animation: activeFinalBadge ? 'qtyDivJelly 0.5s ease-in-out' : 'none',
+                        }}
+                      >
+                        {itemLabel} <span style={{ fontSize: '10px' }}>↑</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || animationStage === 'done'}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || animationStage === 'done') ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || animationStage === 'done') ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcDistMul({
+  type = 'CalcDistMul',
+  distance = 240,
+  speed = 80,
+  time = 3,
+  speedUnit = '千米/时',
+  timeUnit = '小时',
+  distanceUnit = '千米',
+  itemLabel = '路程模型探究',
+  buttonText = '求路程',
+}: CalcDistMulProps) {
+  void type
+  void speedUnit
+  void itemLabel
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [droppedSegments, setDroppedSegments] = useState<number[]>([])
+  const [showBadges, setShowBadges] = useState<number[]>([])
+  const [isShellActive, setIsShellActive] = useState<boolean>(false)
+  const [showTotal, setShowTotal] = useState<boolean>(false)
+  const timerRefs = useRef<number[]>([])
+
+  const segmentArray = Array.from({ length: time })
+
+  const clearAllTimers = () => {
+    timerRefs.current.forEach((timerId) => window.clearTimeout(timerId))
+    timerRefs.current = []
+  }
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const startAnimation = async () => {
+    if (isAnimating) return
+
+    setIsAnimating(true)
+    setDroppedSegments([])
+    setShowBadges([])
+    setIsShellActive(false)
+    setShowTotal(false)
+    clearAllTimers()
+
+    for (let i = 0; i < time; i += 1) {
+      const dropTimer = window.setTimeout(() => {
+        setDroppedSegments((prev) => [...prev, i])
+      }, i * 200)
+      timerRefs.current.push(dropTimer)
+
+      await sleep(200)
+
+      const badgeTimer = window.setTimeout(() => {
+        setShowBadges((prev) => [...prev, i])
+      }, 0)
+      timerRefs.current.push(badgeTimer)
+
+      await sleep(100)
+    }
+
+    await sleep(250)
+    setIsShellActive(true)
+    await sleep(150)
+    setShowTotal(true)
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    clearAllTimers()
+    setDroppedSegments([])
+    setShowBadges([])
+    setIsShellActive(false)
+    setShowTotal(false)
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [distance, speed, time])
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '600px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes distMulJelly {
+          0%, 100% { transform: scale(1, 1); }
+          30% { transform: scale(1.15, 0.85); }
+          50% { transform: scale(1.05, 0.95); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcDistMul 乘法求路程组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '64px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '220px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="global-shell"
+          style={{
+            display: 'flex',
+            width: '100%',
+            alignItems: 'center',
+            padding: '40px 16px 24px',
+            borderRadius: '20px',
+            border: isShellActive ? '2px solid #0070F3' : '2px dashed transparent',
+            background: isShellActive ? 'rgba(0, 112, 243, 0.01)' : 'transparent',
+            boxShadow: isShellActive ? '0 12px 24px rgba(0, 112, 243, 0.05)' : 'none',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            className="badge badge-total"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '-46px',
+              transform: showTotal ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+              opacity: showTotal ? 1 : 0,
+              backgroundColor: '#0070F3',
+              color: '#ffffff',
+              border: '1px solid #0070F3',
+              padding: '4px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+              zIndex: 30,
+              transition: 'all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+            }}
+          >
+            总路程: {distance} {distanceUnit} <span style={{ fontSize: '10px' }}>↑</span>
+          </div>
+
+          <div style={{ display: 'flex', width: '100%', gap: '4px', alignItems: 'center' }}>
+            {segmentArray.map((_, i) => {
+              const isDropped = droppedSegments.includes(i)
+              const showBadge = showBadges.includes(i)
+
+              return (
+                <div
+                  key={i}
+                  className="track-segment"
+                  style={{
+                    flex: 1,
+                    height: '16px',
+                    background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                    borderRadius: '9999px',
+                    position: 'relative',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(0)' : 'translateY(-40px)',
+                    transition: 'all 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28)',
+                  }}
+                >
+                  <div
+                    className="segment-badge"
+                    style={{
+                      position: 'absolute',
+                      bottom: '26px',
+                      left: '50%',
+                      transform: showBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                      opacity: showBadge ? 1 : 0,
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e5e5',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      color: '#171717',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                      transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      zIndex: 20,
+                      animation: showBadge ? 'distMulJelly 0.4s ease-in-out' : 'none',
+                    }}
+                  >
+                    {speed} {distanceUnit}
+                  </div>
+
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      color: '#a3a3a3',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    第 {i + 1} {timeUnit}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || droppedSegments.length === time}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || droppedSegments.length === time) ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || droppedSegments.length === time) ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcSpeedDiv({
+  type = 'CalcSpeedDiv',
+  distance = 240,
+  speed = 80,
+  time = 3,
+  speedUnit = '千米/时',
+  timeUnit = '小时',
+  distanceUnit = '千米',
+  buttonText = '求速度',
+}: CalcSpeedDivProps) {
+  void type
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<number[]>([])
+
+  const segmentArray = Array.from({ length: time })
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const startAnimation = async () => {
+    if (isAnimating || time <= 1) return
+
+    setIsAnimating(true)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges([])
+
+    for (let i = 1; i < time; i += 1) {
+      await sleep(120)
+      setActiveKnives((prev) => [...prev, i])
+    }
+
+    await sleep(420)
+    setAnimationStage('split')
+    await sleep(400)
+
+    setAnimationStage('badges')
+    for (let i = 0; i < time; i += 1) {
+      setActiveBadges((prev) => [...prev, i])
+      await sleep(150)
+    }
+
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges([])
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [distance, speed, time])
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes speedDivJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcSpeedDiv 除法求速度组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '54px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总路程: {distance} {distanceUnit}
+        </div>
+
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: time - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / time) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
+              return (
+                <div
+                  key={knifeIndex}
+                  className="knife-line"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const isActiveBadge = activeBadges.includes(i)
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        top: '28px',
+                        left: '50%',
+                        transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: isActiveBadge ? 1 : 0,
+                        backgroundColor: '#0070F3',
+                        color: '#ffffff',
+                        border: '1px solid #0070F3',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.2)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        zIndex: 40,
+                        animation: isActiveBadge ? 'speedDivJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {speed} {speedUnit} <span style={{ fontSize: '10px' }}>↑</span>
+                    </div>
+
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '24px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        color: '#a3a3a3',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      第 {i + 1} {timeUnit}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || (animationStage === 'badges' && activeBadges.length === time)}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || (animationStage === 'badges' && activeBadges.length === time)) ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || (animationStage === 'badges' && activeBadges.length === time)) ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcTimeDiv({
+  type = 'CalcTimeDiv',
+  distance = 240,
+  speed = 80,
+  time = 3,
+  speedUnit = '千米/时',
+  timeUnit = '小时',
+  distanceUnit = '千米',
+  buttonText = '求时间',
+}: CalcTimeDivProps) {
+  void type
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'done'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<boolean>(false)
+  const [activeFinalBadge, setActiveFinalBadge] = useState<boolean>(false)
+
+  const segmentArray = Array.from({ length: time })
+  const middleIndex = Math.floor(time / 2)
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const startAnimation = async () => {
+    if (isAnimating || time <= 1) return
+
+    setIsAnimating(true)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges(false)
+    setActiveFinalBadge(false)
+
+    for (let i = 1; i < time; i += 1) {
+      await sleep(120)
+      setActiveKnives((prev) => [...prev, i])
+    }
+
+    await sleep(300)
+    setAnimationStage('split')
+    await sleep(400)
+
+    setActiveBadges(true)
+    await sleep(time * 120 + 300)
+
+    setAnimationStage('done')
+    setActiveFinalBadge(true)
+    setIsAnimating(false)
+  }
+
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges(false)
+    setActiveFinalBadge(false)
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [distance, speed, time])
+
+  return (
+    <div
+      className="ui-card"
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+        border: '1px solid #f0f0f0',
+        padding: '32px',
+        maxWidth: '540px',
+        width: '100%',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <style>{`
+        @keyframes timeDivJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        className="title-part"
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcTimeDiv 除法求时间组件
+      </div>
+
+      <div
+        className="stage"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '54px 24px',
+          marginBottom: '24px',
+          border: '1px solid #e5e5e5',
+          minHeight: '180px',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          className="total-label"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            left: '24px',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            fontWeight: 700,
+            color: '#a3a3a3',
+            letterSpacing: '0.05em',
+          }}
+        >
+          总路程: {distance} {distanceUnit}
+        </div>
+
+        <div className="stage-wrapper" style={{ position: 'relative', width: '100%', height: '64px', display: 'flex', alignItems: 'center' }}>
+          <div className="knives-layer" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
+            {animationStage === 'knives' && Array.from({ length: time - 1 }).map((_, i) => {
+              const knifeIndex = i + 1
+              const leftPercent = (knifeIndex / time) * 100
+              const isDropped = activeKnives.includes(knifeIndex)
+              return (
+                <div
+                  key={knifeIndex}
+                  className="knife-line"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `calc(${leftPercent}% - 1px)`,
+                    width: '2px',
+                    height: '20px',
+                    backgroundColor: '#0070F3',
+                    opacity: isDropped ? 1 : 0,
+                    transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div
+            className="segments-container"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              zIndex: 10,
+              gap: (animationStage !== 'idle' && animationStage !== 'knives') ? '16px' : '0px',
+              transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            {(animationStage === 'idle' || animationStage === 'knives') ? (
+              <div
+                className="base-line"
+                style={{
+                  background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                  height: '16px',
+                  width: '100%',
+                  borderRadius: '9999px',
+                  transition: 'all 0.4s ease',
+                }}
+              />
+            ) : (
+              segmentArray.map((_, i) => {
+                const showBadge = activeBadges
+
+                return (
+                  <div
+                    key={i}
+                    className="sub-segment"
+                    style={{
+                      background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+                      height: '16px',
+                      flex: 1,
+                      borderRadius: '9999px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div
+                      className="badge"
+                      style={{
+                        position: 'absolute',
+                        bottom: '28px',
+                        left: '50%',
+                        transform: showBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                        opacity: showBadge ? 1 : 0,
+                        backgroundColor: '#ffffff',
+                        color: '#0070F3',
+                        border: '1px solid #e5e5e5',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 6px -1px rgba(0, 70, 243, 0.08)',
+                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        transitionDelay: `${i * 120}ms`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        zIndex: 40,
+                        animation: showBadge ? 'timeDivJelly 0.5s ease-in-out' : 'none',
+                      }}
+                    >
+                      {speed} {speedUnit}
+                    </div>
+
+                    {i === middleIndex && (
+                      <div
+                        className="badge-final"
+                        style={{
+                          position: 'absolute',
+                          top: '28px',
+                          left: '50%',
+                          transform: activeFinalBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                          opacity: activeFinalBadge ? 1 : 0,
+                          backgroundColor: '#0070F3',
+                          color: '#ffffff',
+                          border: '1px solid #0070F3',
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 10px 15px -3px rgba(0, 112, 243, 0.3)',
+                          transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          zIndex: 50,
+                          animation: activeFinalBadge ? 'timeDivJelly 0.5s ease-in-out' : 'none',
+                        }}
+                      >
+                        {time} {timeUnit} <span style={{ fontSize: '10px' }}>↑</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="btn-row"
+        style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'center',
+        }}
+      >
+        <button
+          className="btn-reset"
+          onClick={resetDemo}
+          disabled={isAnimating}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: isAnimating ? 'not-allowed' : 'pointer',
+            border: '1px solid #e5e5e5',
+            background: '#f5f5f5',
+            color: '#525252',
+            opacity: isAnimating ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          重置
+        </button>
+        <button
+          className="btn-action"
+          onClick={startAnimation}
+          disabled={isAnimating || animationStage === 'done'}
+          style={{
+            padding: '10px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: (isAnimating || animationStage === 'done') ? 'not-allowed' : 'pointer',
+            border: 'none',
+            background: '#0070F3',
+            color: '#ffffff',
+            opacity: (isAnimating || animationStage === 'done') ? 0.5 : 1,
+            transition: 'background 0.2s, opacity 0.2s',
+          }}
+        >
+          {buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type SubtractiveMode = 'diff' | 'remain'
+
+interface SubtractiveCardProps {
+  mode: SubtractiveMode
+  total: number
+  minus: number
+  unit: string
+  title: string
+  label: string
+  buttonText: string
+}
+
+function SubtractiveCard({
+  mode,
+  total,
+  minus,
+  unit,
+  title,
+  label,
+  buttonText,
+}: SubtractiveCardProps) {
+  const [currentX, setCurrentX] = useState<number>(145)
+  const [currentY, setCurrentY] = useState<number>(0)
+  const [isDragging, setIsDragging] = useState<boolean>(false)
+  const [isDraggedOut, setIsDraggedOut] = useState<boolean>(false)
+  const [showResult, setShowResult] = useState<boolean>(false)
+
+  const zoneRef = useRef<HTMLDivElement>(null)
+  const handlerRef = useRef<HTMLDivElement>(null)
+  const startDragPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const currentOffset = useRef<{ x: number; y: number }>({ x: 145, y: 0 })
+
+  const displayTotal = Math.max(0, total)
+  const displayMinus = Math.max(0, minus)
+  const DRAG_THRESHOLD = 85
+  const finalResultVal = Math.max(0, displayTotal - displayMinus)
+  const defaultButtonText = buttonText || (mode === 'diff' ? '直接求差' : '求剩余')
+  const displayLabel = label || '按住后拖拽'
+
+  useEffect(() => {
+    handleReset()
+  }, [displayTotal, displayMinus, unit, mode])
+
+  const handleReset = () => {
+    setIsDraggedOut(false)
+    setIsDragging(false)
+    setShowResult(false)
+    currentOffset.current = { x: 145, y: 0 }
+    setCurrentX(145)
+    setCurrentY(0)
+  }
+
+  const clampOffset = (nextX: number, nextY: number) => {
+    const zoneEl = zoneRef.current
+    const handlerEl = handlerRef.current
+
+    if (!zoneEl || !handlerEl) {
+      return { x: nextX, y: nextY }
+    }
+
+    const zoneRect = zoneEl.getBoundingClientRect()
+    const handlerRect = handlerEl.getBoundingClientRect()
+    const padding = 12
+    const maxX = Math.max(padding, zoneRect.width - handlerRect.width - padding)
+    const maxY = Math.max(padding, zoneRect.height - handlerRect.height - padding)
+
+    return {
+      x: Math.min(Math.max(nextX, padding), maxX),
+      y: Math.min(Math.max(nextY, padding), maxY),
+    }
+  }
+
+  const startDrag = (clientX: number, clientY: number) => {
+    if (isDraggedOut) return
+    setIsDragging(true)
+    startDragPos.current = {
+      x: clientX - currentOffset.current.x,
+      y: clientY - currentOffset.current.y,
+    }
+  }
+
+  const doDrag = (clientX: number, clientY: number) => {
+    if (!isDragging || isDraggedOut) return
+
+    const nextX = clientX - startDragPos.current.x
+    const nextY = clientY - startDragPos.current.y
+    const clamped = clampOffset(nextX, nextY)
+
+    currentOffset.current = clamped
+    setCurrentX(clamped.x)
+    setCurrentY(clamped.y)
+  }
+
+  const triggerSuccess = () => {
+    if (isDraggedOut) return
+    setIsDraggedOut(true)
+    currentOffset.current = { x: 150, y: 70 }
+    setCurrentX(150)
+    setCurrentY(70)
+
+    setTimeout(() => {
+      setShowResult(true)
+    }, 250)
+  }
+
+  const stopDrag = () => {
+    if (!isDragging) return
+    setIsDragging(false)
+
+    const { x, y } = currentOffset.current
+    const distance = Math.sqrt((x - 145) * (x - 145) + y * y)
+
+    if (distance >= DRAG_THRESHOLD) {
+      triggerSuccess()
+    } else {
+      currentOffset.current = { x: 145, y: 0 }
+      setCurrentX(145)
+      setCurrentY(0)
+    }
+  }
+
+  const handleQuickAction = () => {
+    triggerSuccess()
+  }
+
+  const getPoolBorderColor = (): string => {
+    if (isDraggedOut) return 'transparent'
+    if (isDragging) return '#0070F3'
+    return '#D6ADFF'
+  }
+
+  return (
+    <div style={styles.uiCard}>
+      <div style={styles.stage}>
+        <div
+          ref={zoneRef}
+          style={{
+            ...styles.interactionZone,
+            height: '200px',
+            overflow: 'visible',
+          }}
+          onMouseMove={(e) => doDrag(e.clientX, e.clientY)}
+          onTouchMove={(e) => {
+            if (e.touches?.[0]) doDrag(e.touches[0].clientX, e.touches[0].clientY)
+          }}
+          onMouseUp={stopDrag}
+          onMouseLeave={stopDrag}
+          onTouchEnd={stopDrag}
+        >
+          <div
+            style={{
+              ...styles.matrixPool,
+              borderColor: getPoolBorderColor(),
+              overflow: 'visible',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '-28px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '12px',
+                color: '#7928CA',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {title}: {displayTotal} {unit}
+            </div>
+            {Array.from({ length: displayTotal }).map((_, index) => {
+              const isTargetLock = index >= displayTotal - displayMinus
+              const itemTransform = isTargetLock && isDragging
+                ? `translate(${(currentX - 145) * 0.15}px, ${currentY * 0.15}px)`
+                : isTargetLock && isDraggedOut
+                  ? 'translate(180px, 80px) scale(0)'
+                  : 'none'
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    ...styles.poolItem,
+                    ...(isTargetLock ? styles.targetLock : {}),
+                    transform: itemTransform,
+                    opacity: isTargetLock && isDraggedOut ? 0 : 1,
+                  }}
+                >
+                  {index + 1}
+                </div>
+              )
+            })}
+          </div>
+
+          <div
+            ref={handlerRef}
+            style={{
+              ...styles.dragHandler,
+              transform: `translate(${currentX}px, ${currentY}px)`,
+              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            }}
+            onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
+            onTouchStart={(e) => {
+              if (e.touches?.[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY)
+            }}
+          >
+            <span style={styles.handLabel}>{displayLabel}</span>
+            <span style={styles.handNum}>拿掉 {displayMinus} {unit}</span>
+          </div>
+
+          <div style={{ ...styles.resultPanel, ...(showResult ? styles.resultPanelShow : {}) }}>
+            {mode === 'diff'
+              ? `相差: ${finalResultVal} ${unit} (剩下 ${finalResultVal} 个)`
+              : `剩余: ${finalResultVal} ${unit} (还剩 ${finalResultVal} 个)`}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={handleReset}>
+          重置
+        </button>
+        <button style={styles.btnAction} onClick={handleQuickAction}>
+          {defaultButtonText}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CalcDiffSub({
+  numA = 20,
+  numB = 8,
+  unit = '个',
+  labelA = '大数池',
+  labelB = '',
+  buttonText = '求差',
+}: CalcDiffSubProps) {
+  return (
+    <SubtractiveCard
+      mode="diff"
+      total={numA}
+      minus={numB}
+      unit={unit}
+      title={labelA || '大数池'}
+      label={labelB}
+      buttonText={buttonText}
+    />
+  )
+}
+
+const sumAddStyles: { [key: string]: React.CSSProperties } = {
+  uiCard: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+    border: '1px solid #f0f0f0',
+    padding: '32px',
+    maxWidth: '560px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  stage: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    padding: '24px 16px',
+    marginBottom: '24px',
+    border: '1px solid #e5e5e5',
+    minHeight: '280px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  interactionZone: {
+    position: 'relative',
+    width: '100%',
+    height: '240px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    touchAction: 'none',
+  },
+  targetPool: {
+    width: '130px',
+    height: '130px',
+    borderRadius: '24px',
+    border: '3px dashed #D6ADFF',
+    background: '#FAFAFA',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '12px',
+    transition: 'all 0.3s ease',
+    position: 'absolute',
+    zIndex: 2,
+  },
+  poolTip: {
+    fontSize: '12px',
+    color: '#A0A0A0',
+    textAlign: 'center',
+    lineHeight: '1.4',
+    pointerEvents: 'none',
+    userSelect: 'none',
+  },
+  dragBlock: {
+    position: 'absolute',
+    width: '76px',
+    height: '76px',
+    borderRadius: '18px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#ffffff',
+    cursor: 'grab',
+    boxShadow: '0 6px 14px rgba(0,0,0,0.1)',
+    userSelect: 'none',
+  },
+  blockNum: {
+    fontSize: '22px',
+    fontWeight: '900',
+    lineHeight: '1.1',
+  },
+  blockLabel: {
+    fontSize: '11px',
+    opacity: 0.85,
+    marginTop: '2px',
+    whiteSpace: 'nowrap',
+  },
+  resultPanel: {
+    position: 'absolute',
+    bottom: '0px',
+    transform: 'scale(0.8)',
+    opacity: 0,
+    background: '#0070F3',
+    color: 'white',
+    padding: '8px 20px',
+    borderRadius: '12px',
+    fontSize: '15px',
+    fontWeight: 'bold',
+    boxShadow: '0 8px 24px rgba(0, 112, 243, 0.3)',
+    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    pointerEvents: 'none',
+    zIndex: 20,
+  },
+  resultPanelShow: {
+    transform: 'scale(1)',
+    opacity: 1,
+    bottom: '10px',
+  },
+  btnRow: {
+    display: 'flex',
+    justifyContent: 'flex-start',
+    gap: '12px',
+    width: '100%',
+  },
+  btnReset: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    border: '1px solid #e5e5e5',
+    background: '#f5f5f5',
+    color: '#525252',
+  },
+  btnAction: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    border: 'none',
+    background: '#0070F3',
+    color: '#ffffff',
+  },
+}
+
+function JoinSumCard({
+  parts,
+  unit,
+  labels,
+  buttonText,
+}: {
+  parts: number[]
+  unit: string
+  labels: string[]
+  buttonText: string
+}) {
+  const count = Math.max(2, parts.length)
+  const initialPositions = parts.map((_, index) => {
+    const spread = 120
+    const centerOffset = (index - (count - 1) / 2) * spread
+    return {
+      x: centerOffset,
+      y: -92,
+    }
+  })
+
+  const [dragStates, setDragStates] = useState<DragState[]>(
+    parts.map((_, index) => ({
+      isDragging: false,
+      x: initialPositions[index]?.x ?? 0,
+      y: initialPositions[index]?.y ?? -92,
+      startX: 0,
+      startY: 0,
+      isSnapped: false,
+    })),
+  )
+  const [showResult, setShowResult] = useState<boolean>(false)
+
+  const activeIndex = useRef<number | null>(null)
+  const SNAP_THRESHOLD = 60
+
+  useEffect(() => {
+    handleReset()
+  }, [parts.length, parts.join(','), unit, labels.join(','), buttonText])
+
+  const handleReset = () => {
+    setDragStates(
+      parts.map((_, index) => ({
+        isDragging: false,
+        x: initialPositions[index]?.x ?? 0,
+        y: initialPositions[index]?.y ?? -92,
+        startX: 0,
+        startY: 0,
+        isSnapped: false,
+      })),
+    )
+    setShowResult(false)
+    activeIndex.current = null
+  }
+
+  const handleQuickSum = () => {
+    setDragStates((prev) =>
+      prev.map((state) => ({
+        ...state,
+        x: 0,
+        y: 0,
+        isDragging: false,
+        isSnapped: true,
+      })),
+    )
+    setShowResult(true)
+  }
+
+  const startDrag = (index: number, clientX: number, clientY: number) => {
+    if (showResult) return
+    activeIndex.current = index
+    const target = dragStates[index]
+
+    setDragStates((prev) =>
+      prev.map((state, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...state,
+              isDragging: true,
+              startX: clientX - state.x,
+              startY: clientY - state.y,
+            }
+          : state,
+      ),
+    )
+    void target
+  }
+
+  const doDrag = (clientX: number, clientY: number) => {
+    if (activeIndex.current === null) return
+
+    const index = activeIndex.current
+    const target = dragStates[index]
+    if (!target?.isDragging) return
+
+    const nextX = clientX - target.startX
+    const nextY = clientY - target.startY
+
+    setDragStates((prev) =>
+      prev.map((state, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...state,
+              x: nextX,
+              y: nextY,
+            }
+          : state,
+      ),
+    )
+  }
+
+  const stopDrag = () => {
+    if (activeIndex.current === null) return
+
+    const index = activeIndex.current
+    const target = dragStates[index]
+    activeIndex.current = null
+
+    if (!target?.isDragging) return
+
+    const distanceToCenter = Math.sqrt(target.x * target.x + target.y * target.y)
+
+    if (distanceToCenter < SNAP_THRESHOLD) {
+      setDragStates((prev) =>
+        prev.map((state, currentIndex) =>
+          currentIndex === index
+            ? {
+                ...state,
+                isDragging: false,
+                x: 0,
+                y: 0,
+                isSnapped: true,
+              }
+            : state,
+        ),
+      )
+
+      const snappedCount = dragStates.filter((state) => state.isSnapped).length + 1
+      if (snappedCount === dragStates.length) {
+        setTimeout(() => {
+          setShowResult(true)
+        }, 200)
+      }
+    } else {
+      setDragStates((prev) =>
+        prev.map((state, currentIndex) =>
+          currentIndex === index
+            ? {
+                ...state,
+                isDragging: false,
+                x: initialPositions[currentIndex]?.x ?? 0,
+                y: initialPositions[currentIndex]?.y ?? -92,
+                isSnapped: false,
+              }
+            : state,
+        ),
       )
     }
   }
 
-  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragIndex === null || !dropZoneRect || !boardRef.current) return
-    const insideDrop =
-      event.clientX >= dropZoneRect.left &&
-      event.clientX <= dropZoneRect.right &&
-      event.clientY >= dropZoneRect.top &&
-      event.clientY <= dropZoneRect.bottom
-
-    if (insideDrop) {
-      setPlaced((prev) => prev.map((item, index) => (index === dragIndex ? true : item)))
+  const getPoolStyle = (): React.CSSProperties => {
+    const allSnapped = dragStates.every((state) => state.isSnapped)
+    if (allSnapped) {
+      return { ...sumAddStyles.targetPool, borderColor: '#0070F3', background: '#E6F1FF' }
     }
-
-    setDragIndex(null)
-    setIsDragging(false)
-    setOverDropZone(false)
+    if (dragStates.some((state) => state.isDragging)) {
+      return { ...sumAddStyles.targetPool, borderColor: '#7928CA', background: '#F5E9FF' }
+    }
+    return sumAddStyles.targetPool
   }
 
+  const total = parts.reduce((sum, value) => sum + value, 0)
+
   return (
-    <div ref={boardRef} className="relative rounded-[22px] border border-[#EAEAEA] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {parts.map((part, index) => {
-          const isPlaced = placed[index]
-          const isDraggingItem = dragIndex === index && isDragging
-            const baseNode = (
-              <div className={`rounded-[16px] border p-3 transition-all duration-300 ${isPlaced ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)] opacity-50' : 'border-[#EAEAEA] bg-white'}`}>
-                <div className="text-[11px] text-[#888888]">{labels[index] || `部分 ${index + 1}`}</div>
-                <div className="mt-2 text-sm font-semibold text-[#171717]">{joinUnit(part, unit)}</div>
-              </div>
-          )
+    <div style={sumAddStyles.uiCard}>
+      <div style={sumAddStyles.stage}>
+        <div
+          style={sumAddStyles.interactionZone}
+          onMouseMove={(e) => { doDrag(e.clientX, e.clientY) }}
+          onTouchMove={(e) => { if (e.touches?.[0]) doDrag(e.touches[0].clientX, e.touches[0].clientY) }}
+          onMouseUp={stopDrag}
+          onMouseLeave={stopDrag}
+          onTouchEnd={stopDrag}
+        >
+          <div style={getPoolStyle()}>
+            {dragStates.every((state) => !state.isSnapped) && <span style={sumAddStyles.poolTip}>把这些数拖到这里</span>}
+            {dragStates.some((state) => state.isSnapped) && !dragStates.every((state) => state.isSnapped) && <span style={sumAddStyles.poolTip}>还差一个数...</span>}
+            {showResult && <span style={{ ...sumAddStyles.poolTip, color: '#0070F3', fontWeight: 'bold' }}>成功合在一起！</span>}
+          </div>
 
-          return (
-            <div key={`${part}-${index}`} className="relative">
-              <div
-                ref={(node) => {
-                  itemRefs.current[index] = node
-                }}
-                onPointerDown={(event) => startDrag(index, event)}
-                onPointerMove={moveDrag}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                className={`touch-none select-none ${isDraggingItem ? 'opacity-0' : ''} ${isPlaced ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
-              >
-                {baseNode}
-              </div>
-
-              {isDraggingItem && (
-                <div
-                  className="pointer-events-none absolute z-20 w-full max-w-[calc(50%-8px)]"
-                  style={{
-                    left: `${dragPos.x}px`,
-                    top: `${dragPos.y}px`,
-                  }}
-                >
-                  <div className="rounded-[16px] border border-[#7928CA]/20 bg-white p-3 shadow-[0_16px_28px_rgba(121,40,202,0.18)]">
-                    <div className="text-[11px] text-[#888888]">{labels[index] || `部分 ${index + 1}`}</div>
-                    <div className="mt-2 text-sm font-semibold text-[#171717]">{joinUnit(part, unit)}</div>
-                  </div>
-                </div>
-              )}
+          {dragStates.map((state, index) => (
+            <div
+              key={index}
+              style={{
+                ...sumAddStyles.dragBlock,
+                background: index % 2 === 0
+                  ? 'linear-gradient(135deg, #7928CA 0%, #B800FF 100%)'
+                  : 'linear-gradient(135deg, #FF0080 0%, #FF60B0 100%)',
+                transform: `translate(${state.x}px, ${state.y}px) scale(${state.isSnapped ? 0.85 : 1})`,
+                transition: state.isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.15)',
+                zIndex: state.isDragging ? 15 : 10 + index,
+                opacity: showResult ? 0.3 : 1,
+              }}
+              onMouseDown={(e) => startDrag(index, e.clientX, e.clientY)}
+              onTouchStart={(e) => { if (e.touches?.[0]) startDrag(index, e.touches[0].clientX, e.touches[0].clientY) }}
+            >
+              <span style={sumAddStyles.blockNum}>{parts[index]}</span>
+              <span style={sumAddStyles.blockLabel}>{labels[index] || `部分${index + 1}`}</span>
             </div>
-          )
-        })}
-      </div>
+          ))}
 
-      <div
-        ref={dropRef}
-        className={`mt-3 rounded-[16px] border p-3 transition-all duration-300 ${allPlaced || overDropZone ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-dashed border-[#EAEAEA] bg-[#FAFAFA]'}`}
-      >
-        <div className="text-[11px] text-[#888888]">合成区</div>
-        <div className="mt-2 flex min-h-[64px] flex-wrap items-center gap-2 rounded-[14px] bg-white px-3 py-3 text-center text-xl font-semibold text-[#171717]">
-          {placed.some(Boolean) ? (
-            <>
-              {parts.map((part, index) =>
-                placed[index] ? (
-                  <span key={`placed-${index}`} className="rounded-full border border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)] px-3 py-1 text-sm font-semibold text-[#171717]">
-                    {labels[index] || `部分 ${index + 1}`} {joinUnit(part, unit)}
-                  </span>
-                ) : null,
-              )}
-              {allPlaced && (
-                <span className="rounded-full bg-gradient-to-r from-[#7928CA] to-[#FF0080] px-3 py-1 text-sm font-semibold text-white">
-                  {sumText}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-sm font-medium text-[#888888]">把上面的部分拖进来</span>
-          )}
+          <div style={{ ...sumAddStyles.resultPanel, ...(showResult ? sumAddStyles.resultPanelShow : {}) }}>
+            总和: {total} {unit}
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-start">
-        <button
-          type="button"
-          onClick={() => {
-            setPlaced(Array.from({ length: parts.length }, () => false))
-            setDragIndex(null)
-            setIsDragging(false)
-            setDragPos({ x: 0, y: 0 })
-            setOverDropZone(false)
-          }}
-          className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
-        >
+      <div style={sumAddStyles.btnRow}>
+        <button style={sumAddStyles.btnReset} onClick={handleReset}>
           重置
+        </button>
+        <button style={sumAddStyles.btnAction} onClick={handleQuickSum}>
+          {buttonText || '求和'}
         </button>
       </div>
     </div>
   )
 }
 
-export function AverageComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const total = toNumber(props.total, extractAllNumbers(block.math_object)[0] ?? 0)
-  const count = Math.max(1, toNumber(props.count, extractAllNumbers(block.math_object)[1] ?? 4))
-  const unit = toText(props.unit, extractUnit(block.math_object) || '个')
-  const average = count > 0 ? total / count : 0
-  const cutCountTotal = Math.max(0, count - 1)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [cutProgress, setCutProgress] = useState(0)
-  const cutTimerRef = useRef<number | null>(null)
-  const finishTimerRef = useRef<number | null>(null)
+export function CalcSumAdd({
+  parts = [3, 5],
+  unit = '个',
+  labels = ['', ''],
+  buttonText = '求和',
+}: CalcSumAddProps) {
+  return <JoinSumCard parts={parts} unit={unit} labels={labels} buttonText={buttonText} />
+}
 
-  useEffect(() => {
-    setIsAnimating(false)
-    setIsCompleted(false)
-    setCutProgress(0)
-    if (cutTimerRef.current !== null) window.clearInterval(cutTimerRef.current)
-    if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current)
-  }, [block.component, block.math_object, block.visual_object, total, count, unit])
+export function CalcRemainSub({
+  total = 20,
+  used = 8,
+  unit = '个',
+  totalLabel = '总数池',
+  usedLabel = '',
+  buttonText = '求剩余',
+}: CalcRemainSubProps) {
+  return (
+    <SubtractiveCard
+      mode="remain"
+      total={total}
+      minus={used}
+      unit={unit}
+      title={totalLabel || '总数池'}
+      label={usedLabel}
+      buttonText={buttonText}
+    />
+  )
+}
 
-  useEffect(() => {
-    return () => {
-      if (cutTimerRef.current !== null) window.clearInterval(cutTimerRef.current)
-      if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current)
-    }
-  }, [])
+export function CalcTimesDiv({
+  type = 'times',
+  numA = 12,
+  numB = 1,
+  baseNum = 4,
+  multiple = 3,
+  unit = '倍',
+  labelA = '总量',
+  labelB = '',
+  labelBase = '底数',
+  buttonText = '开始切分求倍数',
+}: CalcTimesDivProps) {
+  void type
+  void numB
+  void labelB
 
-  const resetDemo = () => {
-    if (cutTimerRef.current !== null) window.clearInterval(cutTimerRef.current)
-    if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current)
-    setIsAnimating(false)
-    setIsCompleted(false)
-    setCutProgress(0)
-  }
+  const totalSegments = Math.max(1, multiple)
+  const segmentArray = Array.from({ length: totalSegments })
+  const middleIndex = Math.floor(totalSegments / 2)
+  const [isAnimating, setIsAnimating] = useState<boolean>(false)
+  const [animationStage, setAnimationStage] = useState<'idle' | 'knives' | 'split' | 'badges' | 'final'>('idle')
+  const [activeKnives, setActiveKnives] = useState<number[]>([])
+  const [activeBadges, setActiveBadges] = useState<number[]>([])
 
-  const startDemo = () => {
-    if (isAnimating) return
-    if (isCompleted) {
-      resetDemo()
-      return
-    }
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-    if (cutCountTotal <= 0) {
-      setIsCompleted(true)
-      return
-    }
+  const startAnimation = async () => {
+    if (isAnimating || totalSegments <= 1) return
 
     setIsAnimating(true)
-    setIsCompleted(false)
-    setCutProgress(0)
+    setAnimationStage('knives')
+    setActiveKnives([])
+    setActiveBadges([])
 
-    let nextCut = 0
-    cutTimerRef.current = window.setInterval(() => {
-      nextCut += 1
-      setCutProgress(nextCut)
+    for (let i = 1; i < totalSegments; i += 1) {
+      await sleep(150)
+      setActiveKnives((prev) => [...prev, i])
+    }
 
-      if (nextCut >= cutCountTotal) {
-        if (cutTimerRef.current !== null) window.clearInterval(cutTimerRef.current)
-        cutTimerRef.current = null
-        finishTimerRef.current = window.setTimeout(() => {
-          setIsAnimating(false)
-          setIsCompleted(true)
-        }, 520)
-      }
-    }, 520)
+    await sleep(450)
+    setAnimationStage('split')
+    await sleep(400)
+
+    setAnimationStage('badges')
+    for (let i = 0; i < totalSegments; i += 1) {
+      setActiveBadges((prev) => [...prev, i])
+      await sleep(120)
+    }
+
+    await sleep(300)
+    setAnimationStage('final')
+    setIsAnimating(false)
   }
 
-  const visibleSegments = isCompleted ? count : Math.min(count, cutProgress + 1)
-  const segmentWidth = 100 / Math.max(1, visibleSegments)
+  const resetDemo = () => {
+    if (isAnimating) return
+    setAnimationStage('idle')
+    setActiveKnives([])
+    setActiveBadges([])
+  }
+
+  useEffect(() => {
+    resetDemo()
+  }, [numA, baseNum, multiple, unit, labelA, labelBase])
+
+  const labelText = `${labelA || '总量'}: ${numA} ${unit}`
+  const finalText = `${multiple} ${unit}`
 
   return (
-    <div className="rounded-[22px] border border-[#EAEAEA] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-      <div className="relative overflow-hidden rounded-[18px] border border-[#EAEAEA] bg-[#FAFAFA] px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] text-[#888888]">{props.totalLabel || '总量展示'}</div>
-            <div className="mt-1 text-sm font-medium text-[#171717]">
-              {isCompleted ? '均分结果' : isAnimating ? '正在均分' : '总量展示'}
+    <div style={timesDivStyles.uiCard}>
+      <style>{`
+        @keyframes calcTimesDivJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+
+      <div
+        style={{
+          fontSize: '18px',
+          fontWeight: 'bold',
+          color: '#171717',
+          marginBottom: '20px',
+          textAlign: 'center',
+        }}
+      >
+        CalcTimesDiv
+      </div>
+
+      <div style={timesDivStyles.stage}>
+        <div style={timesDivStyles.interactionZone}>
+          <div style={timesDivStyles.stageWrapper}>
+            <div style={timesDivStyles.knivesLayer}>
+              {animationStage === 'knives' && Array.from({ length: totalSegments - 1 }).map((_, i) => {
+                const knifeIndex = i + 1
+                const leftPercent = (knifeIndex / totalSegments) * 100
+                const isDropped = activeKnives.includes(knifeIndex)
+
+                return (
+                  <div
+                    key={knifeIndex}
+                    style={{
+                      ...timesDivStyles.knifeLine,
+                      left: `calc(${leftPercent}% - 1px)`,
+                      opacity: isDropped ? 1 : 0,
+                      transform: isDropped ? 'translateY(22px)' : 'translateY(-24px)',
+                    }}
+                  />
+                )
+              })}
             </div>
-          </div>
-          <div className="rounded-full bg-[rgba(0,112,243,0.08)] px-3 py-1 text-sm font-semibold text-[#0070F3]">
-            {joinUnit(total, unit)}
+
+            <div
+              style={{
+                ...timesDivStyles.segmentsContainer,
+                gap: animationStage === 'split' || animationStage === 'badges' || animationStage === 'final' ? '16px' : '0px',
+              }}
+            >
+              {animationStage === 'idle' || animationStage === 'knives' ? (
+                <div style={timesDivStyles.baseLine} />
+              ) : (
+                segmentArray.map((_, i) => {
+                  const isActiveBadge = activeBadges.includes(i)
+                  const isCenter = i === middleIndex
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        ...timesDivStyles.subSegment,
+                        transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          ...timesDivStyles.badge,
+                          ...timesDivStyles.badgeTop,
+                          opacity: isActiveBadge ? 1 : 0,
+                          transform: isActiveBadge ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                          animation: isActiveBadge ? 'calcTimesDivJelly 0.5s ease-in-out' : 'none',
+                        }}
+                      >
+                        {labelBase || '底数'}: {baseNum} {unit}
+                      </div>
+
+                      {isCenter && (
+                        <div
+                          style={{
+                            ...timesDivStyles.badgeFinal,
+                            opacity: animationStage === 'final' ? 1 : 0,
+                            transform: animationStage === 'final' ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.75)',
+                            animation: animationStage === 'final' ? 'calcTimesDivJelly 0.5s ease-in-out' : 'none',
+                          }}
+                        >
+                          {finalText}
+                          <span style={{ fontSize: '10px', marginLeft: '4px' }}>↑</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {animationStage === 'idle' && (
+              <div style={{
+                position: 'absolute',
+                top: '-10px',
+                left: '-10px',
+                right: '-10px',
+                bottom: '-10px',
+                border: '2px dashed #0070F3',
+                borderRadius: '12px',
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                paddingTop: '6px',
+              }}>
+                <span style={{
+                  fontSize: '12px',
+                  color: '#0070F3',
+                  fontWeight: 'bold',
+                  background: '#ffffff',
+                  padding: '0 6px',
+                }}>
+                  {labelText}
+                </span>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        <div className="relative mt-6 h-[92px]">
-          <div className="absolute left-0 right-0 top-1/2 h-6 -translate-y-1/2 rounded-full bg-[#EAEAEA]/75" />
+      <div style={timesDivStyles.btnRow}>
+        <button style={timesDivStyles.btnReset} onClick={resetDemo} disabled={isAnimating}>
+          重置
+        </button>
+        <button
+          style={{
+            ...timesDivStyles.btnAction,
+            opacity: isAnimating || animationStage === 'final' ? 0.5 : 1,
+            cursor: isAnimating || animationStage === 'final' ? 'not-allowed' : 'pointer',
+          }}
+          onClick={startAnimation}
+          disabled={isAnimating || animationStage === 'final'}
+        >
+          {animationStage === 'final' ? '切分完成' : buttonText}
+        </button>
+      </div>
+    </div>
+  )
+}
 
-          <div className="absolute left-0 right-0 top-1/2 h-6 -translate-y-1/2 overflow-hidden rounded-full">
-            <div
-              className="flex h-full transition-all duration-500 ease-out"
-              style={{ width: isCompleted || isAnimating ? '100%' : '100%' }}
-            >
-              {Array.from({ length: visibleSegments }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`relative h-full border-r-2 border-white transition-all duration-500 ease-out ${
-                    isCompleted || isAnimating
-                      ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]'
-                      : 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]'
-                  }`}
-                  style={{ width: `${segmentWidth}%` }}
-                >
-                <div
-                  className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 px-1 text-[10px] font-medium leading-none tracking-wide text-white transition-all duration-500 drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] ${
-                      isCompleted
-                        ? 'translate-y-0 scale-100 opacity-100'
-                        : isAnimating
-                          ? 'scale-95 opacity-100'
-                          : 'scale-95 opacity-90'
-                    }`}
-                  >
-                    {isCompleted ? joinUnit(average, unit) : ''}
-                  </div>
+export function CalcTimesMul({
+  baseNum = 4,
+  multiple = 3,
+  unit = '个',
+  labelBase = '',
+  buttonText = '求一倍数的几倍',
+}: CalcTimesMulProps) {
+  void unit
+  const [renderedCount, setRenderedCount] = useState(1)
+  const targetResult = baseNum * multiple
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+          <div style={{ width: '100%' }}>
+            <div style={styles.miniLabel}>{labelBase || '基础量'}: {baseNum} {unit}</div>
+            <div style={{ display: 'flex', gap: '3px', width: '60px' }}>
+              {Array.from({ length: baseNum }).map((_, i) => <div key={i} style={{ width: '8px', height: '8px', background: '#0070F3', borderRadius: '50%' }} />)}
+            </div>
+          </div>
+          <div style={{ width: '100%', borderTop: '1px dashed #ccc', paddingTop: '12px' }}>
+            <div style={styles.miniLabel}>基础量的几倍 (当前: {renderedCount} 倍)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {Array.from({ length: renderedCount }).map((_, row) => (
+                <div key={row} style={{ display: 'flex', gap: '3px', background: '#F5E9FF', padding: '4px', borderRadius: '4px', animation: 'jelly 0.3s ease' }}>
+                  {Array.from({ length: baseNum }).map((_, i) => <div key={i} style={{ width: '8px', height: '8px', background: '#7928CA', borderRadius: '50%' }} />)}
                 </div>
               ))}
             </div>
           </div>
-
+          {showResultPanel(renderedCount === multiple, `总共几倍数量: ${targetResult} ${unit}`)}
         </div>
-
-      <div className="mt-3 flex items-center justify-end text-xs text-[#888888]">
-        <span>{isCompleted ? `每段 ${joinUnit(average, unit)}` : ''}</span>
       </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-start gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={resetDemo}
-            className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
-          >
-            重置
-          </button>
-          <button
-            type="button"
-            disabled={isAnimating || isCompleted}
-            onClick={startDemo}
-            className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:bg-[#EAEAEA] disabled:text-[#888888] disabled:opacity-100"
-          >
-            {isCompleted ? '已完成' : isAnimating ? '播放中' : getButtonText(block, '开始均分')}
-          </button>
-        </div>
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setRenderedCount(1)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setRenderedCount(multiple)}>{buttonText}</button>
       </div>
     </div>
   )
 }
 
-export function FractionComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const total = toNumber(props.total, extractAllNumbers(block.math_object)[0] ?? 1)
-  const part = toNumber(props.part, extractAllNumbers(block.math_object)[1] ?? 1)
-  const numerator = Math.max(1, toNumber(props.numerator, part))
-  const denominator = Math.max(numerator, toNumber(props.denominator, total))
-  const segmentWidth = denominator > 0 ? 100 / denominator : 100
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [segmentProgress, setSegmentProgress] = useState(0)
-  const [highlightProgress, setHighlightProgress] = useState(0)
-  const segmentTimerRef = useRef<number | null>(null)
-  const highlightDelayRef = useRef<number | null>(null)
-  const highlightIntervalRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    setIsAnimating(false)
-    setIsCompleted(false)
-    setSegmentProgress(0)
-    setHighlightProgress(0)
-    if (segmentTimerRef.current !== null) window.clearInterval(segmentTimerRef.current)
-    if (highlightDelayRef.current !== null) window.clearTimeout(highlightDelayRef.current)
-    if (highlightIntervalRef.current !== null) window.clearInterval(highlightIntervalRef.current)
-  }, [block.component, block.math_object, block.visual_object, total, part, numerator, denominator])
-
-  useEffect(() => {
-    return () => {
-      if (segmentTimerRef.current !== null) window.clearInterval(segmentTimerRef.current)
-      if (highlightDelayRef.current !== null) window.clearTimeout(highlightDelayRef.current)
-      if (highlightIntervalRef.current !== null) window.clearInterval(highlightIntervalRef.current)
-    }
-  }, [])
-
-  const resetDemo = () => {
-    if (segmentTimerRef.current !== null) window.clearInterval(segmentTimerRef.current)
-    if (highlightDelayRef.current !== null) window.clearTimeout(highlightDelayRef.current)
-    if (highlightIntervalRef.current !== null) window.clearInterval(highlightIntervalRef.current)
-    setIsAnimating(false)
-    setIsCompleted(false)
-    setSegmentProgress(0)
-    setHighlightProgress(0)
-  }
-
-  const startDemo = () => {
-    if (isAnimating) return
-    if (isCompleted) {
-      resetDemo()
-      return
-    }
-
-    setIsAnimating(true)
-    setIsCompleted(false)
-    setSegmentProgress(0)
-    setHighlightProgress(0)
-
-    let nextSegment = 0
-    segmentTimerRef.current = window.setInterval(() => {
-      nextSegment += 1
-      setSegmentProgress(nextSegment)
-
-      if (nextSegment >= Math.max(0, denominator - 1)) {
-        if (segmentTimerRef.current !== null) window.clearInterval(segmentTimerRef.current)
-        segmentTimerRef.current = null
-        highlightDelayRef.current = window.setTimeout(() => {
-          let nextHighlight = 0
-          const maxHighlight = Math.min(numerator, denominator)
-          highlightIntervalRef.current = window.setInterval(() => {
-            nextHighlight += 1
-            setHighlightProgress(nextHighlight)
-
-            if (nextHighlight >= maxHighlight) {
-              if (highlightIntervalRef.current !== null) window.clearInterval(highlightIntervalRef.current)
-              highlightIntervalRef.current = null
-              highlightDelayRef.current = window.setTimeout(() => {
-                setIsAnimating(false)
-                setIsCompleted(true)
-              }, 180)
-            }
-          }, 260)
-        }, 220)
-      }
-    }, 380)
-  }
+export function CalcFracPart({
+  total = 12,
+  part = 4,
+  numerator = 3,
+  denominator = 4,
+  unit = '个',
+  buttonText = '第一步：求每份数',
+}: CalcFracPartProps) {
+  void part
+  const [step, setStep] = useState(0)
+  const safeDenominator = Math.max(1, denominator)
+  const perPart = total / safeDenominator
+  const resultPart = perPart * numerator
 
   return (
-    <div className="rounded-[22px] border border-[#EAEAEA] bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
-      <div className="rounded-[18px] border border-[#EAEAEA] bg-[#FAFAFA] p-3">
-        <div className="relative overflow-hidden rounded-full bg-[#E5E5E5]">
-          <div className="flex h-6 w-full">
-            {Array.from({ length: Math.max(1, isCompleted ? denominator : Math.max(1, segmentProgress + 1)) }).map((_, index) => {
-              const filled = (isCompleted || highlightProgress > index) && index < numerator
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={styles.miniLabel}>总数 {total} 被平均分成 {safeDenominator} 份：</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${safeDenominator}, minmax(0, 1fr))`, gap: '6px' }}>
+            {Array.from({ length: safeDenominator }).map((_, idx) => {
+              const isSelected = idx < numerator && step >= 2
               return (
                 <div
-                  key={index}
-                  className={`h-full border-r-2 border-white transition-all duration-300 ${filled ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]' : 'bg-[#D9D9D9]'}`}
-                  style={{ width: `${segmentWidth}%` }}
-                />
+                  key={idx}
+                  style={{
+                    border: '2px solid #7928CA',
+                    borderRadius: '8px',
+                    padding: '8px 4px',
+                    textAlign: 'center',
+                    background: step >= 1 ? (isSelected ? '#FF0080' : '#F5E9FF') : '#fff',
+                    color: isSelected ? '#fff' : '#171717',
+                    transition: 'all 0.3s',
+                  }}
+                >
+                  <div style={{ fontSize: '10px', opacity: 0.6 }}>第 {idx + 1} 份</div>
+                  {step >= 1 && <div style={{ fontWeight: 'bold' }}>{perPart}</div>}
+                </div>
               )
             })}
           </div>
+          {step === 1 && <div style={{ fontSize: '12px', color: '#7928CA' }}>每份算出来了，等于：{total} ÷ {safeDenominator} = {perPart}</div>}
+          {showResultPanel(step >= 2, `取其中的 ${numerator} 份: ${resultPart} ${unit}`)}
         </div>
       </div>
-
-      <div className="mt-3 flex items-center justify-start gap-2">
-        <button
-          type="button"
-          onClick={resetDemo}
-          className="inline-flex items-center justify-center rounded-[14px] border border-[#EAEAEA] bg-white px-4 py-2 text-sm font-medium text-[#171717] transition-all duration-200 hover:scale-[1.02] hover:bg-[#FAFAFA]"
-        >
-          重置
-        </button>
-        <button
-          type="button"
-          disabled={isAnimating || isCompleted}
-          onClick={startDemo}
-          className="inline-flex items-center justify-center rounded-[14px] bg-[#0070F3] px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:scale-[1.02] hover:opacity-95 disabled:cursor-not-allowed disabled:bg-[#EAEAEA] disabled:text-[#888888] disabled:opacity-100"
-        >
-          {isCompleted ? '已完成' : isAnimating ? '播放中' : getButtonText(block, '开始看分数')}
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setStep(0)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setStep((prev) => Math.min(2, prev + 1))}>
+          {buttonText || (step === 0 ? '第一步：求每份数' : '第二步：求几分之几')}
         </button>
       </div>
     </div>
   )
 }
 
-export function PatternCycleComponent({ block }: MathComponentProps) {
-  const rawProps = useMemo(() => extractPatternCycleProps(block), [block])
-  const useDemoPreset =
-    rawProps.targetN === 1 &&
-    rawProps.cycleLength === 1 &&
-    rawProps.fullCycles === 1 &&
-    rawProps.remainderCount === 1 &&
-    rawProps.cycleItems.length === 1 &&
-    rawProps.cycleItems[0] === '图形'
-
-  const props = useMemo(() => {
-    if (!useDemoPreset) return rawProps
-
-    return {
-      ...rawProps,
-      type: 'find_position' as const,
-      targetN: 11,
-      cycleLength: 3,
-      cycleItems: ['🔴', '🔺', '🟦'],
-      fullCycles: 3,
-      perCycleCount: 1,
-      remainderCount: 2,
-      buttonText: rawProps.buttonText || '开始探究',
-    }
-  }, [rawProps, useDemoPreset])
-
-  const queueItems = useMemo(
-    () => Array.from({ length: props.targetN }, (_, index) => props.cycleItems[index % props.cycleItems.length] || '图形'),
-    [props.cycleItems, props.targetN],
-  )
-  const targetToken = queueItems[props.targetN - 1] || props.cycleItems[0] || '图形'
-  const remainderItems = queueItems.slice(props.fullCycles * props.cycleLength)
-  const fullGroups = Math.max(0, props.fullCycles)
-
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [activeGroups, setActiveGroups] = useState(0)
-  const [remainderGlow, setRemainderGlow] = useState(false)
-  const [targetGlow, setTargetGlow] = useState(false)
-  const [matchedGlow, setMatchedGlow] = useState(false)
-  const groupTimerRef = useRef<number | null>(null)
-  const stageTimerRef = useRef<number | null>(null)
-
-  const clearTimers = () => {
-    if (groupTimerRef.current !== null) window.clearInterval(groupTimerRef.current)
-    if (stageTimerRef.current !== null) window.clearTimeout(stageTimerRef.current)
-    groupTimerRef.current = null
-    stageTimerRef.current = null
-  }
-
-  useEffect(() => {
-    return () => {
-      clearTimers()
-    }
-  }, [])
-
-  useEffect(() => {
-    clearTimers()
-    setIsAnimating(false)
-    setActiveGroups(0)
-    setRemainderGlow(false)
-    setTargetGlow(false)
-    setMatchedGlow(false)
-  }, [block.component, block.math_object, block.visual_object, props.targetN, props.cycleLength, props.fullCycles, props.remainderCount, props.perCycleCount, props.cycleItems])
-
-  const resetDemo = () => {
-    if (isAnimating) return
-    clearTimers()
-    setActiveGroups(0)
-    setRemainderGlow(false)
-    setTargetGlow(false)
-    setMatchedGlow(false)
-    setIsAnimating(false)
-  }
-
-  const finishTargetStage = () => {
-    setRemainderGlow(false)
-    setTargetGlow(true)
-    setMatchedGlow(true)
-    stageTimerRef.current = window.setTimeout(() => {
-      setIsAnimating(false)
-    }, 600)
-  }
-
-  const enterTargetStage = () => {
-    if (props.remainderCount > 0) {
-      setRemainderGlow(true)
-      stageTimerRef.current = window.setTimeout(() => {
-        finishTargetStage()
-      }, 620)
-      return
-    }
-
-    finishTargetStage()
-  }
-
-  const startAnimation = () => {
-    if (isAnimating) return
-
-    clearTimers()
-    setIsAnimating(true)
-    setActiveGroups(0)
-    setRemainderGlow(false)
-    setTargetGlow(false)
-    setMatchedGlow(false)
-
-    if (fullGroups <= 0) {
-      stageTimerRef.current = window.setTimeout(() => {
-        enterTargetStage()
-      }, 180)
-      return
-    }
-
-    let nextGroup = 0
-    groupTimerRef.current = window.setInterval(() => {
-      nextGroup += 1
-      setActiveGroups(nextGroup)
-
-      if (nextGroup >= fullGroups) {
-        if (groupTimerRef.current !== null) window.clearInterval(groupTimerRef.current)
-        groupTimerRef.current = null
-        stageTimerRef.current = window.setTimeout(() => {
-          enterTargetStage()
-        }, 180)
-      }
-    }, 400)
-  }
-
-  const groups = useMemo(() => {
-    const list: Array<{ kind: 'full' | 'remainder'; items: string[]; key: string; index: number }> = []
-
-    for (let groupIndex = 0; groupIndex < fullGroups; groupIndex += 1) {
-      list.push({
-        kind: 'full',
-        items: queueItems.slice(groupIndex * props.cycleLength, (groupIndex + 1) * props.cycleLength),
-        key: `full-${groupIndex}`,
-        index: groupIndex,
-      })
-    }
-
-    if (props.remainderCount > 0) {
-      list.push({
-        kind: 'remainder',
-        items: remainderItems,
-        key: 'remainder',
-        index: fullGroups,
-      })
-    }
-
-    if (list.length === 0) {
-      list.push({
-        kind: 'remainder',
-        items: queueItems,
-        key: 'fallback',
-        index: 0,
-      })
-    }
-
-    return list
-  }, [fullGroups, props.cycleLength, props.remainderCount, queueItems, remainderItems])
+export function CalcFracRate({
+  total = 12,
+  part = 3,
+  numerator = 1,
+  denominator = 4,
+  unit = '个',
+  buttonText = '求占比',
+}: CalcFracRateProps) {
+  void unit
+  const [showStatus, setShowStatus] = useState(false)
+  const percent = total === 0 ? 0 : (part / total) * 100
+  void unit
 
   return (
-    <div className="w-full max-w-2xl rounded-[28px] border border-neutral-100 bg-white p-8 shadow-xl shadow-black/5">
-      <style>{`
-        @keyframes patternCycleJelly {
-          0%, 100% { transform: scale(1, 1); }
-          30% { transform: scale(1.25, 0.75); }
-          40% { transform: scale(0.75, 1.25); }
-          50% { transform: scale(1.15, 0.85); }
-          65% { transform: scale(0.95, 1.05); }
-          75% { transform: scale(1.05, 0.95); }
-        }
-      `}</style>
-
-      <div className="rounded-[18px] border border-neutral-200/60 bg-[#FAFAFA] p-6 min-h-[140px] flex flex-col justify-center">
-        <div className="flex flex-wrap items-center justify-start gap-x-6 gap-y-8">
-          {groups.map((group, groupIndex) => {
-            const activeGroup = isAnimating && (group.kind === 'full' ? groupIndex < activeGroups : (props.remainderCount > 0 && remainderGlow) || targetGlow || matchedGlow)
-            const isRemainderGroup = group.kind === 'remainder'
-            const groupClassName = activeGroup
-              ? isRemainderGroup
-                ? 'border-[#FF0080] bg-[rgba(255,0,128,0.04)] shadow-[0_10px_24px_rgba(255,0,128,0.08)]'
-                : 'border-[#7928CA] bg-[rgba(121,40,202,0.04)] shadow-[0_10px_24px_rgba(121,40,202,0.08)]'
-              : 'border-dashed border-neutral-300 bg-white'
-
-            return (
-              <div
-                key={group.key}
-                className={`flex gap-2 rounded-xl border p-2 transition-all duration-500 ${groupClassName}`}
-              >
-                {group.items.map((item, itemIndex) => {
-                  const absoluteIndex = group.kind === 'full'
-                    ? groupIndex * props.cycleLength + itemIndex
-                    : fullGroups * props.cycleLength + itemIndex
-                  const isTarget = absoluteIndex === props.targetN - 1
-                  const isMatch = item === targetToken
-                  const nodeClassName = isTarget
-                    ? 'bg-gradient-to-br from-[#7928CA] to-[#FF0080] text-white border-transparent shadow-md'
-                    : isMatch && matchedGlow
-                      ? 'bg-[#0070F3] text-white border-transparent shadow-md'
-                      : 'bg-white text-[var(--text-body)] border-neutral-200/80 shadow-xs'
-
-                  return (
-                    <div key={`${group.key}-${absoluteIndex}`} className="flex flex-col items-center justify-start gap-1">
-                      <div
-                        className={`flex h-10 w-10 select-none items-center justify-center rounded-lg border text-xl transition-all duration-300 ${nodeClassName} ${isTarget && targetGlow ? 'scale-110' : ''}`}
-                        style={isTarget && targetGlow ? { animation: 'patternCycleJelly 0.6s ease-in-out' } : undefined}
-                        data-char={item}
-                      >
-                        {item}
-                      </div>
-                      <span className="text-[10px] font-medium text-[var(--text-muted)]">{absoluteIndex + 1}</span>
-                    </div>
-                  )
-                })}
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+          <div style={{ width: '100%', height: '24px', background: '#eee', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, #7928CA, #FF0080)', transition: 'width 0.5s' }} />
+            <div style={{ position: 'absolute', top: '4px', left: '8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>部分量: {part}</div>
+            <div style={{ position: 'absolute', top: '4px', right: '8px', fontSize: '11px', color: '#666' }}>总量: {total}</div>
+          </div>
+          {showStatus && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'jelly 0.4s ease' }}>
+              <div style={{ fontSize: '13px', color: '#666' }}>占比分数结果：</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 0' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#FF0080' }}>{numerator}</span>
+                <div style={{ width: '30px', height: '2px', background: '#171717', margin: '2px 0' }} />
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#7928CA' }}>{denominator}</span>
               </div>
-            )
-          })}
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="mt-6 flex items-center justify-start gap-3">
-        <button
-          type="button"
-          onClick={resetDemo}
-          disabled={isAnimating}
-          className="inline-flex items-center justify-center rounded-xl border border-neutral-200 bg-neutral-100 px-5 py-2.5 text-sm font-medium text-neutral-600 transition-all active:scale-95 hover:bg-neutral-200 disabled:pointer-events-none disabled:opacity-60"
-        >
-          重置
-        </button>
-        <button
-          type="button"
-          onClick={startAnimation}
-          disabled={isAnimating}
-          className="inline-flex items-center justify-center rounded-xl bg-[#0070F3] px-5 py-2.5 text-sm font-medium text-white transition-all active:scale-95 hover:bg-[#0063d7] disabled:pointer-events-none disabled:opacity-50"
-        >
-          {props.buttonText || '开始探究'}
-        </button>
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setShowStatus(false)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setShowStatus(true)}>{buttonText}</button>
       </div>
     </div>
   )
 }
 
-export function ReverseComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const steps = readStringArray(props.steps, splitMathObject(block.math_object))
-  const op = toText(props.op, 'add')
-  const currentValue = toNumber(props.currentValue, extractAllNumbers(block.math_object)[0] ?? 0)
-  const stepValue = toNumber(props.stepValue, extractAllNumbers(block.math_object)[1] ?? 1)
+export function CalcAvgDiv({
+  total = 12,
+  count = 3,
+  unit = '个',
+  totalLabel = '总量',
+  buttonText = '求平均数',
+}: CalcAvgDivProps) {
+  const [isFlattened, setIsFlattened] = useState(false)
+  const safeCount = Math.max(1, count)
+  const average = total / safeCount
 
   return (
-    <MaterialLiteShell
-      block={block}
-      buttonLabel={getButtonText(block, '开始倒推')}
-    >
-      {(active) => (
-        <div className="grid gap-3 md:grid-cols-3">
-          {[
-            { title: steps[0] || '起点', value: active ? '正在回推' : '盲盒' },
-            { title: steps[1] || '算子', value: active ? `${op === 'add' ? '-' : op === 'sub' ? '+' : op === 'mul' ? '÷' : '×'} ${stepValue}` : `${op} ${stepValue}` },
-            { title: steps[2] || '结果', value: currentValue },
-          ].map((item, index) => (
-            <div key={item.title} className={`rounded-[16px] border p-3 transition-all duration-300 ${active && index === 1 ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-              <div className="text-[11px] text-[#888888]">{item.title}</div>
-              <div className="mt-2 text-lg font-semibold text-[#171717]">{item.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </MaterialLiteShell>
-  )
-}
-
-export function CompareComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const numA = toNumber(props.numA, extractAllNumbers(block.math_object)[0] ?? 0)
-  const numB = toNumber(props.numB, extractAllNumbers(block.math_object)[1] ?? 0)
-  const operator = toText(props.operator, numA > numB ? '>' : numA < numB ? '<' : '=')
-  const contextType = toText(props.contextType, 'pure_compare')
-
-  return (
-    <MaterialLiteShell
-      block={block}
-      buttonLabel={getButtonText(block, '开始比较')}
-    >
-      {(active) => (
-        <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-            <div className="rounded-[16px] border border-[#EAEAEA] bg-white p-3 text-center">
-              <div className="text-[11px] text-[#888888]">A</div>
-              <div className="mt-2 text-2xl font-semibold text-[#171717]">{numA}</div>
-            </div>
-            <div className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${active ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080] text-white' : 'bg-[#FAFAFA] text-[#4D4D4D]'}`}>
-              {contextType === 'threshold_check' ? '限界' : operator}
-            </div>
-            <div className="rounded-[16px] border border-[#EAEAEA] bg-white p-3 text-center">
-              <div className="text-[11px] text-[#888888]">B</div>
-              <div className="mt-2 text-2xl font-semibold text-[#171717]">{numB}</div>
-            </div>
-          </div>
-
-          <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-            <div className="text-[11px] text-[#888888]">比较结论</div>
-            <div className="mt-2 text-sm text-[#171717]">
-              {active ? `当前关系是 ${numA} ${operator} ${numB}` : '点击按钮后只高亮最终关系，不做计算展示。'}
-            </div>
-          </div>
-        </div>
-      )}
-    </MaterialLiteShell>
-  )
-}
-
-export function EstimateComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const rawValue = toNumber(props.rawValue, extractAllNumbers(block.math_object)[0] ?? 0)
-  const roundTo = toNumber(props.roundTo, Math.round(rawValue / 10) * 10)
-  const snapped = Math.round(rawValue / 10) * 10
-
-  return (
-    <MaterialLiteShell
-      block={block}
-      buttonLabel={getButtonText(block, '开始吸附')}
-    >
-      {(active) => (
-        <div className="space-y-3">
-          <div className="rounded-[16px] border border-[#EAEAEA] bg-white p-3">
-            <div className="flex items-center justify-between text-[11px] text-[#888888]">
-              <span>{Math.max(0, roundTo - 10)}</span>
-              <span>{roundTo}</span>
-              <span>{roundTo + 10}</span>
-            </div>
-            <div className="relative mt-4 h-16">
-              <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#EAEAEA]" />
-              <div
-                className={`absolute top-1/2 -translate-y-1/2 rounded-[18px] border px-4 py-2 text-sm font-semibold transition-all duration-300 ${
-                  active ? 'border-[#7928CA]/20 bg-gradient-to-r from-[#7928CA] to-[#FF0080] text-white translate-x-0' : 'border-[#EAEAEA] bg-[rgba(255,255,255,0.9)] text-[#171717]'
-                }`}
-                style={{ left: '50%', transform: active ? 'translate(-50%, -50%) scale(1.03)' : 'translate(-50%, -50%)' }}
-              >
-                {rawValue}
-              </div>
-            </div>
-          </div>
-
-          <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-            <div className="text-[11px] text-[#888888]">估算结果</div>
-            <div className="mt-2 text-lg font-semibold text-[#171717]">{active ? snapped : '待吸附'}</div>
-          </div>
-        </div>
-      )}
-    </MaterialLiteShell>
-  )
-}
-
-export function NumberSenseComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const numA = toNumber(props.numA, extractAllNumbers(block.math_object)[0] ?? 0)
-  const numB = toNumber(props.numB, extractAllNumbers(block.math_object)[1] ?? 0)
-  const op = toText(props.op, 'multiply')
-  const digits = String(Math.max(1, op === 'divide' ? Math.max(1, Math.floor(numA / Math.max(1, numB))) : numA * numB)).split('')
-
-  return (
-    <MaterialLiteShell
-      block={block}
-      buttonLabel={getButtonText(block, '开始扫描')}
-    >
-      {(active) => (
-        <div className="space-y-3">
-          <div className="rounded-[16px] border border-[#EAEAEA] bg-white p-3 text-center text-2xl font-semibold text-[#171717]">
-            {numA} {op === 'divide' ? '÷' : '×'} {numB}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-6">
-            {Array.from({ length: Math.max(6, digits.length) }).map((_, index) => (
-              <div key={index} className={`rounded-[16px] border p-3 text-center transition-all duration-300 ${active && index < digits.length ? 'border-[#7928CA]/20 bg-gradient-to-b from-[#7928CA] to-[#FF0080] text-white' : 'border-[#EAEAEA] bg-white text-[#4D4D4D]'}`}>
-                <div className="text-[11px] opacity-70">{['个位', '十位', '百位', '千位', '万位', '十万位'][index] || `位 ${index + 1}`}</div>
-                <div className="mt-1 text-lg font-semibold">{active && index < digits.length ? digits[index] : ''}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </MaterialLiteShell>
-  )
-}
-
-export function AgeComponent({ block }: MathComponentProps) {
-  const props = readBlockProps(block)
-  const ageA = toNumber(props.ageA, extractAllNumbers(block.math_object)[0] ?? 0)
-  const ageB = toNumber(props.ageB, extractAllNumbers(block.math_object)[1] ?? 0)
-  const ageDiff = Math.abs(toNumber(props.ageDiff, ageA - ageB))
-  const years = toNumber(props.years, 0)
-  const targetMultiple = toNumber(props.targetMultiple, 2)
-  const type = toText(props.type, 'diff_constant')
-
-  return (
-    <MaterialLiteShell
-      block={block}
-      buttonLabel={getButtonText(block, '开始推演')}
-    >
-      {(active) => (
-        <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            {[
-              { label: '甲', value: ageA },
-              { label: '乙', value: ageB },
-            ].map((item, index) => (
-              <div key={item.label} className="rounded-[16px] border border-[#EAEAEA] bg-white p-3">
-                <div className="text-[11px] text-[#888888]">{item.label}年龄</div>
-                <div className="mt-3 h-3 rounded-full bg-[#EAEAEA]">
-                  <div className={`h-full rounded-full transition-all duration-300 ${active ? 'bg-gradient-to-r from-[#7928CA] to-[#FF0080]' : 'bg-[#0070F3]'}`} style={{ width: `${Math.min(100, Math.max(30, item.value * 4))}%` }} />
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={styles.miniLabel}>{totalLabel || '总量'}: {total} 分配到 {safeCount} 个容器里</div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {Array.from({ length: safeCount }).map((_, idx) => {
+              const currentHeight = isFlattened ? average * 8 : (idx === 0 ? average * 1.5 * 8 : average * 0.6 * 8)
+              return (
+                <div key={idx} style={{ width: '44px', height: '90px', border: '2px solid #666', borderRadius: '0 0 8px 8px', position: 'relative', display: 'flex', alignItems: 'flex-end', background: '#fff' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: `${Math.min(84, currentHeight)}px`,
+                      background: 'linear-gradient(0deg, #0070F3, #00DFD8)',
+                      transition: 'height 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
+                    }}
+                  />
+                  {isFlattened && <div style={{ position: 'absolute', width: '100%', top: '-20px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', color: '#0070F3' }}>{average}</div>}
                 </div>
-                <div className="mt-2 text-lg font-semibold text-[#171717]">{item.value}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-              <div className="text-[11px] text-[#888888]">年龄差</div>
-              <div className="mt-2 text-lg font-semibold text-[#171717]">{ageDiff}</div>
-            </div>
-            <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-              <div className="text-[11px] text-[#888888]">目标倍数</div>
-              <div className="mt-2 text-lg font-semibold text-[#171717]">{targetMultiple} 倍</div>
-            </div>
-            <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-              <div className="text-[11px] text-[#888888]">时间推进</div>
-              <div className="mt-2 text-lg font-semibold text-[#171717]">{years > 0 ? `${years} 年后` : years < 0 ? `${Math.abs(years)} 年前` : '当前'}</div>
-            </div>
-          </div>
-
-          <div className={`rounded-[16px] border p-3 transition-all duration-300 ${active ? 'border-[#7928CA]/20 bg-[rgba(121,40,202,0.06)]' : 'border-[#EAEAEA] bg-white'}`}>
-            <div className="text-[11px] text-[#888888]">推演模式</div>
-            <div className="mt-2 text-sm text-[#171717]">
-              {type === 'diff_constant' ? '年龄差恒定不变' : '寻找倍数契合点'}
-            </div>
-          </div>
+          {showResultPanel(isFlattened, `均分结果: ${average} ${unit}/份`)}
         </div>
-      )}
-    </MaterialLiteShell>
+      </div>
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setIsFlattened(false)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setIsFlattened(true)}>{buttonText}</button>
+      </div>
+    </div>
   )
 }
 
-export function GenericLogicComponent({ block }: MathComponentProps) {
-  const tone = getToneForComponent(block.component)
+export function CalcMultiSum({
+  parts = [2, 3, 4],
+  unit = '个',
+  labels = [],
+  buttonText = '求总数',
+}: CalcMultiSumProps) {
+  return <JoinSumCard parts={parts} unit={unit} labels={labels} buttonText={buttonText} />
+}
+
+export function TimeSubSpan({
+  startTime = '08:00',
+  endTime = '09:30',
+  pauseMinutes = 0,
+  durationMinutes = 90,
+  buttonText = '求经过时间',
+}: TimeSubSpanProps) {
+  void pauseMinutes
+  const [showFlow, setShowFlow] = useState(false)
+
   return (
-    <MathComponentShell block={block} tone={tone} buttonLabel="先理解关系">
-      {(active, visual) => (
-        <div className={`rounded-[20px] border p-4 transition-all duration-300 ${active ? 'border-[var(--color-link)] bg-[rgba(0,112,243,0.06)]' : 'border-[var(--color-hairline)] bg-white'}`}>
-          <div className="text-[11px] text-[var(--color-mute)]">通用逻辑</div>
-          <div className="mt-2 text-sm text-[var(--color-ink)]">
-            {active ? '先理解这个关系，再完成下面的问题。' : '等待更具体的逻辑块来接管。'}
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f5f5', padding: '8px 12px', borderRadius: '8px' }}>
+            <div>⏳ 起始: <strong style={{ color: '#7928CA' }}>{startTime}</strong></div>
+            <div style={{ fontSize: '12px', color: '#999' }}>──▶</div>
+            <div>🏁 结束: <strong style={{ color: '#FF0080' }}>{endTime}</strong></div>
           </div>
-          <div className="mt-3 text-3xl">{visual.emoji}</div>
+          {pauseMinutes > 0 && <div style={{ fontSize: '12px', color: '#666' }}>⚠️ 中途扣除（如暂停/休息）: {pauseMinutes} 分钟</div>}
+          {showFlow && (
+            <div style={{ background: '#E6F1FF', borderLeft: '4px solid #0070F3', padding: '8px 12px', borderRadius: '4px', animation: 'jelly 0.3s ease' }}>
+              计算算式：总时间轴长度 − 扣除时间
+            </div>
+          )}
+          {showResultPanel(showFlow, `纯经过时间: ${durationMinutes} 分钟`)}
+        </div>
+      </div>
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setShowFlow(false)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setShowFlow(true)}>{buttonText}</button>
+      </div>
+    </div>
+  )
+}
+
+export function TimeAddPass({
+  startTime = '08:00',
+  endTime = '09:30',
+  durationMinutes = 90,
+  buttonText = '求结束时刻',
+}: TimeAddPassProps) {
+  const [showTarget, setShowTarget] = useState(false)
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.stage}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px solid #7928CA' }}>
+            <div style={{ fontSize: '13px', color: '#666' }}>起始时刻</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#7928CA' }}>{startTime}</div>
+          </div>
+          <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px dashed #0070F3' }}>
+            <div style={{ fontSize: '13px', color: '#666' }}>向后顺延（经过时间）</div>
+            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0070F3' }}>+ {durationMinutes} 分钟</div>
+          </div>
+          {showTarget && (
+            <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px solid #FF0080', animation: 'jelly 0.4s ease' }}>
+              <div style={{ fontSize: '13px', color: '#666' }}>精准到达时刻</div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#FF0080' }}>🏁 {endTime}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={styles.btnRow}>
+        <button style={styles.btnReset} onClick={() => setShowTarget(false)}>重置</button>
+        <button style={styles.btnAction} onClick={() => setShowTarget(true)}>{buttonText}</button>
+      </div>
+    </div>
+  )
+}
+
+const showResultPanel = (visible: boolean, text: string) => {
+  return (
+    <div
+      style={{
+        marginTop: '12px',
+        background: '#0070F3',
+        color: '#fff',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        fontSize: '13px',
+        fontWeight: 'bold',
+        whiteSpace: 'nowrap',
+        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        transform: visible ? 'scale(1)' : 'scale(0.8)',
+        opacity: visible ? 1 : 0,
+        pointerEvents: 'none',
+      }}
+    >
+      {text}
+    </div>
+  )
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  card: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+    border: '1px solid #f0f0f0',
+    padding: '32px',
+    maxWidth: '560px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  uiCard: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+    border: '1px solid #f0f0f0',
+    padding: '32px',
+    maxWidth: '560px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  stage: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '16px',
+    padding: '32px 16px',
+    marginBottom: '24px',
+    border: '1px solid #e5e5e5',
+    minHeight: '280px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  interactionZone: {
+    position: 'relative',
+    width: '100%',
+    minHeight: '260px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '20px',
+    overflow: 'hidden',
+  },
+  matrixPool: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: '8px',
+    background: '#F5E9FF',
+    padding: '16px',
+    borderRadius: '18px',
+    border: '2px dashed #D6ADFF',
+    position: 'relative',
+    transition: 'border-color 0.3s',
+  },
+  poolItem: {
+    width: '40px',
+    height: '40px',
+    background: 'linear-gradient(135deg, #7928CA 0%, #FF0080 100%)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px rgba(121, 40, 202, 0.15)',
+    color: '#FFFFFF',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    userSelect: 'none',
+    transition: 'transform 0.3s ease, opacity 0.5s ease',
+  },
+  targetLock: {
+    background: 'linear-gradient(135deg, #00DFD8 0%, #0070F3 100%)',
+    boxShadow: '0 4px 10px rgba(0, 112, 243, 0.25)',
+  },
+  dragHandler: {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#ffffff',
+    border: '2px solid #0070F3',
+    borderRadius: '20px',
+    padding: '0 16px',
+    height: '64px',
+    minWidth: '170px',
+    cursor: 'grab',
+    zIndex: 20,
+    touchAction: 'none',
+    userSelect: 'none',
+    left: '50%',
+    top: '50%',
+    marginLeft: '-85px',
+    marginTop: '-32px',
+  },
+  handLabel: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: '#888888',
+    marginBottom: '3px',
+  },
+  handNum: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#0070F3',
+    lineHeight: 1.2,
+    whiteSpace: 'nowrap',
+  },
+  resultPanel: {
+    position: 'absolute',
+    background: '#0070F3',
+    color: 'white',
+    padding: '6px 16px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    boxShadow: '0 10px 20px rgba(0, 112, 243, 0.3)',
+    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    pointerEvents: 'none',
+    zIndex: 20,
+    textAlign: 'center',
+    opacity: 0,
+  },
+  resultPanelShow: {
+    opacity: 1,
+    bottom: '12px',
+    transform: 'scale(1)',
+  },
+  btnRow: {
+    display: 'flex',
+    justifyContent: 'flex-start',
+    gap: '12px',
+    width: '100%',
+  },
+  btnReset: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    border: '1px solid #e5e5e5',
+    background: '#f5f5f5',
+    color: '#525252',
+    transition: 'all 0.2s',
+  },
+  btnAction: {
+    padding: '10px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    border: 'none',
+    background: '#0070F3',
+    color: '#ffffff',
+  },
+}
+
+function parseCalcTotalMulProps(block: MathComponentProps['block']): CalcTotalMulProps {
+  const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+    ? (block.props as Record<string, unknown>)
+    : {}
+
+  return {
+    count: typeof props.count === 'number' ? props.count : Number(props.count) || 4,
+    perValue: typeof props.perValue === 'number' ? props.perValue : Number(props.perValue) || 10,
+    unit: typeof props.unit === 'string' ? props.unit : '个',
+    stepLabel: typeof props.stepLabel === 'string' ? props.stepLabel : '每组10个，共4组',
+    totalLabel: typeof props.totalLabel === 'string' ? props.totalLabel : '共40个',
+    buttonText: typeof props.buttonText === 'string' ? props.buttonText : '求总量',
+  }
+}
+
+function CalcTotalMulBlock({ block }: MathComponentProps) {
+  const props = parseCalcTotalMulProps(block)
+  return <CalcTotalMul {...props} />
+}
+
+function UnknownMathComponent({ block }: MathComponentProps) {
+  const visual = buildVisualMeta(block.visual_object)
+
+  return (
+    <MathComponentShell block={block} buttonLabel="查看说明">
+      {(active) => (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-[20px] border border-[var(--color-hairline)] bg-white p-4">
+            <div className="text-3xl">{visual.emoji}</div>
+            <div>
+              <div className="text-sm font-medium text-[var(--color-ink)]">{block.component || '未知组件'}</div>
+              <div className="mt-1 text-xs text-[var(--color-mute)]">
+                {active ? '这个组件还没有注册到新映射里。' : '先放一个占位，避免页面报错。'}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </MathComponentShell>
@@ -1839,33 +4282,322 @@ export function GenericLogicComponent({ block }: MathComponentProps) {
 }
 
 const componentMap: Record<string, (props: MathComponentProps) => ReactElement> = {
-  TotalAmountComponent,
-  PartitionComponent,
-  SumComponent,
-  AverageComponent,
-  FractionComponent,
-  PatternCycleComponent,
-  ReverseComponent,
-  CompareComponent,
-  EstimateComponent,
-  NumberSenseComponent,
-  AgeComponent,
-  DifferenceComponent,
-  RemainderComponent,
-  MultipleComponent,
-  UnitConvertComponent,
-  PointSegmentComponent,
-  PriceQuantityComponent,
-  DistanceSpeedTimeComponent,
-  GeometryAreaComponent,
-  TimeComponent,
-  RoundingComponent,
-  GenericLogicComponent,
+  CalcTotalMul: CalcTotalMulBlock,
+  CalcPartDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcPartDiv
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 60}
+        stepValue={typeof props.stepValue === 'number' ? props.stepValue : Number(props.stepValue) || 15}
+        unit={typeof props.unit === 'string' ? props.unit : '厘米'}
+        stepLabel={typeof props.stepLabel === 'string' ? props.stepLabel : '4份'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求份数'}
+      />
+    )
+  },
+  CalcUnitDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcUnitDiv
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 60}
+        stepValue={typeof props.stepValue === 'number' ? props.stepValue : Number(props.stepValue) || 15}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        stepLabel={typeof props.stepLabel === 'string' ? props.stepLabel : '15个'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求每份数'}
+      />
+    )
+  },
+  CalcPriceMul: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcPriceMul
+        type={typeof props.type === 'string' ? props.type : 'CalcPriceMul'}
+        totalPrice={typeof props.totalPrice === 'number' ? props.totalPrice : Number(props.totalPrice) || 20}
+        price={typeof props.price === 'number' ? props.price : Number(props.price) || 5}
+        quantity={typeof props.quantity === 'number' ? props.quantity : Number(props.quantity) || 4}
+        unit={typeof props.unit === 'string' ? props.unit : '元'}
+        itemLabel={typeof props.itemLabel === 'string' ? props.itemLabel : '总价模型探究'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求总价'}
+      />
+    )
+  },
+  CalcUnitPriceDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcUnitPriceDiv
+        type={typeof props.type === 'string' ? props.type : 'CalcUnitPriceDiv'}
+        totalPrice={typeof props.totalPrice === 'number' ? props.totalPrice : Number(props.totalPrice) || 20}
+        price={typeof props.price === 'number' ? props.price : Number(props.price) || 5}
+        quantity={typeof props.quantity === 'number' ? props.quantity : Number(props.quantity) || 4}
+        unit={typeof props.unit === 'string' ? props.unit : '元'}
+        itemLabel={typeof props.itemLabel === 'string' ? props.itemLabel : '单价: 5元'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求单价'}
+      />
+    )
+  },
+  CalcQtyDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcQtyDiv
+        type={typeof props.type === 'string' ? props.type : 'CalcQtyDiv'}
+        totalPrice={typeof props.totalPrice === 'number' ? props.totalPrice : Number(props.totalPrice) || 20}
+        price={typeof props.price === 'number' ? props.price : Number(props.price) || 5}
+        quantity={typeof props.quantity === 'number' ? props.quantity : Number(props.quantity) || 4}
+        unit={typeof props.unit === 'string' ? props.unit : '元'}
+        itemLabel={typeof props.itemLabel === 'string' ? props.itemLabel : '4个'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求数量'}
+      />
+    )
+  },
+  CalcDistMul: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcDistMul
+        type={typeof props.type === 'string' ? props.type : 'CalcDistMul'}
+        distance={typeof props.distance === 'number' ? props.distance : Number(props.distance) || 240}
+        speed={typeof props.speed === 'number' ? props.speed : Number(props.speed) || 80}
+        time={typeof props.time === 'number' ? props.time : Number(props.time) || 3}
+        speedUnit={typeof props.speedUnit === 'string' ? props.speedUnit : '千米/时'}
+        timeUnit={typeof props.timeUnit === 'string' ? props.timeUnit : '小时'}
+        distanceUnit={typeof props.distanceUnit === 'string' ? props.distanceUnit : '千米'}
+        itemLabel={typeof props.itemLabel === 'string' ? props.itemLabel : '路程模型探究'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求路程'}
+      />
+    )
+  },
+  CalcSpeedDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcSpeedDiv
+        type={typeof props.type === 'string' ? props.type : 'CalcSpeedDiv'}
+        distance={typeof props.distance === 'number' ? props.distance : Number(props.distance) || 240}
+        speed={typeof props.speed === 'number' ? props.speed : Number(props.speed) || 80}
+        time={typeof props.time === 'number' ? props.time : Number(props.time) || 3}
+        speedUnit={typeof props.speedUnit === 'string' ? props.speedUnit : '千米/时'}
+        timeUnit={typeof props.timeUnit === 'string' ? props.timeUnit : '小时'}
+        distanceUnit={typeof props.distanceUnit === 'string' ? props.distanceUnit : '千米'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求速度'}
+      />
+    )
+  },
+  CalcTimeDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcTimeDiv
+        type={typeof props.type === 'string' ? props.type : 'CalcTimeDiv'}
+        distance={typeof props.distance === 'number' ? props.distance : Number(props.distance) || 240}
+        speed={typeof props.speed === 'number' ? props.speed : Number(props.speed) || 80}
+        time={typeof props.time === 'number' ? props.time : Number(props.time) || 3}
+        speedUnit={typeof props.speedUnit === 'string' ? props.speedUnit : '千米/时'}
+        timeUnit={typeof props.timeUnit === 'string' ? props.timeUnit : '小时'}
+        distanceUnit={typeof props.distanceUnit === 'string' ? props.distanceUnit : '千米'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求时间'}
+      />
+    )
+  },
+  CalcDiffSub: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcDiffSub
+        numA={typeof props.numA === 'number' ? props.numA : Number(props.numA) || 20}
+        numB={typeof props.numB === 'number' ? props.numB : Number(props.numB) || 8}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        labelA={typeof props.labelA === 'string' ? props.labelA : ''}
+        labelB={typeof props.labelB === 'string' ? props.labelB : ''}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求差'}
+      />
+    )
+  },
+  CalcSumAdd: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+    const rawParts = Array.isArray(props.parts) ? props.parts : [3, 5]
+    const rawLabels = Array.isArray(props.labels) ? props.labels : ['', '']
+
+    return (
+      <CalcSumAdd
+        parts={rawParts.map((value) => (typeof value === 'number' ? value : Number(value) || 0))}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        labels={rawLabels.map((value) => (typeof value === 'string' ? value : String(value || '')))}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求和'}
+      />
+    )
+  },
+  CalcRemainSub: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcRemainSub
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 20}
+        used={typeof props.used === 'number' ? props.used : Number(props.used) || 8}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        totalLabel={typeof props.totalLabel === 'string' ? props.totalLabel : '总数'}
+        usedLabel={typeof props.usedLabel === 'string' ? props.usedLabel : '拿走'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求剩余'}
+      />
+    )
+  },
+  CalcTimesDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcTimesDiv
+        numA={typeof props.numA === 'number' ? props.numA : Number(props.numA) || 12}
+        numB={typeof props.numB === 'number' ? props.numB : Number(props.numB) || 3}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        labelA={typeof props.labelA === 'string' ? props.labelA : '比较数'}
+        labelB={typeof props.labelB === 'string' ? props.labelB : '标准基准数'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求倍数'}
+      />
+    )
+  },
+  CalcTimesMul: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcTimesMul
+        baseNum={typeof props.baseNum === 'number' ? props.baseNum : Number(props.baseNum) || 4}
+        multiple={typeof props.multiple === 'number' ? props.multiple : Number(props.multiple) || 3}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        labelBase={typeof props.labelBase === 'string' ? props.labelBase : '基础量'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求一倍数的几倍'}
+      />
+    )
+  },
+  CalcFracPart: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcFracPart
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 12}
+        part={typeof props.part === 'number' ? props.part : Number(props.part) || 4}
+        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 3}
+        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 4}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '第一步：求每份数'}
+      />
+    )
+  },
+  CalcFracRate: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcFracRate
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 12}
+        part={typeof props.part === 'number' ? props.part : Number(props.part) || 3}
+        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 1}
+        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 4}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求占比'}
+      />
+    )
+  },
+  CalcAvgDiv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <CalcAvgDiv
+        total={typeof props.total === 'number' ? props.total : Number(props.total) || 12}
+        count={typeof props.count === 'number' ? props.count : Number(props.count) || 3}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        totalLabel={typeof props.totalLabel === 'string' ? props.totalLabel : '总量'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求平均数'}
+      />
+    )
+  },
+  CalcMultiSum: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+    const rawParts = Array.isArray(props.parts) ? props.parts : [2, 3, 4]
+    const rawLabels = Array.isArray(props.labels) ? props.labels : []
+
+    return (
+      <CalcMultiSum
+        parts={rawParts.map((value) => (typeof value === 'number' ? value : Number(value) || 0))}
+        unit={typeof props.unit === 'string' ? props.unit : '个'}
+        labels={rawLabels.map((value) => (typeof value === 'string' ? value : String(value || '')))}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求总数'}
+      />
+    )
+  },
+  TimeSubSpan: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <TimeSubSpan
+        type={typeof props.type === 'string' ? props.type : 'TimeSubSpan'}
+        startTime={typeof props.startTime === 'string' ? props.startTime : '08:00'}
+        endTime={typeof props.endTime === 'string' ? props.endTime : '09:30'}
+        pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 0}
+        durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 90}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求经过时间'}
+      />
+    )
+  },
+  TimeAddPass: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <TimeAddPass
+        type={typeof props.type === 'string' ? props.type : 'TimeAddPass'}
+        startTime={typeof props.startTime === 'string' ? props.startTime : '08:00'}
+        endTime={typeof props.endTime === 'string' ? props.endTime : '09:30'}
+        pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 0}
+        durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 90}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求结束时刻'}
+      />
+    )
+  },
 }
 
 export function MathComponentRenderer({ block }: MathComponentProps) {
-  const Component = componentMap[block.component] || GenericLogicComponent
-  return <Component block={block} />
+  const Component = componentMap[block.component]
+  return Component ? Component({ block }) : <UnknownMathComponent block={block} />
 }
 
 export const MATH_COMPONENT_NAMES = Object.keys(componentMap)

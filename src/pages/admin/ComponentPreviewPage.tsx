@@ -42,29 +42,7 @@ const tutorAnalysisJson = {
 }
 
 const logicAnalysisJson = {
-  logic_blocks: [
-    {
-      step: 1,
-      type: '求总价',
-      component: 'TotalAmountComponent',
-      math_object: '课桌总价',
-      visual_object: '课桌、钱币',
-    },
-    {
-      step: 2,
-      type: '求总价',
-      component: 'TotalAmountComponent',
-      math_object: '椅子总价',
-      visual_object: '椅子、钱币',
-    },
-    {
-      step: 3,
-      type: '求和',
-      component: 'GenericLogicComponent',
-      math_object: '课桌总价 + 椅子总价',
-      visual_object: '总金额',
-    },
-  ],
+  logic_blocks: [],
 }
 
 export default function ComponentPreviewPage() {

@@ -1,5 +1,3 @@
-import type { LogicBlock } from './mathTypes'
-
 export type VisualMeta = {
   raw: string
   tokens: string[]
@@ -49,28 +47,6 @@ export function buildVisualMeta(raw: string): VisualMeta {
 }
 
 const toneByComponent: Record<string, MathTone> = {
-  TotalAmountComponent: 'purple',
-  PartitionComponent: 'blue',
-  SumComponent: 'purple',
-  DifferenceComponent: 'pink',
-  RemainderComponent: 'green',
-  MultipleComponent: 'purple',
-  FractionComponent: 'amber',
-  AverageComponent: 'blue',
-  UnitConvertComponent: 'blue',
-  PointSegmentComponent: 'purple',
-  PriceQuantityComponent: 'pink',
-  DistanceSpeedTimeComponent: 'blue',
-  GeometryAreaComponent: 'green',
-  TimeComponent: 'amber',
-  RoundingComponent: 'amber',
-  PatternCycleComponent: 'purple',
-  ReverseComponent: 'blue',
-  CompareComponent: 'pink',
-  EstimateComponent: 'amber',
-  NumberSenseComponent: 'purple',
-  AgeComponent: 'green',
-  GenericLogicComponent: 'purple',
 }
 
 export function getToneForComponent(component: string): MathTone {

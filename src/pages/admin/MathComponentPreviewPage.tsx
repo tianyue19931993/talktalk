@@ -322,10 +322,11 @@ export default function MathComponentPreviewPage() {
               visual_object: '份数选择',
               props: {
                 total: 12,
+                part: 9,
                 numerator: 3,
                 denominator: 4,
                 unit: '个',
-                buttonText: '第一步：求每份数',
+                buttonText: '开始',
               },
             }}
           />
@@ -337,15 +338,15 @@ export default function MathComponentPreviewPage() {
               step: 1,
               type: '求占比',
               component: 'CalcFracRate',
-              math_object: '部分3，总量12',
+              math_object: '部分8，总量12',
               visual_object: '占比条',
               props: {
                 total: 12,
-                part: 3,
-                numerator: 1,
-                denominator: 4,
+                part: 8,
+                numerator: 8,
+                denominator: 12,
                 unit: '个',
-                buttonText: '求占比',
+                buttonText: '下一步',
               },
             }}
           />

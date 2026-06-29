@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { MathComponentProps } from './mathTypes'
 import { MathComponentShell } from './MathComponentShell'
 import { buildVisualMeta } from './mathHelpers'
@@ -3834,54 +3834,131 @@ export function CalcTimesMul({
 }
 
 export function CalcFracPart({
+  type = 'frac_part',
   total = 12,
-  part = 4,
-  numerator = 3,
-  denominator = 4,
+  part = 8,
+  numerator = 2,
+  denominator = 3,
   unit = '个',
-  buttonText = '第一步：求每份数',
+  buttonText = '下一步',
 }: CalcFracPartProps) {
-  void part
-  const [step, setStep] = useState(0)
+  void type
   const safeDenominator = Math.max(1, denominator)
-  const perPart = total / safeDenominator
-  const resultPart = perPart * numerator
+  const safeNumerator = Math.max(1, Math.min(numerator, safeDenominator))
+  const singleUnitValue = useMemo(() => total / safeDenominator, [total, safeDenominator])
+  const finalPart = Number.isFinite(part) ? part : singleUnitValue * safeNumerator
+  const [currentStep, setCurrentStep] = useState<'idle' | 'do_divide' | 'do_multiply' | 'done'>('idle')
+
+  const handleNextStep = () => {
+    switch (currentStep) {
+      case 'idle':
+        setCurrentStep('do_divide')
+        break
+      case 'do_divide':
+        setCurrentStep('do_multiply')
+        break
+      case 'do_multiply':
+        setCurrentStep('done')
+        break
+      default:
+        break
+    }
+  }
+
+  const handleReset = () => {
+    setCurrentStep('idle')
+  }
+
+  useEffect(() => {
+    handleReset()
+  }, [total, part, numerator, denominator, unit])
 
   return (
     <div style={styles.card}>
-      <div style={styles.stage}>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={styles.miniLabel}>总数 {total} 被平均分成 {safeDenominator} 份：</div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${safeDenominator}, minmax(0, 1fr))`, gap: '6px' }}>
-            {Array.from({ length: safeDenominator }).map((_, idx) => {
-              const isSelected = idx < numerator && step >= 2
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    border: '2px solid #7928CA',
-                    borderRadius: '8px',
-                    padding: '8px 4px',
-                    textAlign: 'center',
-                    background: step >= 1 ? (isSelected ? '#FF0080' : '#F5E9FF') : '#fff',
-                    color: isSelected ? '#fff' : '#171717',
-                    transition: 'all 0.3s',
-                  }}
-                >
-                  <div style={{ fontSize: '10px', opacity: 0.6 }}>第 {idx + 1} 份</div>
-                  {step >= 1 && <div style={{ fontWeight: 'bold' }}>{perPart}</div>}
-                </div>
-              )
-            })}
+      <style>{`
+        @keyframes fracPartJelly {
+          0%, 100% { transform: translateX(-50%) scale(1, 1); }
+          30% { transform: translateX(-50%) scale(1.25, 0.75); }
+          50% { transform: translateX(-50%) scale(1.15, 0.85); }
+        }
+      `}</style>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '64px 24px',
+          marginBottom: '24px',
+          minHeight: '280px',
+        }}
+      >
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', overflow: 'visible' }}>
+          {currentStep === 'idle' && (
+            <div style={{ width: '100%', height: '52px', background: '#0070F3', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,112,243,0.15)' }}>
+              <span style={{ color: '#fff', fontSize: '15px', fontWeight: 'bold' }}>总数: {total} {unit}</span>
+            </div>
+          )}
+
+          {(currentStep === 'do_divide' || currentStep === 'do_multiply' || currentStep === 'done') && (
+            <div style={{ display: 'flex', width: '100%', gap: '10px', justifyContent: 'center', alignItems: 'stretch', position: 'relative' }}>
+              {Array.from({ length: safeDenominator }).map((_, index) => {
+                const isHighlighted = (currentStep === 'do_multiply' || currentStep === 'done') && index < safeNumerator
+
+                return (
+                  <div
+                    key={`part-seg-${index}`}
+                    style={{
+                      flex: 1,
+                      height: '52px',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      background: isHighlighted ? 'linear-gradient(135deg, #00DFD8 0%, #0070F3 100%)' : '#EAEAEA',
+                      color: isHighlighted ? '#ffffff' : '#666666',
+                      boxShadow: isHighlighted ? '0 4px 12px rgba(0,112,243,0.2)' : 'none',
+                      border: currentStep === 'do_divide' ? '2px solid #0070F3' : 'none',
+                    }}
+                  >
+                    {singleUnitValue} {unit}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '-56px',
+              left: '50%',
+              transform: currentStep === 'done' ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.8)',
+              opacity: currentStep === 'done' ? 1 : 0,
+              whiteSpace: 'nowrap',
+              background: '#171717',
+              color: '#ffffff',
+              padding: '8px 24px',
+              borderRadius: '14px',
+              fontSize: '15px',
+              fontWeight: 900,
+              boxShadow: '0 8px 22px rgba(0,0,0,0.15)',
+              transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              zIndex: 10,
+            }}
+          >
+            部分量结果: <span style={{ color: '#00DFD8', marginLeft: '6px' }}>{part} {unit}</span>
           </div>
-          {step === 1 && <div style={{ fontSize: '12px', color: '#7928CA' }}>每份算出来了，等于：{total} ÷ {safeDenominator} = {perPart}</div>}
-          {showResultPanel(step >= 2, `取其中的 ${numerator} 份: ${resultPart} ${unit}`)}
         </div>
       </div>
+
       <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={() => setStep(0)}>重置</button>
-        <button style={styles.btnAction} onClick={() => setStep((prev) => Math.min(2, prev + 1))}>
-          {buttonText || (step === 0 ? '第一步：求每份数' : '第二步：求几分之几')}
+        <button style={styles.btnReset} onClick={handleReset}>
+          重置
+        </button>
+        <button style={styles.btnAction} onClick={handleNextStep} disabled={currentStep === 'done'}>
+          {currentStep === 'done' ? '运算完成' : buttonText}
         </button>
       </div>
     </div>
@@ -3889,42 +3966,205 @@ export function CalcFracPart({
 }
 
 export function CalcFracRate({
+  type = 'frac_rate',
   total = 12,
-  part = 3,
-  numerator = 1,
-  denominator = 4,
+  part = 8,
+  numerator = 8,
+  denominator = 12,
   unit = '个',
-  buttonText = '求占比',
+  buttonText = '下一步',
 }: CalcFracRateProps) {
-  void unit
-  const [showStatus, setShowStatus] = useState(false)
-  const percent = total === 0 ? 0 : (part / total) * 100
-  void unit
+  void type
+
+  const safeTotal = Math.max(1, total)
+  const safeNumerator = Math.max(0, Math.min(numerator, safeTotal))
+  const safePart = Math.max(0, Math.min(part, safeTotal))
+
+  const getGCD = (a: number, b: number): number => (b === 0 ? Math.abs(a) : getGCD(b, a % b))
+
+  const gcd = useMemo(() => getGCD(safeNumerator, safeTotal), [safeNumerator, safeTotal])
+  const simpNumerator = useMemo(() => (gcd > 0 ? safeNumerator / gcd : safeNumerator), [safeNumerator, gcd])
+  const simpDenominator = useMemo(() => (gcd > 0 ? safeTotal / gcd : safeTotal), [safeTotal, gcd])
+
+  const [currentStep, setCurrentStep] = useState<'idle' | 'show_origin' | 'show_gcd_group' | 'do_reduce' | 'done'>('idle')
+
+  const handleNextStep = () => {
+    switch (currentStep) {
+      case 'idle':
+        setCurrentStep('show_origin')
+        break
+      case 'show_origin':
+        setCurrentStep(gcd > 1 ? 'show_gcd_group' : 'do_reduce')
+        break
+      case 'show_gcd_group':
+        setCurrentStep('do_reduce')
+        break
+      case 'do_reduce':
+        setCurrentStep('done')
+        break
+      default:
+        break
+    }
+  }
+
+  const handleReset = () => {
+    setCurrentStep('idle')
+  }
 
   return (
     <div style={styles.card}>
       <div style={styles.stage}>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-          <div style={{ width: '100%', height: '24px', background: '#eee', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
-            <div style={{ width: `${percent}%`, height: '100%', background: 'linear-gradient(90deg, #7928CA, #FF0080)', transition: 'width 0.5s' }} />
-            <div style={{ position: 'absolute', top: '4px', left: '8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>部分量: {part}</div>
-            <div style={{ position: 'absolute', top: '4px', right: '8px', fontSize: '11px', color: '#666' }}>总量: {total}</div>
-          </div>
-          {showStatus && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'jelly 0.4s ease' }}>
-              <div style={{ fontSize: '13px', color: '#666' }}>占比分数结果：</div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '4px 0' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#FF0080' }}>{numerator}</span>
-                <div style={{ width: '30px', height: '2px', background: '#171717', margin: '2px 0' }} />
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#7928CA' }}>{denominator}</span>
-              </div>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', overflow: 'visible' }}>
+          {currentStep === 'idle' && (
+            <div style={{ width: '100%', height: '24px', background: '#eee', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+              <div
+                style={{
+                  width: `${(safePart / safeTotal) * 100}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #7928CA, #FF0080)',
+                  transition: 'width 0.5s',
+                }}
+              />
+              <div style={{ position: 'absolute', top: '4px', left: '8px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>部分量: {safePart} {unit}</div>
+              <div style={{ position: 'absolute', top: '4px', right: '8px', fontSize: '11px', color: '#666' }}>总量: {safeTotal} {unit}</div>
             </div>
           )}
+
+          {(currentStep === 'show_origin' || currentStep === 'show_gcd_group') && (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  width: '100%',
+                  justifyContent: 'space-between',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#8b8b8b',
+                  padding: '0 4px',
+                }}
+              >
+                <span>部分量: {safeNumerator} {unit}</span>
+                <span>总量: {safeTotal} {unit}</span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  width: '100%',
+                  gap: '4px',
+                  alignItems: 'stretch',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
+              >
+                {Array.from({ length: safeTotal }).map((_, index) => {
+                  const isPart = index < safeNumerator
+                  const isGroupStart = currentStep === 'show_gcd_group' && gcd > 1 && index % gcd === 0
+                  return (
+                    <div
+                      key={`origin-${index}`}
+                      style={{
+                        position: 'relative',
+                        width: `calc((100% - ${(safeTotal - 1) * 4}px) / ${safeTotal})`,
+                        height: '46px',
+                        background: isPart ? '#0070F3' : '#EAEAEA',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isPart ? '#ffffff' : '#666666',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        overflow: 'visible',
+                      }}
+                    >
+                      {isGroupStart && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            left: '-2px',
+                            width: `calc(${gcd} * 100% + ${(gcd - 1) * 4}px + 4px)`,
+                            height: '58px',
+                            border: '4px dashed #7928CA',
+                            borderRadius: '12px',
+                            pointerEvents: 'none',
+                            zIndex: 10,
+                            boxShadow: '0 0 12px rgba(121, 40, 202, 0.2)',
+                            animation: 'fadeIn 0.4s ease forwards',
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {(currentStep === 'do_reduce' || currentStep === 'done') && (
+            <div
+              style={{
+                display: 'flex',
+                width: '100%',
+                gap: '16px',
+                alignItems: 'stretch',
+                justifyContent: 'center',
+                overflow: 'visible',
+              }}
+            >
+              {Array.from({ length: simpDenominator }).map((_, index) => {
+                const isPart = index < simpNumerator
+                return (
+                  <div
+                    key={`simp-${index}`}
+                    style={{
+                      width: `calc((100% - ${(simpDenominator - 1) * 16}px) / ${simpDenominator})`,
+                      height: '46px',
+                      background: isPart ? 'linear-gradient(135deg, #00DFD8 0%, #0070F3 100%)' : '#D5D5D5',
+                      color: isPart ? '#ffffff' : '#666666',
+                      boxShadow: isPart ? '0 4px 10px rgba(0,112,243,0.15)' : 'none',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    第 {index + 1} 组
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div
+            style={{
+              marginTop: '4px',
+              background: '#0070F3',
+              color: '#fff',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              transform: currentStep === 'done' ? 'scale(1)' : 'scale(0.8)',
+              opacity: currentStep === 'done' ? 1 : 0,
+              pointerEvents: 'none',
+            }}
+          >
+            约分最终占比: <span style={{ color: '#00DFD8', marginLeft: '6px' }}>{simpNumerator} / {simpDenominator}</span>
+          </div>
         </div>
       </div>
+
       <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={() => setShowStatus(false)}>重置</button>
-        <button style={styles.btnAction} onClick={() => setShowStatus(true)}>{buttonText}</button>
+        <button style={styles.btnReset} onClick={handleReset}>重置</button>
+        <button style={styles.btnAction} onClick={handleNextStep} disabled={currentStep === 'done'}>
+          {currentStep === 'done' ? '分析完成' : buttonText}
+        </button>
       </div>
     </div>
   )
@@ -4506,11 +4746,11 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
     return (
       <CalcFracPart
         total={typeof props.total === 'number' ? props.total : Number(props.total) || 12}
-        part={typeof props.part === 'number' ? props.part : Number(props.part) || 4}
-        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 3}
-        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 4}
+        part={typeof props.part === 'number' ? props.part : Number(props.part) || 8}
+        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 2}
+        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 3}
         unit={typeof props.unit === 'string' ? props.unit : '个'}
-        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '第一步：求每份数'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },
@@ -4522,11 +4762,11 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
     return (
       <CalcFracRate
         total={typeof props.total === 'number' ? props.total : Number(props.total) || 12}
-        part={typeof props.part === 'number' ? props.part : Number(props.part) || 3}
-        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 1}
-        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 4}
+        part={typeof props.part === 'number' ? props.part : Number(props.part) || 8}
+        numerator={typeof props.numerator === 'number' ? props.numerator : Number(props.numerator) || 8}
+        denominator={typeof props.denominator === 'number' ? props.denominator : Number(props.denominator) || 12}
         unit={typeof props.unit === 'string' ? props.unit : '个'}
-        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求占比'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },

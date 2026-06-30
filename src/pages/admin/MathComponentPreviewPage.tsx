@@ -21,6 +21,7 @@ export default function MathComponentPreviewPage() {
     { name: 'CalcAvgDiv', title: '用除法求平均数' },
     { name: 'CalcMultiSum', title: '用加法求各部分之和' },
     { name: 'TimeSubSpan', title: '求经过时间' },
+    { name: 'TimeSubPass', title: '求开始时刻' },
     { name: 'TimeAddPass', title: '求结束时刻' },
   ]
 
@@ -326,7 +327,7 @@ export default function MathComponentPreviewPage() {
                 numerator: 3,
                 denominator: 4,
                 unit: '个',
-                buttonText: '开始',
+                buttonText: '下一步',
               },
             }}
           />
@@ -365,7 +366,7 @@ export default function MathComponentPreviewPage() {
                 count: 3,
                 unit: '个',
                 totalLabel: '总量',
-                buttonText: '求平均数',
+                buttonText: '下一步',
               },
             }}
           />
@@ -400,9 +401,28 @@ export default function MathComponentPreviewPage() {
               props: {
                 startTime: '08:00',
                 endTime: '09:30',
-                pauseMinutes: 0,
+                pauseMinutes: 10,
                 durationMinutes: 90,
-                buttonText: '求经过时间',
+                buttonText: '下一步',
+              },
+            }}
+          />
+        )
+      case 'TimeSubPass':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '求开始时刻',
+              component: 'TimeSubPass',
+              math_object: '09:30，往前推 90 分钟',
+              visual_object: '时间轴倒推',
+              props: {
+                startTime: '08:00',
+                endTime: '09:30',
+                pauseMinutes: 10,
+                durationMinutes: 90,
+                buttonText: '下一步',
               },
             }}
           />
@@ -414,13 +434,14 @@ export default function MathComponentPreviewPage() {
               step: 1,
               type: '求结束时刻',
               component: 'TimeAddPass',
-              math_object: '08:00 + 90分钟',
+              math_object: '09:00 + 135分钟',
               visual_object: '时间推进',
               props: {
-                startTime: '08:00',
-                endTime: '09:30',
-                durationMinutes: 90,
-                buttonText: '求结束时刻',
+                startTime: '09:00',
+                endTime: '11:45',
+                pauseMinutes: 30,
+                durationMinutes: 135,
+                buttonText: '画一段时间',
               },
             }}
           />

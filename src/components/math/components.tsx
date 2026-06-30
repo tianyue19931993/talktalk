@@ -299,6 +299,22 @@ interface CalcFracPartProps {
   buttonText?: string
 }
 
+type CalcFracPartStep = 'idle' | 'divide' | 'multiply' | 'done'
+
+function normalizePositiveInteger(value: number | undefined, fallback: number, min = 1) {
+  const resolved = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback
+  return Math.max(min, resolved)
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function formatDisplayNumber(value: number) {
+  if (!Number.isFinite(value)) return '0'
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.00$/, '')
+}
+
 interface CalcFracRateProps {
   type?: string
   total?: number
@@ -334,6 +350,15 @@ interface TimeSubSpanProps {
 }
 
 interface TimeAddPassProps {
+  type?: string
+  startTime?: string
+  endTime?: string
+  pauseMinutes?: number
+  durationMinutes?: number
+  buttonText?: string
+}
+
+interface TimeSubPassProps {
   type?: string
   startTime?: string
   endTime?: string
@@ -3843,45 +3868,49 @@ export function CalcFracPart({
   buttonText = '下一步',
 }: CalcFracPartProps) {
   void type
-  const safeDenominator = Math.max(1, denominator)
-  const safeNumerator = Math.max(1, Math.min(numerator, safeDenominator))
-  const singleUnitValue = useMemo(() => total / safeDenominator, [total, safeDenominator])
-  const finalPart = Number.isFinite(part) ? part : singleUnitValue * safeNumerator
-  const [currentStep, setCurrentStep] = useState<'idle' | 'do_divide' | 'do_multiply' | 'done'>('idle')
+  const safeTotal = normalizePositiveInteger(total, 12)
+  const safeDenominator = normalizePositiveInteger(denominator, 3)
+  const safeNumerator = clampNumber(normalizePositiveInteger(numerator, 2), 1, safeDenominator)
+  const singleUnitValue = useMemo(() => safeTotal / safeDenominator, [safeTotal, safeDenominator])
+  const expectedPart = useMemo(() => singleUnitValue * safeNumerator, [singleUnitValue, safeNumerator])
+  const finalPart = Number.isFinite(part) ? part : expectedPart
+  const [currentStep, setCurrentStep] = useState<CalcFracPartStep>('idle')
+
+  useEffect(() => {
+    setCurrentStep('idle')
+  }, [safeTotal, safeDenominator, safeNumerator, finalPart, unit])
 
   const handleNextStep = () => {
-    switch (currentStep) {
-      case 'idle':
-        setCurrentStep('do_divide')
-        break
-      case 'do_divide':
-        setCurrentStep('do_multiply')
-        break
-      case 'do_multiply':
-        setCurrentStep('done')
-        break
-      default:
-        break
-    }
+    setCurrentStep((step) => {
+      switch (step) {
+        case 'idle':
+          return 'divide'
+        case 'divide':
+          return 'multiply'
+        case 'multiply':
+          return 'done'
+        default:
+          return step
+      }
+    })
   }
 
   const handleReset = () => {
     setCurrentStep('idle')
   }
 
-  useEffect(() => {
-    handleReset()
-  }, [total, part, numerator, denominator, unit])
+  const stageHint = {
+    idle: `先看总数 ${safeTotal} ${unit}`,
+    divide: `把总数平均分成 ${safeDenominator} 份`,
+    multiply: `取其中 ${safeNumerator} 份`,
+    done: '计算完成',
+  }[currentStep]
+
+  const showSegments = currentStep !== 'idle'
+  const showResult = currentStep === 'done'
 
   return (
     <div style={styles.card}>
-      <style>{`
-        @keyframes fracPartJelly {
-          0%, 100% { transform: translateX(-50%) scale(1, 1); }
-          30% { transform: translateX(-50%) scale(1.25, 0.75); }
-          50% { transform: translateX(-50%) scale(1.15, 0.85); }
-        }
-      `}</style>
       <div
         style={{
           ...styles.stage,
@@ -3891,17 +3920,50 @@ export function CalcFracPart({
           minHeight: '280px',
         }}
       >
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', overflow: 'visible' }}>
+        <div
+          style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            alignItems: 'center',
+            overflow: 'visible',
+          }}
+        >
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#7a7a7a' }}>{stageHint}</div>
+
           {currentStep === 'idle' && (
-            <div style={{ width: '100%', height: '52px', background: '#0070F3', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,112,243,0.15)' }}>
-              <span style={{ color: '#fff', fontSize: '15px', fontWeight: 'bold' }}>总数: {total} {unit}</span>
+            <div
+              style={{
+                width: '100%',
+                height: '52px',
+                background: '#0070F3',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(0,112,243,0.15)',
+              }}
+            >
+              <span style={{ color: '#fff', fontSize: '15px', fontWeight: 'bold' }}>
+                总数: {safeTotal} {unit}
+              </span>
             </div>
           )}
 
-          {(currentStep === 'do_divide' || currentStep === 'do_multiply' || currentStep === 'done') && (
-            <div style={{ display: 'flex', width: '100%', gap: '10px', justifyContent: 'center', alignItems: 'stretch', position: 'relative' }}>
+          {showSegments && (
+            <div
+              style={{
+                display: 'flex',
+                width: '100%',
+                gap: '10px',
+                justifyContent: 'center',
+                alignItems: 'stretch',
+                position: 'relative',
+              }}
+            >
               {Array.from({ length: safeDenominator }).map((_, index) => {
-                const isHighlighted = (currentStep === 'do_multiply' || currentStep === 'done') && index < safeNumerator
+                const isHighlighted = (currentStep === 'multiply' || currentStep === 'done') && index < safeNumerator
 
                 return (
                   <div
@@ -3915,14 +3977,14 @@ export function CalcFracPart({
                       justifyContent: 'center',
                       fontSize: '13px',
                       fontWeight: 'bold',
-                      transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      transition: 'all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       background: isHighlighted ? 'linear-gradient(135deg, #00DFD8 0%, #0070F3 100%)' : '#EAEAEA',
                       color: isHighlighted ? '#ffffff' : '#666666',
                       boxShadow: isHighlighted ? '0 4px 12px rgba(0,112,243,0.2)' : 'none',
-                      border: currentStep === 'do_divide' ? '2px solid #0070F3' : 'none',
+                      border: currentStep === 'divide' ? '2px solid #0070F3' : 'none',
                     }}
                   >
-                    {singleUnitValue} {unit}
+                    {formatDisplayNumber(singleUnitValue)} {unit}
                   </div>
                 )
               })}
@@ -3931,33 +3993,32 @@ export function CalcFracPart({
 
           <div
             style={{
-              position: 'absolute',
+              ...styles.badgeFinal,
+              top: 'auto',
               bottom: '-56px',
-              left: '50%',
-              transform: currentStep === 'done' ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.8)',
-              opacity: currentStep === 'done' ? 1 : 0,
-              whiteSpace: 'nowrap',
-              background: '#171717',
-              color: '#ffffff',
-              padding: '8px 24px',
-              borderRadius: '14px',
-              fontSize: '15px',
-              fontWeight: 900,
-              boxShadow: '0 8px 22px rgba(0,0,0,0.15)',
-              transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              zIndex: 10,
+              opacity: showResult ? 1 : 0,
+              transform: showResult ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.92)',
+              pointerEvents: 'none',
             }}
           >
-            部分量结果: <span style={{ color: '#00DFD8', marginLeft: '6px' }}>{part} {unit}</span>
+            部分量结果: <span style={{ color: '#00DFD8', marginLeft: '6px' }}>{formatDisplayNumber(finalPart)} {unit}</span>
+            <div style={{ marginTop: '2px', fontSize: '10px', fontWeight: 700, opacity: 0.7 }}>
+              {formatDisplayNumber(safeTotal)} ÷ {safeDenominator} × {safeNumerator} = {formatDisplayNumber(expectedPart)}
+            </div>
           </div>
         </div>
       </div>
 
       <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={handleReset}>
+        <button type="button" style={styles.btnReset} onClick={handleReset}>
           重置
         </button>
-        <button style={styles.btnAction} onClick={handleNextStep} disabled={currentStep === 'done'}>
+        <button
+          type="button"
+          style={styles.btnAction}
+          onClick={handleNextStep}
+          disabled={currentStep === 'done'}
+        >
           {currentStep === 'done' ? '运算完成' : buttonText}
         </button>
       </div>
@@ -3975,6 +4036,7 @@ export function CalcFracRate({
   buttonText = '下一步',
 }: CalcFracRateProps) {
   void type
+  void denominator
 
   const safeTotal = Math.max(1, total)
   const safeNumerator = Math.max(0, Math.min(numerator, safeTotal))
@@ -4175,41 +4237,147 @@ export function CalcAvgDiv({
   count = 3,
   unit = '个',
   totalLabel = '总量',
-  buttonText = '求平均数',
+  buttonText = '下一步',
 }: CalcAvgDivProps) {
-  const [isFlattened, setIsFlattened] = useState(false)
-  const safeCount = Math.max(1, count)
-  const average = total / safeCount
+  const safeCount = Math.max(1, Math.round(count))
+  const avgValue = useMemo(() => total / safeCount, [total, safeCount])
+  const [currentStep, setCurrentStep] = useState<'idle' | 'do_divide' | 'done'>('idle')
+
+  const handleNextStep = () => {
+    switch (currentStep) {
+      case 'idle':
+        setCurrentStep('do_divide')
+        break
+      case 'do_divide':
+        setCurrentStep('done')
+        break
+      default:
+        break
+    }
+  }
+
+  const handleReset = () => {
+    setCurrentStep('idle')
+  }
 
   return (
     <div style={styles.card}>
-      <div style={styles.stage}>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={styles.miniLabel}>{totalLabel || '总量'}: {total} 分配到 {safeCount} 个容器里</div>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {Array.from({ length: safeCount }).map((_, idx) => {
-              const currentHeight = isFlattened ? average * 8 : (idx === 0 ? average * 1.5 * 8 : average * 0.6 * 8)
-              return (
-                <div key={idx} style={{ width: '44px', height: '90px', border: '2px solid #666', borderRadius: '0 0 8px 8px', position: 'relative', display: 'flex', alignItems: 'flex-end', background: '#fff' }}>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '64px 24px',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center', overflow: 'visible' }}>
+          <div style={styles.miniLabel}>{totalLabel || '总量'}: {total} {unit} 平均分到 {safeCount} 个容器里</div>
+
+          {currentStep === 'idle' && (
+            <div
+              style={{
+                width: '100%',
+                height: '52px',
+                background: '#0070F3',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(0,112,243,0.15)',
+              }}
+            >
+              <div style={{
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+              }}>
+                <span style={styles.totalBarText}>
+                  {totalLabel || '总量'}: {total} {unit}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {(currentStep === 'do_divide' || currentStep === 'done') && (
+            <div
+              style={{
+                display: 'flex',
+                width: '100%',
+                height: '52px',
+                justifyContent: 'center',
+                alignItems: 'stretch',
+                gap: currentStep === 'done' ? '12px' : '4px',
+                position: 'relative',
+                zIndex: 2,
+                overflow: 'visible',
+              }}
+            >
+              {Array.from({ length: safeCount }).map((_, index) => {
+                return (
                   <div
+                    key={`avg-div-${index}`}
                     style={{
-                      width: '100%',
-                      height: `${Math.min(84, currentHeight)}px`,
-                      background: 'linear-gradient(0deg, #0070F3, #00DFD8)',
-                      transition: 'height 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
+                      flex: 1,
+                      minWidth: 0,
+                      height: '100%',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      background: currentStep === 'done'
+                        ? 'linear-gradient(135deg, #00DFD8 0%, #0070F3 100%)'
+                        : '#EAEAEA',
+                      color: currentStep === 'done' ? '#ffffff' : '#666666',
+                      boxShadow: currentStep === 'done' ? '0 4px 12px rgba(0,112,243,0.15)' : 'none',
                     }}
-                  />
-                  {isFlattened && <div style={{ position: 'absolute', width: '100%', top: '-20px', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', color: '#0070F3' }}>{average}</div>}
-                </div>
-              )
-            })}
+                  >
+                    {currentStep === 'done' ? `${avgValue} ${unit}` : `第 ${index + 1} 份`}
+                  </div>
+                )
+              })}
+
+              {currentStep === 'do_divide' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '-10px',
+                    bottom: '-10px',
+                    left: '-4px',
+                    right: '-4px',
+                    border: '3px dashed #FF0055',
+                    borderRadius: '12px',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                    boxShadow: '0 0 10px rgba(255, 0, 85, 0.15)',
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          <div
+            style={{
+              ...styles.badgeFinal,
+              opacity: currentStep === 'done' ? 1 : 0,
+              transform: currentStep === 'done' ? 'translateX(-50%) scale(1)' : 'translateX(-50%) scale(0.8)',
+            }}
+          >
+            平均数结果: <span style={{ color: '#00DFD8', marginLeft: '6px' }}>{avgValue} {unit}</span>
           </div>
-          {showResultPanel(isFlattened, `均分结果: ${average} ${unit}/份`)}
+
+          <div style={styles.btnRow}>
+            <button style={styles.btnReset} onClick={handleReset}>重置</button>
+            <button style={styles.btnAction} onClick={handleNextStep} disabled={currentStep === 'done'}>
+              {currentStep === 'done' ? '运算完成' : buttonText}
+            </button>
+          </div>
         </div>
-      </div>
-      <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={() => setIsFlattened(false)}>重置</button>
-        <button style={styles.btnAction} onClick={() => setIsFlattened(true)}>{buttonText}</button>
       </div>
     </div>
   )
@@ -4227,70 +4395,518 @@ export function CalcMultiSum({
 export function TimeSubSpan({
   startTime = '08:00',
   endTime = '09:30',
-  pauseMinutes = 0,
+  pauseMinutes = 10,
   durationMinutes = 90,
-  buttonText = '求经过时间',
+  buttonText = '下一步',
 }: TimeSubSpanProps) {
-  void pauseMinutes
-  const [showFlow, setShowFlow] = useState(false)
+  const parseToMin = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':').map((value) => Number(value))
+    return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0)
+  }
+
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60).toString().padStart(2, '0')
+    const mins = (minutes % 60).toString().padStart(2, '0')
+    return `${hours}:${mins}`
+  }
+
+  const startMin = useMemo(() => parseToMin(startTime), [startTime])
+  const endMin = useMemo(() => parseToMin(endTime), [endTime])
+  const timeSegments = useMemo(() => {
+    const segments: Array<{
+      startLabel: string
+      endLabel: string
+      duration: number
+      isFullHour: boolean
+    }> = []
+
+    let currentMin = startMin
+    while (currentMin < endMin) {
+      const nextMin = Math.min(currentMin + 60, endMin)
+      const duration = nextMin - currentMin
+      segments.push({
+        startLabel: formatTime(currentMin),
+        endLabel: formatTime(nextMin),
+        duration,
+        isFullHour: duration === 60,
+      })
+      currentMin = nextMin
+    }
+
+    return segments
+  }, [endMin, startMin])
+
+  const [visibleCount, setVisibleCount] = useState(0)
+  const [hasCutPause, setHasCutPause] = useState(false)
+
+  useEffect(() => {
+    setVisibleCount(0)
+    setHasCutPause(false)
+  }, [startTime, endTime, pauseMinutes, durationMinutes])
+
+  const handleNextSegment = () => {
+    setVisibleCount((prev) => Math.min(prev + 1, timeSegments.length))
+  }
+
+  const handleTogglePause = () => {
+    setHasCutPause((prev) => !prev)
+  }
+
+  const handleReset = () => {
+    setVisibleCount(0)
+    setHasCutPause(false)
+  }
 
   return (
     <div style={styles.card}>
-      <div style={styles.stage}>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '32px 24px',
+          justifyContent: 'space-between',
+        }}
+      >
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f5f5', padding: '8px 12px', borderRadius: '8px' }}>
-            <div>⏳ 起始: <strong style={{ color: '#7928CA' }}>{startTime}</strong></div>
-            <div style={{ fontSize: '12px', color: '#999' }}>──▶</div>
-            <div>🏁 结束: <strong style={{ color: '#FF0080' }}>{endTime}</strong></div>
+
+          <div style={styles.switchWrapper}>
+            <span style={styles.switchLabel}>这道题有需要扣除的休息/暂停时间吗？</span>
+            <button
+              type="button"
+              onClick={handleTogglePause}
+              style={{
+                ...styles.btnToggle,
+                backgroundColor: hasCutPause ? '#7928CA' : '#EAEAEA',
+                color: hasCutPause ? '#FFFFFF' : '#666666',
+              }}
+            >
+              {hasCutPause ? '🔴 需要扣除暂停' : '⚪ 不需要扣除'}
+            </button>
           </div>
-          {pauseMinutes > 0 && <div style={{ fontSize: '12px', color: '#666' }}>⚠️ 中途扣除（如暂停/休息）: {pauseMinutes} 分钟</div>}
-          {showFlow && (
-            <div style={{ background: '#E6F1FF', borderLeft: '4px solid #0070F3', padding: '8px 12px', borderRadius: '4px', animation: 'jelly 0.3s ease' }}>
-              计算算式：总时间轴长度 − 扣除时间
-            </div>
+
+          {visibleCount === 0 && (
+            <div style={styles.idleText}>点击下方按钮，开始画时间线段</div>
           )}
-          {showResultPanel(showFlow, `纯经过时间: ${durationMinutes} 分钟`)}
+
+          <div style={styles.segmentListContainer}>
+            {timeSegments.slice(0, visibleCount).map((segment, index) => {
+              const isLastSegment = index === timeSegments.length - 1
+
+              return (
+                <div key={`time-sub-span-${index}`} style={styles.segmentRow}>
+                  <span style={styles.timeLabel}>{segment.startLabel}</span>
+
+                  <div style={styles.trackBase}>
+                    <div
+                      style={{
+                        ...styles.fillBar,
+                        width: `${(segment.duration / 60) * 100}%`,
+                        background: segment.isFullHour
+                          ? 'linear-gradient(90deg, #10B981 0%, #059669 100%)'
+                          : 'linear-gradient(90deg, #0070F3 0%, #00DFD8 100%)',
+                      }}
+                    >
+                      <span style={styles.barText}>
+                        {segment.isFullHour ? '满 1 小时' : `${segment.duration} 分钟`}
+                      </span>
+
+                      {isLastSegment && hasCutPause && pauseMinutes > 0 && (
+                        <div
+                          style={{
+                            ...styles.pauseOverlayBlock,
+                            width: `${Math.min(100, (pauseMinutes / Math.max(1, segment.duration)) * 100)}%`,
+                          }}
+                        >
+                          {`-${pauseMinutes}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <span style={styles.timeLabel}>{segment.endLabel}</span>
+                </div>
+              )
+            })}
+          </div>
+
         </div>
       </div>
-      <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={() => setShowFlow(false)}>重置</button>
-        <button style={styles.btnAction} onClick={() => setShowFlow(true)}>{buttonText}</button>
+
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={handleReset}>重置</button>
+          <button
+            style={styles.btnAction}
+            onClick={handleNextSegment}
+            disabled={visibleCount === timeSegments.length}
+          >
+            {visibleCount === timeSegments.length ? '线段绘制完' : buttonText}
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
 export function TimeAddPass({
-  startTime = '08:00',
-  endTime = '09:30',
-  durationMinutes = 90,
-  buttonText = '求结束时刻',
+  type = 'time_add_pass',
+  startTime = '09:00',
+  endTime = '11:45',
+  pauseMinutes = 30,
+  durationMinutes = 135,
+  buttonText = '画一段时间',
 }: TimeAddPassProps) {
-  const [showTarget, setShowTarget] = useState(false)
+  void type
+  void endTime
+
+  const parseToMin = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':').map((value) => Number(value))
+    return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0)
+  }
+
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60).toString().padStart(2, '0')
+    const mins = (minutes % 60).toString().padStart(2, '0')
+    return `${hours}:${mins}`
+  }
+
+  const startMin = useMemo(() => parseToMin(startTime), [startTime])
+
+  const [visibleCount, setVisibleCount] = useState<number>(0)
+  const [hasAddPause, setHasAddPause] = useState<boolean>(false)
+
+  const durationSegments = useMemo(() => {
+    const list: Array<{
+      type: 'duration' | 'pause'
+      startLabel: string
+      endLabel: string
+      duration: number
+      isFullHour: boolean
+    }> = []
+
+    let remMinutes = durationMinutes
+    let currentRunningMin = startMin
+
+    while (remMinutes > 0) {
+      const stepMinutes = Math.min(60, remMinutes)
+      const nextMin = currentRunningMin + stepMinutes
+      list.push({
+        type: 'duration',
+        startLabel: formatTime(currentRunningMin),
+        endLabel: formatTime(nextMin),
+        duration: stepMinutes,
+        isFullHour: stepMinutes === 60,
+      })
+      currentRunningMin = nextMin
+      remMinutes -= stepMinutes
+    }
+
+    return list
+  }, [durationMinutes, startMin])
+
+  const segments = useMemo(() => {
+    if (!hasAddPause) {
+      return durationSegments
+    }
+
+    return [
+      ...durationSegments,
+      {
+        type: 'pause' as const,
+        startLabel: formatTime(startMin + durationMinutes),
+        endLabel: formatTime(startMin + durationMinutes + pauseMinutes),
+        duration: pauseMinutes,
+        isFullHour: false,
+      },
+    ]
+  }, [durationMinutes, durationSegments, hasAddPause, pauseMinutes, startMin])
+
+  useEffect(() => {
+    setVisibleCount(0)
+    setHasAddPause(false)
+  }, [startTime, endTime, pauseMinutes, durationMinutes])
+
+  const handleNextSegment = () => {
+    if (visibleCount < segments.length) {
+      setVisibleCount((prev) => prev + 1)
+    }
+  }
+
+  const handleTogglePause = () => {
+    setHasAddPause((prev) => {
+      const nextState = !prev
+      if (nextState) {
+        setVisibleCount((current) =>
+          Math.max(current, durationSegments.length + (pauseMinutes > 0 ? 1 : 0)),
+        )
+      } else {
+        setVisibleCount((current) => Math.min(current, durationSegments.length))
+      }
+      return nextState
+    })
+  }
+
+  const handleReset = () => {
+    setVisibleCount(0)
+    setHasAddPause(false)
+  }
 
   return (
     <div style={styles.card}>
-      <div style={styles.stage}>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '32px 24px',
+          justifyContent: 'space-between',
+        }}
+      >
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px solid #7928CA' }}>
-            <div style={{ fontSize: '13px', color: '#666' }}>起始时刻</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#7928CA' }}>{startTime}</div>
+
+          <div style={styles.switchWrapper}>
+            <span style={styles.switchLabel}>需要把中间停下来没动(休息)的时间也加上吗?</span>
+            <button
+              onClick={handleTogglePause}
+              style={{
+                ...styles.btnToggle,
+                backgroundColor: hasAddPause ? '#7928CA' : '#EAEAEA',
+                color: hasAddPause ? '#FFFFFF' : '#666666',
+              }}
+            >
+              {hasAddPause ? '需要加上' : '不需要加上'}
+            </button>
           </div>
-          <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px dashed #0070F3' }}>
-            <div style={{ fontSize: '13px', color: '#666' }}>向后顺延（经过时间）</div>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0070F3' }}>+ {durationMinutes} 分钟</div>
-          </div>
-          {showTarget && (
-            <div style={{ position: 'relative', paddingLeft: '16px', borderLeft: '3px solid #FF0080', animation: 'jelly 0.4s ease' }}>
-              <div style={{ fontSize: '13px', color: '#666' }}>精准到达时刻</div>
-              <div style={{ fontSize: '20px', fontWeight: '900', color: '#FF0080' }}>🏁 {endTime}</div>
-            </div>
+
+          {visibleCount === 0 && (
+            <div style={styles.idleText}>点击下方按钮，开始画出经过的时间线段</div>
           )}
+
+          <div style={styles.segmentListContainer}>
+            {segments.slice(0, visibleCount).map((segment, index) => {
+              const widthPercent = (segment.duration / 60) * 100
+
+              let bgGradient = 'linear-gradient(90deg, #0070F3 0%, #00DFD8 100%)'
+              let textLabel = `增加 ${segment.duration} 分钟`
+
+              if (segment.type === 'duration' && segment.isFullHour) {
+                bgGradient = 'linear-gradient(90deg, #10B981 0%, #059669 100%)'
+                textLabel = '增加 1 小时'
+              } else if (segment.type === 'pause') {
+                bgGradient = 'linear-gradient(90deg, #7928CA 0%, #A855F7 100%)'
+                textLabel = `加上休息 ${segment.duration} 分钟`
+              }
+
+              return (
+                <div key={`add-seg-${index}`} style={styles.segmentRow}>
+                  <span style={styles.timeLabel}>{segment.startLabel}</span>
+
+                  <div style={styles.trackBase}>
+                    <div
+                      style={{
+                        ...styles.fillBar,
+                        width: `${widthPercent}%`,
+                        background: bgGradient,
+                      }}
+                    >
+                      <span style={styles.barText}>{textLabel}</span>
+                    </div>
+                  </div>
+
+                  <span style={styles.timeLabel}>{segment.endLabel}</span>
+                </div>
+              )
+            })}
+          </div>
+
         </div>
       </div>
-      <div style={styles.btnRow}>
-        <button style={styles.btnReset} onClick={() => setShowTarget(false)}>重置</button>
-        <button style={styles.btnAction} onClick={() => setShowTarget(true)}>{buttonText}</button>
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={handleReset}>重置</button>
+          <button
+            style={styles.btnAction}
+            onClick={handleNextSegment}
+            disabled={visibleCount === segments.length}
+          >
+            {visibleCount === segments.length ? '线段绘制完' : buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface TimeSubPassStep {
+  fromMin: number
+  toMin: number
+  leftPercent: number
+  rightPercent: number
+}
+
+export function TimeSubPass({
+  type = 'TimeSubPass',
+  startTime = '08:00',
+  endTime = '09:30',
+  pauseMinutes = 10,
+  durationMinutes = 90,
+  buttonText = '下一步',
+}: TimeSubPassProps) {
+  void type
+  void startTime
+  void pauseMinutes
+
+  const timeToMin = (str: string): number => {
+    if (!str) return 0
+    const [h, m] = str.split(':').map(Number)
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0)
+  }
+
+  const minToTime = (min: number): string => {
+    const h = Math.floor(min / 60).toString().padStart(2, '0')
+    const m = (min % 60).toString().padStart(2, '0')
+    return `${h}:${m}`
+  }
+
+  const endMin = useMemo(() => timeToMin(endTime), [endTime])
+  const minStartAnchor = endMin - durationMinutes
+  const [steps, setSteps] = useState<TimeSubPassStep[]>([])
+  const [visibleCount, setVisibleCount] = useState<number>(0)
+
+  useEffect(() => {
+    if (!endTime || !durationMinutes) {
+      setSteps([])
+      setVisibleCount(0)
+      return
+    }
+
+    const generatedSteps: TimeSubPassStep[] = []
+    let remMinutes = durationMinutes
+    let currentMin = endMin
+
+    while (remMinutes > 0) {
+      const chunk = Math.min(60, remMinutes)
+      const prevMin = currentMin - chunk
+
+      const rightPercent = ((endMin - currentMin) / durationMinutes) * 100
+      const leftPercent = ((prevMin - minStartAnchor) / durationMinutes) * 100
+
+      generatedSteps.push({
+        fromMin: currentMin,
+        toMin: prevMin,
+        leftPercent,
+        rightPercent: 100 - rightPercent,
+      })
+
+      currentMin = prevMin
+      remMinutes -= chunk
+    }
+
+    setSteps(generatedSteps)
+    setVisibleCount(0)
+  }, [durationMinutes, endMin, endTime, minStartAnchor])
+
+  const handleNextStep = () => {
+    if (visibleCount < steps.length) {
+      setVisibleCount((prev) => prev + 1)
+    }
+  }
+
+  const handleReset = () => {
+    setVisibleCount(0)
+  }
+
+  return (
+    <div style={{ ...styles.uiCard, maxWidth: '640px' }}>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '24px',
+          minHeight: '240px',
+          justifyContent: 'space-between',
+          alignItems: 'stretch',
+        }}
+      >
+        <div style={styles.timeAxisShell}>
+          <div style={styles.axisLine} />
+
+          <svg style={styles.braceSvgLayer} viewBox="0 0 1000 56" preserveAspectRatio="none">
+            {steps.slice(0, visibleCount).map((step, idx) => {
+              const xLeft = step.leftPercent * 10
+              const xRight = step.rightPercent * 10
+              const xMid = ((step.leftPercent + step.rightPercent) / 2) * 10
+
+              const pathData = `
+                M ${xLeft} 50
+                Q ${xLeft} 25, ${xLeft + 12} 25
+                L ${xMid - 12} 25
+                Q ${xMid} 25, ${xMid} 6
+                Q ${xMid} 25, ${xMid + 12} 25
+                L ${xRight - 12} 25
+                Q ${xRight} 25, ${xRight} 50
+              `
+
+              return (
+                <path
+                  key={`time-sub-pass-brace-${idx}`}
+                  d={pathData}
+                  fill="none"
+                  stroke="#0070F3"
+                  strokeWidth="2"
+                  strokeDasharray="5,4"
+                  strokeLinecap="round"
+                />
+              )
+            })}
+          </svg>
+
+          <div style={styles.pointsContainer}>
+            <div style={{ ...styles.timeNode, left: '100%', transform: 'translateX(-100%)' }}>
+              <span style={styles.timeAxisLabel}>{endTime}</span>
+            </div>
+
+            {steps.map((step, idx) => {
+              const isFinalStartNode = idx === steps.length - 1
+              const isRevealed = idx < visibleCount
+
+              let timeStr = minToTime(step.toMin)
+              let isUnknown = false
+
+              if (!isRevealed) {
+                if (isFinalStartNode && visibleCount === 0) {
+                  timeStr = '??:??'
+                  isUnknown = true
+                } else {
+                  return null
+                }
+              }
+
+              return (
+                <div key={`time-sub-pass-node-${idx}`} style={{ ...styles.timeNode, left: `${step.leftPercent}%` }}>
+                  <span style={{ ...styles.timeAxisLabel, ...(isUnknown ? styles.unknownLabel : {}) }}>
+                    {timeStr}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+      </div>
+
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={handleReset}>
+            重置
+          </button>
+          <button
+            style={styles.btnAction}
+            onClick={handleNextStep}
+            disabled={visibleCount >= steps.length}
+          >
+            {visibleCount >= steps.length ? '推算完成' : buttonText}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -4353,6 +4969,160 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
+  },
+  timeAxisShell: {
+    position: 'relative',
+    width: '100%',
+    height: '120px',
+    marginTop: '20px',
+  },
+  axisLine: {
+    position: 'absolute',
+    left: '40px',
+    right: '40px',
+    top: '60px',
+    height: '4px',
+    backgroundColor: '#0070F3',
+    borderRadius: '2px',
+  },
+  braceSvgLayer: {
+    position: 'absolute',
+    left: '40px',
+    right: '40px',
+    top: 0,
+    height: '56px',
+    width: 'calc(100% - 80px)',
+    pointerEvents: 'none',
+    overflow: 'visible',
+  },
+  pointsContainer: {
+    position: 'absolute',
+    left: '40px',
+    right: '40px',
+    top: 0,
+    height: '120px',
+  },
+  timeNode: {
+    position: 'absolute',
+    top: '72px',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  timeAxisLabel: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#333333',
+    fontFamily: 'monospace',
+    whiteSpace: 'nowrap',
+  },
+  unknownLabel: {
+    color: '#9CA3AF',
+    letterSpacing: '0.08em',
+  },
+  miniLabel: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#666666',
+    lineHeight: 1.4,
+  },
+  segmentListContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    width: '100%',
+  },
+  idleText: {
+    color: '#999999',
+    fontSize: '14px',
+    textAlign: 'center',
+    padding: '30px 0 12px',
+  },
+  timeSummaryTrack: {
+    width: '100%',
+    height: '18px',
+    backgroundColor: '#EAEAEA',
+    borderRadius: '999px',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  timeSummaryFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #0070F3 0%, #00DFD8 100%)',
+    borderRadius: '999px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    transition: 'width 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    overflow: 'hidden',
+  },
+  timeSummaryCutTail: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #7928CA 0%, #FF0080 100%)',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '11px',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+  },
+  segmentRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    width: '100%',
+  },
+  timeLabel: {
+    width: '52px',
+    flexShrink: 0,
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#333333',
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
+  trackBase: {
+    flex: 1,
+    height: '36px',
+    backgroundColor: '#F5F5F5',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  fillBar: {
+    height: '100%',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: '12px',
+    boxSizing: 'border-box',
+    position: 'relative',
+    overflow: 'hidden',
+    transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+  },
+  barText: {
+    color: '#ffffff',
+    fontSize: '12px',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    textShadow: '0 1px 2px rgba(0,0,0,0.12)',
+  },
+  pauseOverlayBlock: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    background: 'linear-gradient(90deg, rgba(121,40,202,0.85) 0%, rgba(255,0,128,0.95) 100%)',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
   },
   interactionZone: {
     position: 'relative',
@@ -4449,6 +5219,34 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: '12px',
     transform: 'scale(1)',
   },
+  badgeFinal: {
+    position: 'absolute',
+    bottom: '-56px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    whiteSpace: 'nowrap',
+    background: '#171717',
+    color: '#ffffff',
+    padding: '8px 24px',
+    borderRadius: '14px',
+    fontSize: '15px',
+    fontWeight: 900,
+    boxShadow: '0 8px 22px rgba(0,0,0,0.15)',
+    transition: 'all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    zIndex: 10,
+  },
+  subHint: {
+    marginLeft: '8px',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#A0A0A0',
+  },
+  controlPanel: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+  },
   btnRow: {
     display: 'flex',
     justifyContent: 'flex-start',
@@ -4476,6 +5274,26 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: '#0070F3',
     color: '#ffffff',
+  },
+  switchWrapper: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  switchLabel: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#666666',
+  },
+  btnToggle: {
+    padding: '10px 16px',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    border: 'none',
+    transition: 'all 0.2s',
+    alignSelf: 'flex-start',
   },
 }
 
@@ -4781,7 +5599,7 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
         count={typeof props.count === 'number' ? props.count : Number(props.count) || 3}
         unit={typeof props.unit === 'string' ? props.unit : '个'}
         totalLabel={typeof props.totalLabel === 'string' ? props.totalLabel : '总量'}
-        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求平均数'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },
@@ -4801,6 +5619,22 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
       />
     )
   },
+  TimeSubPass: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <TimeSubPass
+        type={typeof props.type === 'string' ? props.type : 'TimeSubPass'}
+        startTime={typeof props.startTime === 'string' ? props.startTime : '08:00'}
+        endTime={typeof props.endTime === 'string' ? props.endTime : '09:30'}
+        pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 10}
+        durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 90}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
+      />
+    )
+  },
   TimeSubSpan: ({ block }) => {
     const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
       ? (block.props as Record<string, unknown>)
@@ -4813,7 +5647,7 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
         endTime={typeof props.endTime === 'string' ? props.endTime : '09:30'}
         pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 0}
         durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 90}
-        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求经过时间'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },
@@ -4825,11 +5659,11 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
     return (
       <TimeAddPass
         type={typeof props.type === 'string' ? props.type : 'TimeAddPass'}
-        startTime={typeof props.startTime === 'string' ? props.startTime : '08:00'}
-        endTime={typeof props.endTime === 'string' ? props.endTime : '09:30'}
-        pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 0}
-        durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 90}
-        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求结束时刻'}
+        startTime={typeof props.startTime === 'string' ? props.startTime : '09:00'}
+        endTime={typeof props.endTime === 'string' ? props.endTime : '11:45'}
+        pauseMinutes={typeof props.pauseMinutes === 'number' ? props.pauseMinutes : Number(props.pauseMinutes) || 30}
+        durationMinutes={typeof props.durationMinutes === 'number' ? props.durationMinutes : Number(props.durationMinutes) || 135}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '画一段时间'}
       />
     )
   },

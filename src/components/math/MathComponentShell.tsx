@@ -32,7 +32,7 @@ export function MathComponentShell({
           onClick={() => setActive((value) => !value)}
           className="inline-flex h-10 items-center justify-center rounded-[12px] border border-[#0070F3] bg-[#0070F3] px-5 text-sm font-medium text-white"
         >
-          {buttonLabel || '开始'}
+          {buttonLabel || '下一步'}
         </button>
       </div>
     </div>

@@ -12,6 +12,87 @@ function safeText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function stripJsonComments(text) {
+  const input = safeText(text)
+  if (!input) return ''
+
+  let output = ''
+  let inString = false
+  let stringQuote = ''
+
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i]
+    const nextChar = input[i + 1]
+
+    if (inString) {
+      output += char
+      if (char === '\\') {
+        i += 1
+        if (i < input.length) {
+          output += input[i]
+        }
+        continue
+      }
+      if (char === stringQuote) {
+        inString = false
+        stringQuote = ''
+      }
+      continue
+    }
+
+    if (char === '"' || char === '\'') {
+      inString = true
+      stringQuote = char
+      output += char
+      continue
+    }
+
+    if (char === '/' && nextChar === '/') {
+      while (i < input.length && input[i] !== '\n') {
+        i += 1
+      }
+      if (i < input.length) {
+        output += '\n'
+      }
+      continue
+    }
+
+    if (char === '/' && nextChar === '*') {
+      i += 2
+      while (i < input.length - 1 && !(input[i] === '*' && input[i + 1] === '/')) {
+        i += 1
+      }
+      i += 1
+      continue
+    }
+
+    output += char
+  }
+
+  return output
+}
+
+function parseJsonText(value, fallback = null) {
+  if (value && typeof value === 'object') {
+    return value
+  }
+  const text = safeText(value)
+  if (!text) return fallback
+  try {
+    return JSON.parse(text)
+  } catch {
+    const stripped = stripJsonComments(text)
+    if (!stripped || stripped === text) {
+      return fallback
+    }
+    try {
+      return JSON.parse(stripped)
+    } catch {
+      return fallback
+    }
+  }
+}
+
 async function getCurrentUser(authHeader) {
   const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -55,7 +136,7 @@ async function getLogicTypes() {
     .map((row) => ({
       name: safeText(row?.name),
       mathComponent: safeText(row?.math_component),
-      componentProps: safeText(row?.component_props),
+      componentProps: row?.component_props ?? null,
     }))
     .filter((item) => item.name && item.mathComponent)
 
@@ -105,8 +186,14 @@ function parseComponentPropKeys(componentPropsText) {
 }
 
 function buildPrompt(configValue, questionText, context = {}) {
+  let promptValue = configValue
+  if (context.jsonSchema !== undefined) {
+    const schemaText = JSON.stringify(context.jsonSchema, null, 2)
+    promptValue = promptValue.replaceAll('{{json_schema}}', schemaText)
+  }
+
   const sections = [
-    configValue,
+    promptValue,
     '',
     '题目原文：',
     questionText,
@@ -125,18 +212,22 @@ function buildPrompt(configValue, questionText, context = {}) {
   }
 
   if (context.logicTypes) {
-    sections.push('', 'logic_types 表候选列表：', JSON.stringify(context.logicTypes, null, 2))
-    sections.push('', '允许的 type 值（只能从下面选择，必须原样返回）：', context.logicTypes.map((item) => item.name).join(' | '))
-    sections.push('', '每个 logic_type 对应的 component_props（必须严格遵守，props 的 key 只能来自这里）：', JSON.stringify(
-      context.logicTypes.map((item) => ({
-        name: item.name,
-        math_component: item.mathComponent,
-        component_props: item.componentProps,
-        component_props_keys: item.componentPropsKeys,
-      })),
-      null,
-      2,
-    ))
+    sections.push(
+      '',
+      'logic_types 表候选列表（只需要用于选择最匹配的类型，不要输出这些内容）：',
+      JSON.stringify(
+        context.logicTypes.map((item) => ({
+          name: item.name,
+          math_component: item.mathComponent,
+        })),
+        null,
+        2,
+      ),
+    )
+    sections.push(
+      '',
+      '要求：从候选中选择 1 个最匹配的 logic_type.name，并输出它对应的 logic_type.math_component 到 component 字段。',
+    )
   }
 
   sections.push('', '要求：只输出 JSON，不要输出 markdown、解释或多余文本。')
@@ -164,38 +255,16 @@ async function runAnalysisStep({
 
 function normalizeLogicAnalysis(result, logicTypes) {
   const blocks = Array.isArray(result?.logic_blocks) ? result.logic_blocks : []
-  const byName = new Map(logicTypes.map((item) => [item.name, item]))
   const byComponent = new Map(logicTypes.map((item) => [item.mathComponent, item]))
   const normalizedBlocks = blocks
     .map((block) => {
-      const rawType = safeText(block?.type)
       const rawComponent = safeText(block?.component)
-      const matched = byName.get(rawType) || byComponent.get(rawComponent)
-      const rawProps = block && typeof block === 'object' && !Array.isArray(block) ? block.props : undefined
-      let props = {}
-
-      if (rawProps && typeof rawProps === 'object' && !Array.isArray(rawProps)) {
-        props = rawProps
-      } else if (typeof rawProps === 'string') {
-        try {
-          const parsed = JSON.parse(rawProps)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            props = parsed
-          }
-        } catch {
-          const parsed = parseComponentPropKeys(rawProps)
-          if (parsed.length > 0) {
-            props = Object.fromEntries(parsed.map((key) => [key, null]))
-          }
-        }
-      }
+      const matched = byComponent.get(rawComponent)
 
       if (matched) {
         return {
-          ...block,
-          type: matched.name,
           component: matched.mathComponent,
-          props,
+          math_object: safeText(block?.math_object),
         }
       }
 
@@ -210,8 +279,7 @@ function normalizeLogicAnalysis(result, logicTypes) {
 }
 
 function validateLogicAnalysis(logicAnalysis, logicTypes) {
-  const allowed = new Set(logicTypes.map((item) => item.name))
-  const byName = new Map(logicTypes.map((item) => [item.name, item]))
+  const allowedComponents = new Set(logicTypes.map((item) => item.mathComponent))
   const blocks = Array.isArray(logicAnalysis?.logic_blocks) ? logicAnalysis.logic_blocks : []
   if (blocks.length === 0) {
     return {
@@ -223,59 +291,27 @@ function validateLogicAnalysis(logicAnalysis, logicTypes) {
 
   for (let index = 0; index < blocks.length; index += 1) {
     const block = blocks[index]
-    const type = safeText(block?.type)
-    if (!allowed.has(type)) {
+    const component = safeText(block?.component)
+    if (!allowedComponents.has(component)) {
       return {
         ok: false,
-        kind: 'type',
+        kind: 'component',
         index,
         step: block?.step ?? index + 1,
-        type,
-        message: `第 ${block?.step ?? index + 1} 步的 type 非法：${type || '空'}`,
+        component,
+        message: `第 ${block?.step ?? index + 1} 步的 component 非法：${component || '空'}`,
       }
     }
 
-    const matched = byName.get(type)
-    const expectedKeys = parseComponentPropKeys(matched?.componentProps)
-    const props = block?.props
-    if (expectedKeys.length === 0) {
-      if (props && typeof props === 'object' && !Array.isArray(props)) continue
+    const mathObject = safeText(block?.math_object)
+    if (!mathObject) {
       return {
         ok: false,
-        kind: 'props',
+        kind: 'math_object',
         index,
         step: block?.step ?? index + 1,
-        type,
-        expectedKeys,
-        actualKeys: [],
-        message: `第 ${block?.step ?? index + 1} 步的 props 不是对象`,
-      }
-    }
-
-    if (!props || typeof props !== 'object' || Array.isArray(props)) {
-      return {
-        ok: false,
-        kind: 'props',
-        index,
-        step: block?.step ?? index + 1,
-        type,
-        expectedKeys,
-        actualKeys: [],
-        message: `第 ${block?.step ?? index + 1} 步的 props 不是对象`,
-      }
-    }
-
-    const actualKeys = Object.keys(props)
-    if (actualKeys.length !== expectedKeys.length || !expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(props, key))) {
-      return {
-        ok: false,
-        kind: 'props',
-        index,
-        step: block?.step ?? index + 1,
-        type,
-        expectedKeys,
-        actualKeys,
-        message: `第 ${block?.step ?? index + 1} 步的 props 字段不匹配`,
+        component,
+        message: `第 ${block?.step ?? index + 1} 步的 math_object 不能为空`,
       }
     }
   }
@@ -283,6 +319,26 @@ function validateLogicAnalysis(logicAnalysis, logicTypes) {
   return {
     ok: true,
   }
+}
+
+function getComponentSchemaFromLogicAnalysis(logicAnalysisJson, logicTypes) {
+  const blocks = Array.isArray(logicAnalysisJson?.logic_blocks) ? logicAnalysisJson.logic_blocks : []
+  const componentName = safeText(blocks.map((block) => block?.component).find((item) => safeText(item)))
+  if (!componentName) {
+    throw new Error('logic_analysis_json 中没有可用的 component，无法生成 component_analysis')
+  }
+
+  const matched = logicTypes.find((item) => item.mathComponent === componentName)
+  if (!matched) {
+    throw new Error(`logic_types 中找不到 component = ${componentName} 对应的配置`)
+  }
+
+  const schema = parseJsonText(matched.componentProps)
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    throw new Error(`logic_types.${componentName} 的 component_props 不是合法 JSON 对象`)
+  }
+
+  return schema
 }
 
 async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes) {
@@ -297,8 +353,8 @@ async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes
         context: {
           mathAnalysisJson,
           logicTypes: logicTypes.map((item) => ({
-            ...item,
-            componentPropsKeys: parseComponentPropKeys(item.componentProps),
+            name: item.name,
+            mathComponent: item.mathComponent,
           })),
         },
       })
@@ -464,6 +520,7 @@ export default async (req, res) => {
         mathAnalysisJson,
         logicAnalysisJson,
         tutorAnalysisJson,
+        jsonSchema: getComponentSchemaFromLogicAnalysis(logicAnalysisJson, logicTypes),
       },
     })
     await updateWhere('user_questions', { id: question.id }, {

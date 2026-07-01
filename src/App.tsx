@@ -23,6 +23,7 @@ import UserQuestionManagePage from './pages/admin/UserQuestionManagePage'
 import ConfigsManagePage from './pages/admin/ConfigsManagePage'
 import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
 import MathComponentPreviewPage from './pages/admin/MathComponentPreviewPage'
+import UniversalTapeMatrixLabPage from './pages/admin/UniversalTapeMatrixLabPage'
 import MathBlockTestPage from './pages/admin/MathBlockTestPage'
 
 export default function App() {
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="configs" element={<ConfigsManagePage />} />
         <Route path="component-preview" element={<ComponentPreviewPage />} />
         <Route path="math-components" element={<MathComponentPreviewPage />} />
+        <Route path="universal-tape-matrix-lab" element={<UniversalTapeMatrixLabPage />} />
         <Route path="math-block-test" element={<MathBlockTestPage />} />
       </Route>
 

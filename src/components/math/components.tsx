@@ -367,6 +367,23 @@ interface TimeSubPassProps {
   buttonText?: string
 }
 
+interface UnitConvProps {
+  type?: 'UnitConvTime' | 'UnitConvLen' | 'UnitConvArea' | 'UnitConvWeight' | string
+  fromUnit?: string
+  toUnit?: string
+  value?: number
+  rate?: number
+  buttonText?: string
+}
+
+interface PointSegProps {
+  totalLength?: number
+  spacing?: number
+  lengthUnit?: string
+  segments?: number
+  buttonText?: string
+}
+
 export function CalcTotalMul({
   count = 4,
   perValue = 10,
@@ -4912,6 +4929,393 @@ export function TimeSubPass({
   )
 }
 
+export function UnitConv({
+  type = 'UnitConvLen',
+  fromUnit = '米',
+  toUnit = '厘米',
+  value = 3,
+  rate = 100,
+  buttonText = '下一步',
+}: UnitConvProps) {
+  void type
+
+  const [currentStep, setCurrentStep] = useState<number>(0)
+  const finalResult = value * rate
+
+  const handleNextStep = () => {
+    if (currentStep < 2) {
+      setCurrentStep((prev) => prev + 1)
+    }
+  }
+
+  const handleReset = () => {
+    setCurrentStep(0)
+  }
+
+  const getStatusText = () => {
+    if (currentStep === 0) {
+      return (
+        <>
+          想一想：从 <b>{fromUnit}</b> 换算到 <b>{toUnit}</b> 需要怎么计算？
+        </>
+      )
+    }
+
+    if (currentStep === 1) {
+      return (
+        <>
+          发现规律：高级单位化低级单位，要乘它们之间的进率 <b>{rate}</b>。
+        </>
+      )
+    }
+
+    return (
+      <>
+        挑战成功！计算结果：
+        <span style={{ color: '#10B981' }}>{value} {fromUnit} = {finalResult} {toUnit}</span>
+      </>
+    )
+  }
+
+  return (
+    <div style={styles.uiCard}>
+      <div style={styles.stage}>
+        <div style={styles.unitConvDisplay}>
+          <div style={styles.unitConvBox}>
+            {value}
+            <span style={styles.unitConvName}>{fromUnit}</span>
+          </div>
+
+          <div style={styles.unitConvArrow}>
+            <div
+              style={{
+                ...styles.unitConvRateBadge,
+                ...(currentStep >= 1 ? styles.unitConvRateBadgeShow : {}),
+              }}
+            >
+              × {rate}
+            </div>
+            <div style={styles.unitConvArrowLine} />
+          </div>
+
+          <div style={styles.unitConvBox}>
+            {currentStep === 2 ? (
+              <span style={{ ...styles.unitConvPlaceholder, ...styles.unitConvPlaceholderResolved }}>
+                {finalResult}
+              </span>
+            ) : (
+              <span style={styles.unitConvPlaceholder}>?</span>
+            )}
+            <span style={styles.unitConvName}>{toUnit}</span>
+          </div>
+        </div>
+
+        <div style={styles.badgeFinal}>{getStatusText()}</div>
+      </div>
+
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={handleReset}>
+            重置
+          </button>
+          <button
+            style={styles.btnAction}
+            onClick={handleNextStep}
+            disabled={currentStep === 2}
+          >
+            {currentStep === 2 ? '完成' : buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type PointSegShapeType = 'unclosed' | 'closed' | null
+type PointSegSideType = 'single' | 'double' | null
+type PointSegRuleType = 'both' | 'neither' | 'one' | 'loop' | null
+
+export function PointSeg({
+  totalLength = 20,
+  spacing = 5,
+  lengthUnit = '米',
+  segments = 4,
+  buttonText = '下一步',
+}: PointSegProps) {
+  const [isLoop, setIsLoop] = useState<PointSegShapeType>('unclosed')
+  const [isDoubleSide, setIsDoubleSide] = useState<PointSegSideType>('double')
+  const [endpointRule, setEndpointRule] = useState<PointSegRuleType>('both')
+  const [currentStep, setCurrentStep] = useState<number>(0)
+  const loopSize = 240
+  const loopCenter = loopSize / 2
+
+  const shouldPlantAtNode = (
+    index: number,
+    totalSegments: number,
+    shape: PointSegShapeType,
+    rule: PointSegRuleType,
+  ) => {
+    if (shape === 'closed') {
+      return index < totalSegments
+    }
+    if (rule === 'both') return true
+    if (rule === 'neither') return index > 0 && index < totalSegments
+    if (rule === 'one') return index > 0
+    return false
+  }
+
+  const handleShapeChange = (shape: 'unclosed' | 'closed') => {
+    setIsLoop(shape)
+    if (shape === 'closed') {
+      setEndpointRule('loop')
+    } else {
+      setEndpointRule(null)
+    }
+    setCurrentStep(0)
+  }
+
+  const handleSideChange = (side: 'single' | 'double') => {
+    setIsDoubleSide(side)
+    setCurrentStep(0)
+  }
+
+  const handleRuleChange = (rule: 'both' | 'neither' | 'one') => {
+    setEndpointRule(rule)
+    setCurrentStep(0)
+  }
+
+  const isReady = isLoop !== null && isDoubleSide !== null && endpointRule !== null
+
+  const getLoopPoint = (radius: number, angleDeg: number) => {
+    const rad = ((angleDeg - 90) * Math.PI) / 180
+    return {
+      left: loopCenter + Math.cos(rad) * radius,
+      top: loopCenter + Math.sin(rad) * radius,
+    }
+  }
+
+  return (
+    <div style={styles.uiCard}>
+      <div style={styles.stage}>
+        <div style={styles.pointSegConfigPanel}>
+          <div style={styles.pointSegConfigRow}>
+            <div style={styles.pointSegConfigLabel}>形态：</div>
+            <div style={styles.pointSegBtnGroup}>
+              <button
+                style={{ ...styles.pointSegToggleBtn, ...(isLoop === 'unclosed' ? styles.pointSegActiveBtn : {}) }}
+                onClick={() => handleShapeChange('unclosed')}
+              >
+                非封闭
+              </button>
+              <button
+                style={{ ...styles.pointSegToggleBtn, ...(isLoop === 'closed' ? styles.pointSegActiveBtn : {}) }}
+                onClick={() => handleShapeChange('closed')}
+              >
+                封闭
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.pointSegConfigRow}>
+            <div style={styles.pointSegConfigLabel}>单双侧：</div>
+            <div style={styles.pointSegBtnGroup}>
+              <button
+                style={{ ...styles.pointSegToggleBtn, ...(isDoubleSide === 'double' ? styles.pointSegActiveBtn : {}) }}
+                onClick={() => handleSideChange('double')}
+              >
+                双侧
+              </button>
+              <button
+                style={{ ...styles.pointSegToggleBtn, ...(isDoubleSide === 'single' ? styles.pointSegActiveBtn : {}) }}
+                onClick={() => handleSideChange('single')}
+              >
+                单侧
+              </button>
+            </div>
+          </div>
+
+          <div style={styles.pointSegConfigRow}>
+            <div style={styles.pointSegConfigLabel}>要求：</div>
+            <div style={styles.pointSegBtnGroup}>
+              <button
+                disabled={isLoop === 'closed'}
+                style={{
+                  ...styles.pointSegToggleBtn,
+                  ...(endpointRule === 'both' ? styles.pointSegActiveBtn : {}),
+                  ...(isLoop === 'closed' ? styles.pointSegDisabledBtn : {}),
+                }}
+                onClick={() => handleRuleChange('both')}
+              >
+                两端都要
+              </button>
+              <button
+                disabled={isLoop === 'closed'}
+                style={{
+                  ...styles.pointSegToggleBtn,
+                  ...(endpointRule === 'neither' ? styles.pointSegActiveBtn : {}),
+                  ...(isLoop === 'closed' ? styles.pointSegDisabledBtn : {}),
+                }}
+                onClick={() => handleRuleChange('neither')}
+              >
+                两端都不要
+              </button>
+              <button
+                disabled={isLoop === 'closed'}
+                style={{
+                  ...styles.pointSegToggleBtn,
+                  ...(endpointRule === 'one' ? styles.pointSegActiveBtn : {}),
+                  ...(isLoop === 'closed' ? styles.pointSegDisabledBtn : {}),
+                }}
+                onClick={() => handleRuleChange('one')}
+              >
+                只要一端
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.pointSegStageCard}>
+          <div style={styles.pointSegStageInner}>
+            <div style={styles.pointSegFormula}>
+              <div style={styles.pointSegFormulaItem}>总长度: {totalLength} {lengthUnit}</div>
+              <div style={styles.pointSegFormulaItem}>间隔距离: {spacing} {lengthUnit}</div>
+              <div
+                style={{
+                  ...styles.pointSegFormulaItem,
+                  ...(currentStep >= 1 && isReady ? styles.pointSegFormulaHighlight : {}),
+                }}
+              >
+                {currentStep >= 1 && isReady ? `基础段数 = ${segments} 段` : '基础段数 = ?'}
+              </div>
+            </div>
+
+            <div style={styles.pointSegRoadEnvironment}>
+              {isReady && isLoop === 'unclosed' && (
+                <div style={styles.pointSegStraightLine}>
+                  <div style={styles.pointSegStraightRoadBase} />
+                  {Array.from({ length: segments + 1 }).map((_, index) => {
+                    const hasTree = shouldPlantAtNode(index, segments, isLoop, endpointRule)
+                    return (
+                      <div key={index} style={{ ...styles.pointSegStraightNode, left: `${(index / segments) * 100}%` }}>
+                        <div
+                          style={{
+                            ...styles.pointSegFlagMarker,
+                            ...styles.pointSegStraightFlag,
+                            opacity: currentStep >= 1 ? 1 : 0,
+                          }}
+                        />
+                        {hasTree && (
+                          <>
+                            <span
+                              style={{
+                                ...styles.pointSegTreeUnit,
+                                bottom: 'calc(50% + 12px)',
+                                transform: `scale(${currentStep === 2 ? 1 : 0}) translateX(-50%)`,
+                                transformOrigin: 'bottom center',
+                              }}
+                            >
+                              🌳
+                            </span>
+                            {isDoubleSide === 'double' && (
+                              <span
+                                style={{
+                                  ...styles.pointSegTreeUnit,
+                                  top: 'calc(50% + 12px)',
+                                  transform: `scale(${currentStep === 2 ? 1 : 0}) translateX(-50%)`,
+                                  transformOrigin: 'top center',
+                                }}
+                              >
+                                🌳
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {isReady && isLoop === 'closed' && (
+                <div style={styles.pointSegLoopCircle}>
+                  {Array.from({ length: segments }).map((_, index) => {
+                    const angleDeg = (index / segments) * 360
+                    const loopAngle = angleDeg - 90
+                    const hasTree = shouldPlantAtNode(index, segments, isLoop, endpointRule)
+                    const markerPoint = getLoopPoint(loopCenter, loopAngle)
+                    const outerTreePoint = getLoopPoint(loopCenter + 10, loopAngle)
+                    const innerTreePoint = getLoopPoint(loopCenter - 42, loopAngle)
+                    return (
+                      <div key={index} style={styles.pointSegLoopNode}>
+                        <div
+                          style={{
+                            ...styles.pointSegLoopDot,
+                            left: `${markerPoint.left}px`,
+                            top: `${markerPoint.top}px`,
+                            opacity: currentStep >= 1 ? 1 : 0,
+                          }}
+                        />
+                        {hasTree && (
+                          <>
+                            <span
+                              style={{
+                                ...styles.pointSegTreeUnit,
+                                left: `${outerTreePoint.left}px`,
+                                top: `${outerTreePoint.top}px`,
+                                transform: `translate(-50%, -50%) scale(${currentStep === 2 ? 1 : 0})`,
+                              }}
+                            >
+                              🌳
+                            </span>
+                            {isDoubleSide === 'double' && (
+                              <span
+                                style={{
+                                  ...styles.pointSegTreeUnit,
+                                  left: `${innerTreePoint.left}px`,
+                                  top: `${innerTreePoint.top}px`,
+                                  transform: `translate(-50%, -50%) scale(${currentStep === 2 ? 1 : 0})`,
+                                }}
+                              >
+                                🌳
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        <div style={styles.controlPanel}>
+          <button
+            style={styles.btnReset}
+            onClick={() => {
+              setIsLoop('unclosed')
+              setIsDoubleSide('double')
+              setEndpointRule('both')
+              setCurrentStep(0)
+            }}
+          >
+            重置
+          </button>
+          <button
+            style={styles.btnAction}
+            disabled={!isReady || currentStep === 2}
+            onClick={() => currentStep < 2 && setCurrentStep((prev) => prev + 1)}
+          >
+            {currentStep === 2 ? '完成' : buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const showResultPanel = (visible: boolean, text: string) => {
   return (
     <div
@@ -4969,6 +5373,237 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
+  },
+  pointSegConfigPanel: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  pointSegConfigRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+  },
+  pointSegConfigLabel: {
+    minWidth: '60px',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#666666',
+  },
+  pointSegBtnGroup: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  pointSegToggleBtn: {
+    padding: '9px 14px',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    border: '1px solid #e5e5e5',
+    background: '#f5f5f5',
+    color: '#525252',
+    transition: 'all 0.2s',
+  },
+  pointSegActiveBtn: {
+    borderColor: '#0070F3',
+    background: '#E0F2FE',
+    color: '#0070F3',
+  },
+  pointSegDisabledBtn: {
+    opacity: 0.45,
+    cursor: 'not-allowed',
+  },
+  pointSegStageCard: {
+    width: '100%',
+    borderRadius: '16px',
+    border: '1px solid #e5e5e5',
+    background: '#FFFFFF',
+    padding: '24px',
+    boxSizing: 'border-box',
+  },
+  pointSegStageInner: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '18px',
+    position: 'relative',
+  },
+  pointSegFormula: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    alignItems: 'center',
+  },
+  pointSegFormulaItem: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#666666',
+    lineHeight: 1.4,
+  },
+  pointSegFormulaHighlight: {
+    color: '#0070F3',
+    fontWeight: 800,
+  },
+  pointSegRoadEnvironment: {
+    position: 'relative',
+    width: '100%',
+    minHeight: '280px',
+    marginTop: '6px',
+  },
+  pointSegStraightLine: {
+    position: 'relative',
+    width: '100%',
+    minHeight: '220px',
+    marginTop: '34px',
+  },
+  pointSegStraightRoadBase: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    height: '4px',
+    transform: 'translateY(-50%)',
+    borderRadius: '999px',
+    background: 'linear-gradient(90deg, #0070F3 0%, #00DFD8 100%)',
+    boxShadow: '0 4px 14px rgba(0,112,243,0.12)',
+  },
+  pointSegStraightNode: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    transform: 'translateX(-50%)',
+  },
+  pointSegFlagMarker: {
+    position: 'absolute',
+    width: '2px',
+    height: '26px',
+    background: '#0070F3',
+    left: '50%',
+    top: '50%',
+    transformOrigin: 'center bottom',
+    transform: 'translateX(-50%) translateY(-50%)',
+    transition: 'opacity 0.25s ease',
+  },
+  pointSegLoopDot: {
+    position: 'absolute',
+    width: '8px',
+    height: '8px',
+    borderRadius: '999px',
+    background: '#0070F3',
+    boxShadow: '0 0 0 3px rgba(0,112,243,0.12)',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    transition: 'opacity 0.25s ease',
+  },
+  pointSegStraightFlag: {
+    top: '50%',
+  },
+  pointSegTreeUnit: {
+    position: 'absolute',
+    left: '50%',
+    fontSize: '28px',
+    lineHeight: 1,
+    userSelect: 'none',
+    transition: 'transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+  },
+  pointSegLoopCircle: {
+    position: 'relative',
+    width: '240px',
+    height: '240px',
+    margin: '48px auto 0',
+    borderRadius: '50%',
+    border: '2px dashed #DCEBFF',
+    background: 'radial-gradient(circle at center, #F8FBFF 0%, #FFFFFF 70%)',
+    overflow: 'visible',
+  },
+  pointSegLoopNode: {
+    position: 'absolute',
+    inset: 0,
+    transformOrigin: 'center center',
+    pointerEvents: 'none',
+  },
+  unitConvDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    marginTop: '20px',
+    position: 'relative',
+  },
+  unitConvBox: {
+    display: 'inline-flex',
+    alignItems: 'baseline',
+    gap: '4px',
+    fontSize: '32px',
+    fontWeight: 'bold',
+    color: '#171717',
+    fontFamily: 'monospace',
+  },
+  unitConvName: {
+    fontSize: '18px',
+    color: '#4D4D4D',
+    fontWeight: 'normal',
+    marginLeft: '2px',
+  },
+  unitConvPlaceholder: {
+    display: 'inline-block',
+    width: '80px',
+    height: '46px',
+    border: '2px dashed #EF4444',
+    backgroundColor: '#FFF5F5',
+    borderRadius: '8px',
+    color: '#EF4444',
+    textAlign: 'center',
+    lineHeight: '40px',
+    fontSize: '24px',
+    fontWeight: 900,
+  },
+  unitConvPlaceholderResolved: {
+    border: '2px solid #10B981',
+    backgroundColor: '#ECFDF5',
+    color: '#10B981',
+    width: 'auto',
+    padding: '0 12px',
+  },
+  unitConvArrow: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '120px',
+    position: 'relative',
+  },
+  unitConvArrowLine: {
+    width: '100%',
+    height: '2px',
+    backgroundColor: '#e5e5e5',
+    position: 'relative',
+    marginTop: '14px',
+  },
+  unitConvRateBadge: {
+    backgroundColor: '#F3F4F6',
+    color: '#4D4D4D',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    padding: '3px 10px',
+    borderRadius: '20px',
+    border: '1px solid #e5e5e5',
+    transform: 'scale(0)',
+    opacity: 0,
+    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+  },
+  unitConvRateBadgeShow: {
+    transform: 'scale(1)',
+    opacity: 1,
+    backgroundColor: '#E0F2FE',
+    color: '#0070F3',
+    borderColor: '#BAE6FD',
   },
   timeAxisShell: {
     position: 'relative',
@@ -5616,6 +6251,37 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
         unit={typeof props.unit === 'string' ? props.unit : '个'}
         labels={rawLabels.map((value) => (typeof value === 'string' ? value : String(value || '')))}
         buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求总数'}
+      />
+    )
+  },
+  PointSeg: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <PointSeg
+        totalLength={typeof props.totalLength === 'number' ? props.totalLength : Number(props.totalLength) || 20}
+        spacing={typeof props.spacing === 'number' ? props.spacing : Number(props.spacing) || 5}
+        lengthUnit={typeof props.lengthUnit === 'string' ? props.lengthUnit : '米'}
+        segments={typeof props.segments === 'number' ? props.segments : Number(props.segments) || 4}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
+      />
+    )
+  },
+  UnitConv: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <UnitConv
+        type={typeof props.type === 'string' ? props.type : 'UnitConvLen'}
+        fromUnit={typeof props.fromUnit === 'string' ? props.fromUnit : '米'}
+        toUnit={typeof props.toUnit === 'string' ? props.toUnit : '厘米'}
+        value={typeof props.value === 'number' ? props.value : Number(props.value) || 3}
+        rate={typeof props.rate === 'number' ? props.rate : Number(props.rate) || 100}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },

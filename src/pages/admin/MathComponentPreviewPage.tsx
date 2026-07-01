@@ -20,6 +20,8 @@ export default function MathComponentPreviewPage() {
     { name: 'CalcFracRate', title: '用除法求占比' },
     { name: 'CalcAvgDiv', title: '用除法求平均数' },
     { name: 'CalcMultiSum', title: '用加法求各部分之和' },
+    { name: 'PointSeg', title: '点位分段：马路种树' },
+    { name: 'UnitConv', title: '单位换算：乘进率求结果' },
     { name: 'TimeSubSpan', title: '求经过时间' },
     { name: 'TimeSubPass', title: '求开始时刻' },
     { name: 'TimeAddPass', title: '求结束时刻' },
@@ -385,6 +387,45 @@ export default function MathComponentPreviewPage() {
                 unit: '个',
                 labels: ['A', 'B', 'C'],
                 buttonText: '求总数',
+              },
+            }}
+          />
+        )
+      case 'PointSeg':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '点位分段',
+              component: 'PointSeg',
+              math_object: '20米长的路，每隔5米种树',
+              visual_object: '马路种树',
+              props: {
+                totalLength: 20,
+                spacing: 5,
+                lengthUnit: '米',
+                segments: 4,
+                buttonText: '下一步',
+              },
+            }}
+          />
+        )
+      case 'UnitConv':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '单位换算',
+              component: 'UnitConv',
+              math_object: '3米=多少厘米',
+              visual_object: '长度单位换算',
+              props: {
+                type: 'UnitConvLen',
+                fromUnit: '米',
+                toUnit: '厘米',
+                value: 3,
+                rate: 100,
+                buttonText: '下一步',
               },
             }}
           />

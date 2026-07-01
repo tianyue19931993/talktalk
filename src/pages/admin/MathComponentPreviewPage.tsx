@@ -20,6 +20,9 @@ export default function MathComponentPreviewPage() {
     { name: 'CalcFracRate', title: '用除法求占比' },
     { name: 'CalcAvgDiv', title: '用除法求平均数' },
     { name: 'CalcMultiSum', title: '用加法求各部分之和' },
+    { name: 'DiffQtyFixLab', title: '差值定份：求固定物重量' },
+    { name: 'GeometryLab', title: '几何图形：求周长/面积' },
+    { name: 'CycleLab', title: '周期分组：找规律' },
     { name: 'PointSeg', title: '点位分段：马路种树' },
     { name: 'UnitConv', title: '单位换算：乘进率求结果' },
     { name: 'TimeSubSpan', title: '求经过时间' },
@@ -387,6 +390,64 @@ export default function MathComponentPreviewPage() {
                 unit: '个',
                 labels: ['A', 'B', 'C'],
                 buttonText: '求总数',
+              },
+            }}
+          />
+        )
+      case 'DiffQtyFixLab':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '差值定份',
+              component: 'DiffQtyFixLab',
+              math_object: '两组条件找固定物重量',
+              visual_object: '重量差值',
+              props: {
+                stateA_count: 4,
+                stateA_total: 520,
+                stateB_count: 6,
+                stateB_total: 680,
+                unit: '克',
+                itemUnit: '杯',
+                itemName: '水',
+                fixedName: '空瓶',
+              },
+            }}
+          />
+        )
+      case 'GeometryLab':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '几何图形',
+              component: 'GeometryLab',
+              math_object: '长方形求周长和面积',
+              visual_object: '平面几何',
+              props: {
+                shape: 'Rect',
+                params: [6, 4],
+                unit: 'cm',
+                buttonText: '下一步',
+              },
+            }}
+          />
+        )
+      case 'CycleLab':
+        return (
+          <MathComponentRenderer
+            block={{
+              step: 1,
+              type: '周期分组',
+              component: 'CycleLab',
+              math_object: '第14个对应第几组',
+              visual_object: '周期排布',
+              props: {
+                targetN: 14,
+                cycleLength: 3,
+                cycleItems: ['🔴', '🟩', '🟩'],
+                buttonText: '下一步',
               },
             }}
           />

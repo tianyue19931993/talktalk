@@ -340,6 +340,34 @@ interface CalcMultiSumProps {
   buttonText?: string
 }
 
+interface DiffQtyFixLabProps {
+  stateA_count: number
+  stateA_total: number
+  stateB_count: number
+  stateB_total: number
+  unit?: string
+  itemUnit?: string
+  itemName?: string
+  fixedName?: string
+  onFinish?: () => void
+}
+
+interface CycleLabProps {
+  type?: string
+  targetN?: number
+  cycleLength?: number
+  cycleItems?: string[]
+  buttonText?: string
+}
+
+interface GeometryLabProps {
+  type?: string
+  shape: 'Rect' | 'Square' | 'Parallelogram' | 'Triangle' | 'Trapezoid'
+  params: number[]
+  unit?: string
+  buttonText?: string
+}
+
 interface TimeSubSpanProps {
   type?: string
   startTime?: string
@@ -5031,6 +5059,391 @@ export function UnitConv({
   )
 }
 
+export function CycleLab({
+  type = 'CycleLab',
+  targetN = 14,
+  cycleLength = 3,
+  cycleItems = ['🔴', '🟩', '🟩'],
+  buttonText = '下一步',
+}: CycleLabProps) {
+  void type
+
+  const [currentStep, setCurrentStep] = useState<number>(0)
+  const safeCycleLength = Math.max(1, cycleLength)
+  const fullCycles = Math.floor(targetN / safeCycleLength)
+  const remainder = targetN % safeCycleLength
+  const normalizedItems = cycleItems.length > 0 ? cycleItems : ['🔴', '🟩', '🟩']
+  const sampleCycles = currentStep === 0 ? 1 : fullCycles
+
+  let globalIndex = 1
+
+  const handleNextStep = () => {
+    if (currentStep < 1) {
+      setCurrentStep((prev) => prev + 1)
+    }
+  }
+
+  const handleReset = () => {
+    setCurrentStep(0)
+  }
+
+  return (
+    <div style={{ ...styles.card, maxWidth: '720px' }}>
+      <div
+        style={{
+          ...styles.stage,
+          overflow: 'visible',
+          padding: '24px',
+          minHeight: '240px',
+          justifyContent: 'space-between',
+          alignItems: 'stretch',
+        }}
+      >
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={styles.cycleLabFormula}>
+            <div style={styles.cycleLabFormulaItem}>目标位置 N = {targetN}</div>
+            <div style={styles.cycleLabFormulaItem}>周期长度 = {safeCycleLength}</div>
+            <div
+              style={{
+                ...styles.cycleLabFormulaItem,
+                ...(currentStep === 1 ? styles.cycleLabFormulaHighlight : {}),
+              }}
+            >
+              {currentStep === 1 ? `算式：${targetN} ÷ ${safeCycleLength} = ${fullCycles} 组 …… ${remainder} 个` : '算式 = ?'}
+            </div>
+          </div>
+
+          <div style={styles.cycleLabEnvironment}>
+            {Array.from({ length: sampleCycles }).map((_, cycleIdx) => (
+              <div key={`cycle-lab-group-${cycleIdx}`} style={styles.cycleLabGroupCard}>
+                <div style={styles.cycleLabGroupLabel}>第 {cycleIdx + 1} 组</div>
+                <div style={styles.cycleLabItemsRow}>
+                  {normalizedItems.map((item, itemIdx) => {
+                    const currentIndex = globalIndex
+                    globalIndex += 1
+                    return (
+                      <div key={`cycle-lab-item-${cycleIdx}-${itemIdx}`} style={styles.cycleLabItemBox}>
+                        <div style={styles.cycleLabItemUnit}>{item}</div>
+                        <div style={styles.cycleLabItemIndex}>{currentIndex}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {currentStep === 1 && remainder > 0 && (
+              <div style={{ ...styles.cycleLabGroupCard, ...styles.cycleLabRemainderGroupCard }}>
+                <div style={{ ...styles.cycleLabGroupLabel, color: '#EF4444' }}>余数部分</div>
+                <div style={styles.cycleLabItemsRow}>
+                  {normalizedItems.slice(0, remainder).map((item, itemIdx) => {
+                    const currentIndex = globalIndex
+                    globalIndex += 1
+                    return (
+                      <div key={`cycle-lab-remainder-${itemIdx}`} style={styles.cycleLabItemBox}>
+                        <div style={styles.cycleLabItemUnit}>{item}</div>
+                        <div style={{ ...styles.cycleLabItemIndex, ...styles.cycleLabRemainderIndex }}>
+                          {currentIndex}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={handleReset}>
+            重置
+          </button>
+          <button style={styles.btnAction} onClick={handleNextStep} disabled={currentStep === 1}>
+            {currentStep === 1 ? '完成' : buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function GeometryLab({
+  type = 'GeometryLab',
+  shape,
+  params,
+  unit = 'cm',
+  buttonText = '下一步',
+}: GeometryLabProps) {
+  void type
+
+  const [exploreMode, setExploreMode] = useState<'none' | 'perimeter' | 'area'>('none')
+
+  const scale = 25
+  const centerX = 150
+  const centerY = 100
+
+  const hasHeightField = useMemo(
+    () => ['Parallelogram', 'Triangle', 'Trapezoid'].includes(shape),
+    [shape],
+  )
+
+  useEffect(() => {
+    setExploreMode('none')
+  }, [shape, params])
+
+  const geoData = useMemo(() => {
+    let points: Array<[number, number]> = []
+    let labels: Array<{ x: number; y: number; val: string; isHeight?: boolean }> = []
+    let heightLine = { show: false, x1: 0, y1: 0, x2: 0, y2: 0, txt: '' }
+
+    if (!params || params.length === 0) return { pointsStr: '', labels, heightLine }
+
+    switch (shape) {
+      case 'Rect': {
+        const w = (params[0] || 6) * scale
+        const h = (params[1] || 4) * scale
+        const x = centerX - w / 2
+        const y = centerY - h / 2
+        points = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
+        labels = [
+          { x: x + w / 2, y: y - 8, val: `${params[0]} ${unit}` },
+          { x: x - 24, y: y + h / 2 + 4, val: `${params[1]} ${unit}` },
+        ]
+        break
+      }
+      case 'Square': {
+        const side = (params[0] || 5) * scale
+        const x = centerX - side / 2
+        const y = centerY - side / 2
+        points = [[x, y], [x + side, y], [x + side, y + side], [x, y + side]]
+        labels = [{ x: x + side / 2, y: y - 8, val: `${params[0]} ${unit}` }]
+        break
+      }
+      case 'Parallelogram': {
+        const b = (params[0] || 6) * scale
+        const h = (params[1] || 4) * scale
+        const s = (params[2] || 5) * scale
+        const offset = Math.sqrt(s * s - h * h) || 0
+        const x = centerX - (b + offset) / 2
+        const y = centerY - h / 2
+        points = [[x + offset, y], [x + offset + b, y], [x + b, y + h], [x, y + h]]
+        labels = [
+          { x: x + offset + b / 2, y: y - 8, val: `${params[0]} ${unit} (底)` },
+          { x: x + b + offset / 2 + 14, y: y + h / 2, val: `${params[2]} ${unit}` },
+        ]
+        heightLine = {
+          show: true,
+          x1: x + offset,
+          y1: y,
+          x2: x + offset,
+          y2: y + h,
+          txt: `高 ${params[1]} ${unit}`,
+        }
+        break
+      }
+      case 'Triangle': {
+        const b = (params[0] || 6) * scale
+        const h = (params[1] || 4) * scale
+        const x = centerX - b / 2
+        const y = centerY - h / 2
+        points = [[centerX, y], [x + b, y + h], [x, y + h]]
+        labels = [
+          { x: centerX, y: y + h + 16, val: `${params[0]} ${unit} (底)` },
+          { x: x - 14, y: y + h / 2 + 8, val: `${params[2] || ''} ${unit}` },
+          { x: x + b + 14, y: y + h / 2 + 8, val: `${params[3] || ''} ${unit}` },
+        ]
+        heightLine = {
+          show: true,
+          x1: centerX,
+          y1: y,
+          x2: centerX,
+          y2: y + h,
+          txt: `高 ${params[1]} ${unit}`,
+        }
+        break
+      }
+      case 'Trapezoid': {
+        const top = (params[0] || 3) * scale
+        const bot = (params[1] || 7) * scale
+        const h = (params[2] || 4) * scale
+        const x = centerX - bot / 2
+        const y = centerY - h / 2
+        const offset = (bot - top) / 2
+        points = [[x + offset, y], [x + offset + top, y], [x + bot, y + h], [x, y + h]]
+        labels = [
+          { x: centerX, y: y - 8, val: `${params[0]} ${unit} (上底)` },
+          { x: centerX, y: y + h + 16, val: `${params[1]} ${unit} (下底)` },
+          { x: x + offset / 2 - 14, y: y + h / 2 + 4, val: `${params[3] || ''} ${unit}` },
+          { x: x + bot - offset / 2 + 14, y: y + h / 2 + 4, val: `${params[4] || ''} ${unit}` },
+        ]
+        heightLine = {
+          show: true,
+          x1: x + offset,
+          y1: y,
+          x2: x + offset,
+          y2: y + h,
+          txt: `高 ${params[2]} ${unit}`,
+        }
+        break
+      }
+    }
+
+    const pointsStr = points.map((point) => point.join(',')).join(' ')
+
+    if (heightLine.show && hasHeightField) {
+      labels.push({
+        x: heightLine.x1 + 24,
+        y: heightLine.y1 + (heightLine.y2 - heightLine.y1) / 2 + 4,
+        val: heightLine.txt,
+        isHeight: true,
+      })
+    }
+
+    return { pointsStr, labels, heightLine }
+  }, [hasHeightField, params, shape, unit])
+
+  const formulaText = useMemo(() => {
+    if (exploreMode === 'none') return '想一想：我们要探索这个图形的什么呢？'
+
+    const p = params
+    if (exploreMode === 'perimeter') {
+      switch (shape) {
+        case 'Rect':
+          return `长方形周长 = (长 + 宽) × 2 = (${p[0]} + ${p[1]}) × 2 = ${(p[0] + p[1]) * 2} ${unit}`
+        case 'Square':
+          return `正方形周长 = 边长 × 4 = ${p[0]} × 4 = ${p[0] * 4} ${unit}`
+        case 'Parallelogram':
+          return `平行四边形周长 = (底 + 斜边) × 2 = (${p[0]} + ${p[2]}) × 2 = ${(p[0] + p[2]) * 2} ${unit}`
+        case 'Triangle':
+          return `三角形周长 = 三边相加 = ${p[0]} + ${p[2]} + ${p[3]} = ${p[0] + p[2] + p[3]} ${unit}`
+        case 'Trapezoid':
+          return `梯形周长 = 四周边缘相加 = ${p[0]} + ${p[1]} + ${p[3]} + ${p[4]} = ${p[0] + p[1] + p[3] + p[4]} ${unit}`
+      }
+    } else {
+      switch (shape) {
+        case 'Rect':
+          return `长方形面积 = 长 × 宽 = ${p[0]} × ${p[1]} = ${p[0] * p[1]} ${unit}²`
+        case 'Square':
+          return `正方形面积 = 边长 × 边长 = ${p[0]} × ${p[0]} = ${p[0] * p[0]} ${unit}²`
+        case 'Parallelogram':
+          return `平行四边形面积 = 底 × 高 = ${p[0]} × ${p[1]} = ${p[0] * p[1]} ${unit}²`
+        case 'Triangle':
+          return `三角形面积 = 底 × 高 ÷ 2 = ${p[0]} × ${p[1]} ÷ 2 = ${(p[0] * p[1]) / 2} ${unit}²`
+        case 'Trapezoid':
+          return `梯形面积 = (上底 + 下底) × 高 ÷ 2 = (${p[0]} + ${p[1]}) × ${p[2]} ÷ 2 = ${((p[0] + p[1]) * p[2]) / 2} ${unit}²`
+      }
+    }
+  }, [exploreMode, params, shape, unit])
+
+  const showHeightLineNow = hasHeightField && exploreMode === 'area'
+
+  return (
+    <div style={styles.geometryLabContainer}>
+      <div style={styles.geometryLabStageCard}>
+        <div style={styles.geometryLabMathFormula}>
+          <div style={styles.geometryLabFormulaItem(exploreMode)}>
+            {formulaText}
+          </div>
+        </div>
+
+        <div style={styles.geometryLabGeoEnvironment}>
+          <svg width="300" height="180" viewBox="0 0 300 180" style={{ filter: 'drop-shadow(0px 4px 12px rgba(0,0,0,0.01))' }}>
+            <defs>
+              <pattern id="areaGridPattern" width="16" height="16" patternUnits="userSpaceOnUse">
+                <rect width="16" height="16" fill="none" />
+                <path d="M 16 0 L 0 0 0 16" fill="none" stroke="rgba(0,112,243,0.18)" strokeWidth="1" />
+              </pattern>
+            </defs>
+
+            {exploreMode === 'area' && (
+              <polygon points={geoData.pointsStr} fill="url(#areaGridPattern)" />
+            )}
+
+            <polygon
+              points={geoData.pointsStr}
+              className={`shape-polygon ${exploreMode === 'perimeter' ? 'flow-active' : ''} ${exploreMode === 'area' ? 'area-active-fill' : ''}`}
+              style={styles.geometryLabMainPolygon(exploreMode)}
+            />
+
+            {geoData.heightLine.show && (
+              <line
+                x1={geoData.heightLine.x1}
+                y1={geoData.heightLine.y1}
+                x2={geoData.heightLine.x2}
+                y2={geoData.heightLine.y2}
+                style={{
+                  stroke: '#D1D5DB',
+                  strokeWidth: 1.5,
+                  strokeDasharray: '4 4',
+                  transition: 'opacity 0.3s ease',
+                  opacity: showHeightLineNow ? 1 : 0,
+                }}
+              />
+            )}
+
+            <g>
+              {geoData.labels.map((label, index) => {
+                const isHeight = label.isHeight
+                return (
+                  <text
+                    key={index}
+                    x={label.x}
+                    y={label.y}
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      fill: '#4D4D4D',
+                      textAnchor: 'middle',
+                      transition: 'opacity 0.3s ease',
+                      opacity: isHeight ? (showHeightLineNow ? 1 : 0) : 1,
+                    }}
+                  >
+                    {label.val}
+                  </text>
+                )
+              })}
+            </g>
+          </svg>
+        </div>
+
+        <div style={styles.geometryLabExplorePanel}>
+          <div style={styles.geometryLabPanelTitle}>点击按钮，看看图形的变化吧！</div>
+          <div style={styles.geometryLabBtnGroup}>
+            <button
+              style={styles.geometryLabBtnChoice('perimeter', exploreMode)}
+              onClick={() => setExploreMode('perimeter')}
+            >
+              📏 求周长
+            </button>
+            <button
+              style={styles.geometryLabBtnChoice('area', exploreMode)}
+              onClick={() => setExploreMode('area')}
+            >
+              🟩 求面积
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.controlPanel}>
+        <div style={styles.btnRow}>
+          <button style={styles.btnReset} onClick={() => setExploreMode('none')}>
+            重置
+          </button>
+          <button
+            style={styles.btnAction}
+            onClick={() => setExploreMode((prev) => (prev === 'none' ? 'perimeter' : prev === 'perimeter' ? 'area' : 'area'))}
+          >
+            {buttonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type PointSegShapeType = 'unclosed' | 'closed' | null
 type PointSegSideType = 'single' | 'double' | null
 type PointSegRuleType = 'both' | 'neither' | 'one' | 'loop' | null
@@ -5339,7 +5752,7 @@ const showResultPanel = (visible: boolean, text: string) => {
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: any = {
   card: {
     background: '#FFFFFF',
     borderRadius: '24px',
@@ -5604,6 +6017,305 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: '#E0F2FE',
     color: '#0070F3',
     borderColor: '#BAE6FD',
+  },
+  diffQtyFixLabContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    maxWidth: '680px',
+    width: '100%',
+    boxSizing: 'border-box',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
+  diffQtyFixLabStageCard: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+    border: '1px solid #f0f0f0',
+    padding: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  diffQtyFixLabStepIndicator: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0 8px',
+    marginBottom: '4px',
+  },
+  diffQtyFixLabStepDotItem: (_num: number, currentStep: number, isActive: boolean) => {
+    let color = '#9CA3AF'
+    if (isActive) {
+      if (currentStep === 1) color = '#0070F3'
+      else if (currentStep === 2) color = '#10B981'
+      else color = '#F5A623'
+    }
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      fontSize: '13px',
+      fontWeight: 'bold',
+      color,
+      transition: 'all 0.3s ease',
+    }
+  },
+  diffQtyFixLabDot: (isActive: boolean) => ({
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: isActive ? 'currentColor' : '#E5E7EB',
+    transform: isActive ? 'scale(1.2)' : 'none',
+    transition: 'all 0.3s ease',
+  }),
+  diffQtyFixLabFormulaBox: (step: number) => ({
+    background: step === 1 ? '#F0F7FF' : step === 2 ? '#ECFDF5' : '#FFF9DB',
+    color: step === 1 ? '#0070F3' : step === 2 ? '#10B981' : '#D97706',
+    border: `1px solid ${step === 1 ? '#BAE6FD' : step === 2 ? '#A7F3D0' : '#FDE68A'}`,
+    padding: '16px 20px',
+    borderRadius: '14px',
+    fontSize: '14px',
+    lineHeight: '1.6',
+    textAlign: 'center',
+    minHeight: '68px',
+    transition: 'all 0.3s ease',
+  }),
+  diffQtyFixLabStage: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '10px 0',
+    minHeight: '180px',
+  },
+  diffQtyFixLabSvgText: (color: string, size: string = '12px') => ({
+    fontSize: size,
+    fill: color,
+    fontWeight: 'bold',
+    textAnchor: 'middle',
+  }),
+  diffQtyFixLabSvgTextTitle: {
+    fontSize: '11px',
+    fill: '#9CA3AF',
+    textAnchor: 'middle',
+  },
+  diffQtyFixLabControlPanel: {
+    display: 'flex',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: '12px',
+    borderTop: '1px dashed #E5E7EB',
+    paddingTop: '16px',
+  },
+  diffQtyFixLabBtnReset: {
+    padding: '12px 24px',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    border: '1px solid #E5E7EB',
+    backgroundColor: '#F3F4F6',
+    color: '#4D4D4D',
+    transition: 'all 0.2s',
+  },
+  diffQtyFixLabBtnAction: (step: number) => {
+    let bg = '#0070F3'
+    let shadow = 'rgba(0, 112, 243, 0.15)'
+    if (step === 2) {
+      bg = '#10B981'
+      shadow = 'rgba(16, 185, 129, 0.15)'
+    } else if (step === 3) {
+      bg = '#F5A623'
+      shadow = 'rgba(245, 166, 35, 0.15)'
+    }
+    return {
+      padding: '12px 24px',
+      borderRadius: '12px',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      border: 'none',
+      color: '#FFF',
+      backgroundColor: bg,
+      boxShadow: `0 4px 12px ${shadow}`,
+      transition: 'all 0.2s',
+    }
+  },
+  geometryLabContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    maxWidth: '680px',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  geometryLabStageCard: {
+    background: '#FFFFFF',
+    borderRadius: '24px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+    border: '1px solid #f0f0f0',
+    padding: '24px',
+  },
+  geometryLabMathFormula: {
+    display: 'flex',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    marginBottom: '24px',
+  },
+  geometryLabFormulaItem: (mode: string) => ({
+    background: mode === 'perimeter' ? '#ECFDF5' : mode === 'area' ? '#E0F2FE' : '#F9FAFB',
+    color: mode === 'perimeter' ? '#10B981' : mode === 'area' ? '#0070F3' : '#4D4D4D',
+    borderColor: mode === 'perimeter' ? '#A7F3D0' : mode === 'area' ? '#BAE6FD' : '#E5E7EB',
+    padding: '10px 16px',
+    borderRadius: '12px',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    transition: 'all 0.3s ease',
+    width: '100%',
+    textAlign: 'center',
+  }),
+  geometryLabGeoEnvironment: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px 0',
+  },
+  geometryLabMainPolygon: (mode: string) => ({
+    fill: mode === 'area' ? '#E0F2FE' : '#FAFAFA',
+    stroke: mode === 'perimeter' ? '#10B981' : '#0070F3',
+    strokeWidth: mode === 'perimeter' ? 4 : 2,
+    transition: 'fill 0.3s, stroke 0.3s, stroke-width 0.3s',
+  }),
+  geometryLabExplorePanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '24px',
+    borderTop: '1px dashed #E5E7EB',
+    paddingTop: '20px',
+  },
+  geometryLabPanelTitle: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  geometryLabBtnGroup: {
+    display: 'flex',
+    gap: '16px',
+    justifyContent: 'center',
+  },
+  geometryLabBtnChoice: (type: 'perimeter' | 'area', activeMode: string) => {
+    const isSelected = activeMode === type
+    let bg = '#FFF'
+    let color = '#4D4D4D'
+    let border = '2px solid #E5E7EB'
+    let shadow = 'none'
+
+    if (isSelected) {
+      if (type === 'perimeter') {
+        bg = '#10B981'
+        color = '#FFF'
+        border = '2px solid #10B981'
+        shadow = '0 4px 12px rgba(16,185,129,0.2)'
+      } else {
+        bg = '#0070F3'
+        color = '#FFF'
+        border = '2px solid #0070F3'
+        shadow = '0 4px 12px rgba(0,112,243,0.2)'
+      }
+    }
+
+    return {
+      flex: 1,
+      maxWidth: '180px',
+      padding: '12px 20px',
+      borderRadius: '14px',
+      fontSize: '14px',
+      fontWeight: 'bold' as const,
+      cursor: 'pointer',
+      backgroundColor: bg,
+      color,
+      border,
+      boxShadow: shadow,
+      transition: 'all 0.2s',
+    }
+  },
+  cycleLabFormula: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    alignItems: 'center',
+  },
+  cycleLabFormulaItem: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#666666',
+    lineHeight: 1.4,
+  },
+  cycleLabFormulaHighlight: {
+    color: '#0070F3',
+    fontWeight: 800,
+  },
+  cycleLabEnvironment: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '16px',
+    width: '100%',
+    padding: '24px 0',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  cycleLabGroupCard: {
+    background: '#F9FAFB',
+    border: '1px dashed #D1D5DB',
+    borderRadius: '12px',
+    padding: '10px 14px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  cycleLabRemainderGroupCard: {
+    background: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
+  cycleLabGroupLabel: {
+    fontSize: '11px',
+    color: '#9CA3AF',
+    fontWeight: 'bold',
+  },
+  cycleLabItemsRow: {
+    display: 'flex',
+    gap: '12px',
+  },
+  cycleLabItemBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  cycleLabItemUnit: {
+    fontSize: '24px',
+    width: '40px',
+    height: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cycleLabItemIndex: {
+    fontSize: '11px',
+    fontWeight: 'bold',
+    color: '#9CA3AF',
+    background: '#F3F4F6',
+    padding: '1px 6px',
+    borderRadius: '6px',
+    minWidth: '20px',
+    textAlign: 'center',
+  },
+  cycleLabRemainderIndex: {
+    color: '#EF4444',
+    background: '#FEE2E2',
   },
   timeAxisShell: {
     position: 'relative',
@@ -5952,6 +6664,178 @@ function CalcTotalMulBlock({ block }: MathComponentProps) {
   return <CalcTotalMul {...props} />
 }
 
+export function DiffQtyFixLab({
+  stateA_count,
+  stateA_total,
+  stateB_count,
+  stateB_total,
+  unit = '克',
+  itemUnit = '杯',
+  itemName = '水',
+  fixedName = '空瓶',
+  onFinish,
+}: DiffQtyFixLabProps) {
+  const [stepIndex, setStepIndex] = useState<number>(1)
+
+  const mathData = useMemo(() => {
+    const s1 = stateA_count <= stateB_count
+      ? { count: stateA_count, total: stateA_total }
+      : { count: stateB_count, total: stateB_total }
+    const s2 = stateA_count > stateB_count
+      ? { count: stateA_count, total: stateA_total }
+      : { count: stateB_count, total: stateB_total }
+
+    const diffCount = s2.count - s1.count
+    const diffTotal = s2.total - s1.total
+    const perValue = diffTotal / diffCount
+    const fixedValue = s1.total - s1.count * perValue
+
+    return { s1, s2, diffCount, diffTotal, perValue, fixedValue }
+  }, [stateA_count, stateA_total, stateB_count, stateB_total])
+
+  useEffect(() => {
+    setStepIndex(1)
+  }, [stateA_count, stateA_total, stateB_count, stateB_total])
+
+  const handleReset = () => {
+    setStepIndex(1)
+  }
+
+  const handleNextStep = () => {
+    if (stepIndex < 3) {
+      setStepIndex((prev) => prev + 1)
+    } else {
+      onFinish?.()
+      setStepIndex(1)
+    }
+  }
+
+  const { s1, s2, diffCount, diffTotal, perValue, fixedValue } = mathData
+
+  return (
+    <div style={styles.diffQtyFixLabContainer}>
+      <div style={styles.diffQtyFixLabStageCard}>
+        <div style={styles.diffQtyFixLabStepIndicator}>
+          {[1, 2, 3].map((num) => {
+            const labels = ['1. 观察变化', '2. 求单份量', '3. 回代固定量']
+            const isActive = num <= stepIndex
+            return (
+              <div key={num} style={styles.diffQtyFixLabStepDotItem(num, stepIndex, isActive)}>
+                <div style={styles.diffQtyFixLabDot(isActive)} />
+                {labels[num - 1]}
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={styles.diffQtyFixLabFormulaBox(stepIndex)}>
+          {stepIndex === 1 && (
+            <>
+              对比看：{itemName}增加了 <strong>{diffCount}</strong> {itemUnit}，总重增加了 <strong>{diffTotal}</strong> {unit}。<br />
+              <span style={{ fontSize: '12px', opacity: 0.8 }}>💡 思考：增加的重量是谁的？（{fixedName}重量可没变哦）</span>
+            </>
+          )}
+          {stepIndex === 2 && (
+            <>
+              1 {itemUnit}{itemName}的重量 = 增加的重量 ÷ 增加的{itemUnit}数<br />
+              <strong style={{ fontSize: '16px' }}>{diffTotal} ÷ {diffCount} = {perValue} {unit} / {itemUnit}</strong>
+            </>
+          )}
+          {stepIndex === 3 && (
+            <>
+              代入第一组条件：总重 {s1.total}{unit}，减去已知的 {s1.count} {itemUnit}{itemName}的总重。<br />
+              <strong style={{ fontSize: '16px', color: '#D97706' }}>{fixedName}重 = {s1.total} - ({s1.count} × {perValue}) = {fixedValue} {unit}</strong>
+            </>
+          )}
+        </div>
+
+        <div style={styles.diffQtyFixLabStage}>
+          <svg width="420" height="180" viewBox="0 0 420 180">
+            {stepIndex === 1 && (
+              <g>
+                <g transform="translate(40, 20)">
+                  <text x="50" y="10" style={styles.diffQtyFixLabSvgTextTitle}>第一组条件</text>
+                  <rect x="10" y="20" width="80" height="110" rx="8" fill="none" stroke="#0070F3" strokeWidth="2" />
+                  <rect x="11" y="110" width="78" height="19" fill="#E5E7EB" rx="2" />
+                  <text x="50" y="123" style={styles.diffQtyFixLabSvgText('#666')}>{fixedName}</text>
+                  <rect x="16" y="50" width="68" height="60" fill="#BAE6FD" rx="4" />
+                  <text x="50" y="85" style={styles.diffQtyFixLabSvgText('#0070F3')}>{s1.count} {itemUnit}{itemName}</text>
+                  <text x="50" y="152" style={styles.diffQtyFixLabSvgText('#171717')}>共 {s1.total} {unit}</text>
+                </g>
+                <g transform="translate(240, 20)">
+                  <text x="50" y="10" style={styles.diffQtyFixLabSvgTextTitle}>第二组条件</text>
+                  <rect x="10" y="20" width="80" height="110" rx="8" fill="none" stroke="#0070F3" strokeWidth="2" />
+                  <rect x="11" y="110" width="78" height="19" fill="#E5E7EB" rx="2" />
+                  <text x="50" y="123" style={styles.diffQtyFixLabSvgText('#666')}>{fixedName}</text>
+                  <rect x="16" y="60" width="68" height="50" fill="#BAE6FD" opacity="0.4" rx="4" />
+                  <rect x="16" y="30" width="68" height="30" className="blink-element" rx="4" />
+                  <text x="50" y="48" style={styles.diffQtyFixLabSvgText('#FFF')}>多{diffCount}{itemUnit}</text>
+                  <text x="50" y="90" style={styles.diffQtyFixLabSvgText('#0070F3')}>{s2.count} {itemUnit}{itemName}</text>
+                  <text x="50" y="152" style={styles.diffQtyFixLabSvgText('#171717')}>共 {s2.total} {unit}</text>
+                </g>
+              </g>
+            )}
+
+            {stepIndex === 2 && (
+              <g transform="translate(100, 30)">
+                <text x="110" y="15" style={styles.diffQtyFixLabSvgTextTitle}>多出的 {diffCount} {itemUnit}{itemName} 对应多出的 {diffTotal} {unit}</text>
+                <g transform="translate(40, 35)">
+                  <rect x="0" y="0" width="60" height="45" fill="#38BDF8" rx="6" />
+                  <text x="30" y="26" style={styles.diffQtyFixLabSvgText('#FFF')}>{perValue} {unit}</text>
+                </g>
+                <g transform="translate(120, 35)">
+                  <rect x="0" y="0" width="60" height="45" fill="#38BDF8" rx="6" />
+                  <text x="30" y="26" style={styles.diffQtyFixLabSvgText('#FFF')}>{perValue} {unit}</text>
+                </g>
+                <text x="110" y="120" style={styles.diffQtyFixLabSvgText('#10B981', '14px')}>每 {itemUnit}{itemName} = {perValue} {unit}</text>
+              </g>
+            )}
+
+            {stepIndex === 3 && (
+              <g transform="translate(160, 20)">
+                <rect x="10" y="20" width="80" height="110" rx="8" fill="none" stroke="#F5A623" strokeWidth="2" />
+                <rect x="11" y="110" width="78" height="19" className="gold-active" rx="2" />
+                <text x="50" y="123" style={styles.diffQtyFixLabSvgText('#D97706')}>{fixedValue} {unit} ✨</text>
+
+                <g className="fly-out-water">
+                  <rect x="16" y="50" width="68" height="60" fill="#BAE6FD" rx="4" stroke="#0070F3" strokeDasharray="4 2" />
+                  <text x="50" y="85" style={styles.diffQtyFixLabSvgText('#0070F3')}>扣除份数重</text>
+                </g>
+                <text x="50" y="155" style={styles.diffQtyFixLabSvgText('#171717', '11px')}>总重 {s1.total} - {itemName}重 = {fixedName}</text>
+              </g>
+            )}
+          </svg>
+        </div>
+
+        <div style={styles.diffQtyFixLabControlPanel}>
+          <button style={styles.diffQtyFixLabBtnReset} onClick={handleReset}>重置</button>
+          <button style={styles.diffQtyFixLabBtnAction(stepIndex)} onClick={handleNextStep}>
+            {stepIndex === 3 ? '完成' : '下一步'}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes blink {
+          0% { opacity: 0.4; fill: #0284C7; }
+          100% { opacity: 1; fill: #38BDF8; }
+        }
+        .blink-element { animation: blink 0.6s infinite alternate; }
+        @keyframes flyOut {
+          0% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(-35px); opacity: 0.05; }
+        }
+        .fly-out-water { animation: flyOut 1.5s infinite ease-in-out; }
+        @keyframes goldGlow {
+          0% { fill: #FEF3C7; stroke: #F5A623; }
+          100% { fill: #FDE68A; stroke: #D97706; }
+        }
+        .gold-active { animation: goldGlow 0.8s infinite alternate; stroke-width: 1.5px; }
+      `}</style>
+    </div>
+  )
+}
+
 function UnknownMathComponent({ block }: MathComponentProps) {
   const visual = buildVisualMeta(block.visual_object)
 
@@ -6251,6 +7135,62 @@ const componentMap: Record<string, (props: MathComponentProps) => ReactElement> 
         unit={typeof props.unit === 'string' ? props.unit : '个'}
         labels={rawLabels.map((value) => (typeof value === 'string' ? value : String(value || '')))}
         buttonText={typeof props.buttonText === 'string' ? props.buttonText : '求总数'}
+      />
+    )
+  },
+  DiffQtyFixLab: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+
+    return (
+      <DiffQtyFixLab
+        stateA_count={typeof props.stateA_count === 'number' ? props.stateA_count : Number(props.stateA_count) || 4}
+        stateA_total={typeof props.stateA_total === 'number' ? props.stateA_total : Number(props.stateA_total) || 520}
+        stateB_count={typeof props.stateB_count === 'number' ? props.stateB_count : Number(props.stateB_count) || 6}
+        stateB_total={typeof props.stateB_total === 'number' ? props.stateB_total : Number(props.stateB_total) || 680}
+        unit={typeof props.unit === 'string' ? props.unit : '克'}
+        itemUnit={typeof props.itemUnit === 'string' ? props.itemUnit : '杯'}
+        itemName={typeof props.itemName === 'string' ? props.itemName : '水'}
+        fixedName={typeof props.fixedName === 'string' ? props.fixedName : '空瓶'}
+      />
+    )
+  },
+  GeometryLab: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+    const rawParams = Array.isArray(props.params) ? props.params : [6, 4]
+
+    return (
+      <GeometryLab
+        shape={
+          props.shape === 'Rect' ||
+          props.shape === 'Square' ||
+          props.shape === 'Parallelogram' ||
+          props.shape === 'Triangle' ||
+          props.shape === 'Trapezoid'
+            ? props.shape
+            : 'Rect'
+        }
+        params={rawParams.map((value) => (typeof value === 'number' ? value : Number(value) || 0))}
+        unit={typeof props.unit === 'string' ? props.unit : 'cm'}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
+      />
+    )
+  },
+  CycleLab: ({ block }) => {
+    const props = (block.props && typeof block.props === 'object' && !Array.isArray(block.props))
+      ? (block.props as Record<string, unknown>)
+      : {}
+    const rawItems = Array.isArray(props.cycleItems) ? props.cycleItems : ['🔴', '🟩', '🟩']
+
+    return (
+      <CycleLab
+        targetN={typeof props.targetN === 'number' ? props.targetN : Number(props.targetN) || 14}
+        cycleLength={typeof props.cycleLength === 'number' ? props.cycleLength : Number(props.cycleLength) || 3}
+        cycleItems={rawItems.map((value) => (typeof value === 'string' ? value : String(value || '')))}
+        buttonText={typeof props.buttonText === 'string' ? props.buttonText : '下一步'}
       />
     )
   },

@@ -120,6 +120,10 @@ function buildPrompt(configValue, questionText, context = {}) {
     sections.push('', 'logic_analysis_json：', JSON.stringify(context.logicAnalysisJson, null, 2))
   }
 
+  if (context.tutorAnalysisJson) {
+    sections.push('', 'tutor_analysis_json：', JSON.stringify(context.tutorAnalysisJson, null, 2))
+  }
+
   if (context.logicTypes) {
     sections.push('', 'logic_types 表候选列表：', JSON.stringify(context.logicTypes, null, 2))
     sections.push('', '允许的 type 值（只能从下面选择，必须原样返回）：', context.logicTypes.map((item) => item.name).join(' | '))
@@ -417,6 +421,7 @@ export default async (req, res) => {
       math_analysis_json: {},
       logic_analysis_json: {},
       tutor_analysis_json: {},
+      component_analysis_json: {},
     })
 
     if (questionInsert.error || !questionInsert.data || questionInsert.data.length === 0) {
@@ -426,7 +431,7 @@ export default async (req, res) => {
 
     const question = questionInsert.data[0]
 
-    // 4) 依次生成三个 JSON，并逐步回写
+    // 4) 依次生成四个 JSON，并逐步回写
     const mathAnalysisJson = await runAnalysisStep({
       configKey: 'math_analysis',
       questionText,
@@ -450,6 +455,19 @@ export default async (req, res) => {
     })
     await updateWhere('user_questions', { id: question.id }, {
       tutor_analysis_json: tutorAnalysisJson,
+    })
+
+    const componentAnalysisJson = await runAnalysisStep({
+      configKey: 'component_analysis',
+      questionText,
+      context: {
+        mathAnalysisJson,
+        logicAnalysisJson,
+        tutorAnalysisJson,
+      },
+    })
+    await updateWhere('user_questions', { id: question.id }, {
+      component_analysis_json: componentAnalysisJson,
       status: 'completed',
     })
 
@@ -460,6 +478,7 @@ export default async (req, res) => {
       mathAnalysisJson,
       logicAnalysisJson,
       tutorAnalysisJson,
+      componentAnalysisJson,
     })
   } catch (error) {
     console.error('[user-questions/submit] error:', error)

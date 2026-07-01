@@ -30,6 +30,7 @@ function rowToUserQuestion(row: DbRow): UserQuestion {
     mathAnalysisJson: getJson(row, 'math_analysis_json', {}),
     logicAnalysisJson: getJson(row, 'logic_analysis_json', {}),
     tutorAnalysisJson: getJson(row, 'tutor_analysis_json', {}),
+    componentAnalysisJson: getJson(row, 'component_analysis_json', {}),
     status: (getString(row, 'status') as UserQuestion['status']) || 'pending',
     createdAt: getString(row, 'created_at'),
     updatedAt: getString(row, 'updated_at'),

@@ -87,6 +87,7 @@ export interface UserQuestion {
   mathAnalysisJson?: JsonValue
   logicAnalysisJson?: JsonValue
   tutorAnalysisJson?: JsonValue
+  componentAnalysisJson?: JsonValue
   status: 'pending' | 'completed' | 'uploaded'
   createdAt: string
   updatedAt: string

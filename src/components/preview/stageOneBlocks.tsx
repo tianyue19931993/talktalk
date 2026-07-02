@@ -61,7 +61,7 @@ export type ChallengeInfoData = {
     step?: number
     hint: string
     question: string
-    logic_type: string
+    logic_type?: string
   }>
 }
 
@@ -152,7 +152,7 @@ export function MInfo({ data, children }: { data?: ChallengeInfoData; children?:
     return (
       <div className="space-y-3 rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
         {data.challenge_steps.map((step, index) => (
-          <div key={`${step.logic_type}-${index}`} className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
+          <div key={`${step.step ?? index + 1}-${index}`} className="rounded-[var(--radius-xl)] border border-[var(--color-hairline)] bg-[var(--color-canvas-soft)] p-4">
             <div className="flex items-start gap-3">
               <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-medium text-[var(--color-body)]">
                 {step.step ?? index + 1}

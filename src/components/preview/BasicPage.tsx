@@ -22,7 +22,7 @@ type ChallengeInfoData = {
     step?: number
     hint: string
     question: string
-    logic_type: string
+    logic_type?: string
   }>
 }
 

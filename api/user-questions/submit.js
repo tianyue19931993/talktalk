@@ -12,87 +12,6 @@ function safeText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function stripJsonComments(text) {
-  const input = safeText(text)
-  if (!input) return ''
-
-  let output = ''
-  let inString = false
-  let stringQuote = ''
-
-  for (let i = 0; i < input.length; i += 1) {
-    const char = input[i]
-    const nextChar = input[i + 1]
-
-    if (inString) {
-      output += char
-      if (char === '\\') {
-        i += 1
-        if (i < input.length) {
-          output += input[i]
-        }
-        continue
-      }
-      if (char === stringQuote) {
-        inString = false
-        stringQuote = ''
-      }
-      continue
-    }
-
-    if (char === '"' || char === '\'') {
-      inString = true
-      stringQuote = char
-      output += char
-      continue
-    }
-
-    if (char === '/' && nextChar === '/') {
-      while (i < input.length && input[i] !== '\n') {
-        i += 1
-      }
-      if (i < input.length) {
-        output += '\n'
-      }
-      continue
-    }
-
-    if (char === '/' && nextChar === '*') {
-      i += 2
-      while (i < input.length - 1 && !(input[i] === '*' && input[i + 1] === '/')) {
-        i += 1
-      }
-      i += 1
-      continue
-    }
-
-    output += char
-  }
-
-  return output
-}
-
-function parseJsonText(value, fallback = null) {
-  if (value && typeof value === 'object') {
-    return value
-  }
-  const text = safeText(value)
-  if (!text) return fallback
-  try {
-    return JSON.parse(text)
-  } catch {
-    const stripped = stripJsonComments(text)
-    if (!stripped || stripped === text) {
-      return fallback
-    }
-    try {
-      return JSON.parse(stripped)
-    } catch {
-      return fallback
-    }
-  }
-}
-
 async function getCurrentUser(authHeader) {
   const { url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY } = getSupabaseEnv()
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -126,7 +45,7 @@ async function getConfigValue(key) {
 
 async function getLogicTypes() {
   const { data, error } = await query('logic_types', {
-    select: 'name,math_component,component_props',
+    select: 'name,math_component',
     order: 'name',
     ascending: true,
   })
@@ -136,7 +55,6 @@ async function getLogicTypes() {
     .map((row) => ({
       name: safeText(row?.name),
       mathComponent: safeText(row?.math_component),
-      componentProps: row?.component_props ?? null,
     }))
     .filter((item) => item.name && item.mathComponent)
 
@@ -147,49 +65,22 @@ async function getLogicTypes() {
   return list
 }
 
-function parseComponentPropKeys(componentPropsText) {
-  const text = safeText(componentPropsText)
-  if (!text) return []
-
-  const candidates = [
-    text,
-    `{${text}}`,
-    text.replace(/^\{([\s\S]*)\}$/, '$1'),
-  ]
-
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate)
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => safeText(item)).filter(Boolean)
-      }
-      if (parsed && typeof parsed === 'object') {
-        return Object.keys(parsed).filter(Boolean)
-      }
-    } catch {
-      // continue
-    }
-  }
-
-  const keyMatches = [...text.matchAll(/["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?\s*:/g)]
-    .map((match) => safeText(match[1]))
-    .filter(Boolean)
-
-  if (keyMatches.length > 0) {
-    return Array.from(new Set(keyMatches))
-  }
-
-  return text
-    .split(/[,，、\n\r\t;；|]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
 function buildPrompt(configValue, questionText, context = {}) {
   let promptValue = configValue
-  if (context.jsonSchema !== undefined) {
-    const schemaText = JSON.stringify(context.jsonSchema, null, 2)
-    promptValue = promptValue.replaceAll('{{json_schema}}', schemaText)
+  const hasMathAnalysisPlaceholder = promptValue.includes('{{math_analysis_json}}')
+  const hasLogicAnalysisPlaceholder = promptValue.includes('{{logic_analysis_json}}')
+
+  if (context.mathAnalysisJson !== undefined) {
+    promptValue = promptValue.replaceAll(
+      '{{math_analysis_json}}',
+      JSON.stringify(context.mathAnalysisJson, null, 2),
+    )
+  }
+  if (context.logicAnalysisJson !== undefined) {
+    promptValue = promptValue.replaceAll(
+      '{{logic_analysis_json}}',
+      JSON.stringify(context.logicAnalysisJson, null, 2),
+    )
   }
 
   const sections = [
@@ -199,11 +90,11 @@ function buildPrompt(configValue, questionText, context = {}) {
     questionText,
   ]
 
-  if (context.mathAnalysisJson) {
+  if (context.mathAnalysisJson && !hasMathAnalysisPlaceholder) {
     sections.push('', 'math_analysis_json：', JSON.stringify(context.mathAnalysisJson, null, 2))
   }
 
-  if (context.logicAnalysisJson) {
+  if (context.logicAnalysisJson && !hasLogicAnalysisPlaceholder) {
     sections.push('', 'logic_analysis_json：', JSON.stringify(context.logicAnalysisJson, null, 2))
   }
 
@@ -211,23 +102,8 @@ function buildPrompt(configValue, questionText, context = {}) {
     sections.push('', 'tutor_analysis_json：', JSON.stringify(context.tutorAnalysisJson, null, 2))
   }
 
-  if (context.logicTypes) {
-    sections.push(
-      '',
-      'logic_types 表候选列表（只需要用于选择最匹配的类型，不要输出这些内容）：',
-      JSON.stringify(
-        context.logicTypes.map((item) => ({
-          name: item.name,
-          math_component: item.mathComponent,
-        })),
-        null,
-        2,
-      ),
-    )
-    sections.push(
-      '',
-      '要求：从候选中选择 1 个最匹配的 logic_type.name，并输出它对应的 logic_type.math_component 到 component 字段。',
-    )
+  if (context.outputInstruction) {
+    sections.push('', context.outputInstruction)
   }
 
   sections.push('', '要求：只输出 JSON，不要输出 markdown、解释或多余文本。')
@@ -374,133 +250,97 @@ async function runStrictMathAnalysis(questionText) {
   throw lastError || new Error('math_analysis 生成失败')
 }
 
-function normalizeLogicAnalysis(result, logicTypes) {
-  const blocks = Array.isArray(result?.logic_blocks) ? result.logic_blocks : []
-  const byComponent = new Map(logicTypes.map((item) => [item.mathComponent, item]))
-  const normalizedBlocks = blocks
-    .map((block) => {
-      const rawComponent = safeText(block?.component)
-      const matched = byComponent.get(rawComponent)
+function buildLogicAnalysis(mathAnalysisJson, logicTypes) {
+  const stages = Array.isArray(mathAnalysisJson?.logic_stages) ? mathAnalysisJson.logic_stages : []
+  const logicTypeByName = new Map(logicTypes.map((item) => [item.name, item]))
 
-      if (matched) {
-        return {
-          component: matched.mathComponent,
-          math_object: safeText(block?.math_object),
-        }
-      }
+  const logicBlocks = stages.map((stage, index) => {
+    const step = String(stage?.step ?? index + 1)
+    const type = safeText(stage?.type)
+    const matched = logicTypeByName.get(type)
 
-      return null
-    })
-    .filter(Boolean)
+    if (!matched) {
+      throw new Error(`logic_types 中找不到 name = ${type || '空'} 对应的 math_component`)
+    }
 
-  return {
-    ...result,
-    logic_blocks: normalizedBlocks,
+    return {
+      step,
+      type,
+      component: matched.mathComponent,
+    }
+  })
+
+  if (logicBlocks.length === 0) {
+    throw new Error('math_analysis_json.logic_stages 为空，无法生成 logic_analysis_json')
   }
+
+  return { logic_blocks: logicBlocks }
 }
 
-function validateLogicAnalysis(logicAnalysis, logicTypes) {
-  const allowedComponents = new Set(logicTypes.map((item) => item.mathComponent))
-  const blocks = Array.isArray(logicAnalysis?.logic_blocks) ? logicAnalysis.logic_blocks : []
-  if (blocks.length === 0) {
+function validateTutorAnalysis(tutorAnalysisJson, mathAnalysisJson) {
+  const logicStages = Array.isArray(mathAnalysisJson?.logic_stages) ? mathAnalysisJson.logic_stages : []
+  const challengeSteps = Array.isArray(tutorAnalysisJson?.challenge_steps)
+    ? tutorAnalysisJson.challenge_steps
+    : []
+
+  if (challengeSteps.length !== logicStages.length) {
     return {
       ok: false,
-      kind: 'structure',
-      message: 'logic_analysis 中没有 logic_blocks',
+      message: `tutor_analysis.challenge_steps 数量必须等于 logic_stages，期望 ${logicStages.length}，实际 ${challengeSteps.length}`,
     }
   }
 
-  for (let index = 0; index < blocks.length; index += 1) {
-    const block = blocks[index]
-    const component = safeText(block?.component)
-    if (!allowedComponents.has(component)) {
-      return {
-        ok: false,
-        kind: 'component',
-        index,
-        step: block?.step ?? index + 1,
-        component,
-        message: `第 ${block?.step ?? index + 1} 步的 component 非法：${component || '空'}`,
-      }
+  for (let index = 0; index < logicStages.length; index += 1) {
+    const expectedStep = logicStages[index]?.step ?? index + 1
+    const challengeStep = challengeSteps[index]
+    if (String(challengeStep?.step ?? '') !== String(expectedStep)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项的 step 必须对应 ${expectedStep}` }
+    }
+    if (!safeText(challengeStep?.question)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项的 question 不能为空` }
+    }
+    if (!safeText(challengeStep?.hint)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项的 hint 不能为空` }
     }
 
-    const mathObject = safeText(block?.math_object)
-    if (!mathObject) {
-      return {
-        ok: false,
-        kind: 'math_object',
-        index,
-        step: block?.step ?? index + 1,
-        component,
-        message: `第 ${block?.step ?? index + 1} 步的 math_object 不能为空`,
-      }
+    const guidanceText = `${challengeStep.question} ${challengeStep.hint}`
+    if (/[0-9０-９]/.test(guidanceText)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项的 question/hint 不能包含具体数字` }
+    }
+    if (/[=＝×÷]/.test(guidanceText)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项的 question/hint 不能包含完整算式` }
+    }
+    if (/(结果是|等于|得到)/.test(guidanceText)) {
+      return { ok: false, message: `challenge_steps 第 ${index + 1} 项包含暗示答案的表述` }
     }
   }
 
-  return {
-    ok: true,
-  }
+  return { ok: true }
 }
 
-function getComponentSchemaFromLogicAnalysis(logicAnalysisJson, logicTypes) {
-  const blocks = Array.isArray(logicAnalysisJson?.logic_blocks) ? logicAnalysisJson.logic_blocks : []
-  const componentName = safeText(blocks.map((block) => block?.component).find((item) => safeText(item)))
-  if (!componentName) {
-    throw new Error('logic_analysis_json 中没有可用的 component，无法生成 component_analysis')
-  }
-
-  const matched = logicTypes.find((item) => item.mathComponent === componentName)
-  if (!matched) {
-    throw new Error(`logic_types 中找不到 component = ${componentName} 对应的配置`)
-  }
-
-  const schema = parseJsonText(matched.componentProps)
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
-    throw new Error(`logic_types.${componentName} 的 component_props 不是合法 JSON 对象`)
-  }
-
-  return schema
-}
-
-async function runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes) {
-  const allowedNames = logicTypes.map((item) => item.name)
+async function runStrictTutorAnalysis(questionText, mathAnalysisJson, logicAnalysisJson) {
   let lastError = null
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const raw = await runAnalysisStep({
-        configKey: 'logic_analysis',
+      const result = await runAnalysisStep({
+        configKey: 'tutor_analysis',
         questionText,
         context: {
           mathAnalysisJson,
-          logicTypes: logicTypes.map((item) => ({
-            name: item.name,
-            mathComponent: item.mathComponent,
-          })),
+          logicAnalysisJson,
+          outputInstruction: '严格输出 JSON：{"challenge_steps":[{"step":1,"question":"","hint":""}]}',
         },
       })
-
-      const normalized = normalizeLogicAnalysis(raw, logicTypes)
-      const validation = validateLogicAnalysis(normalized, logicTypes)
-      if (validation.ok) {
-        return normalized
-      }
-
-      if (validation.kind === 'props') {
-        lastError = new Error(
-          `${validation.message}，要求字段：${validation.expectedKeys.join(', ') || '无'}，实际字段：${validation.actualKeys.join(', ') || '无'}`,
-        )
-      } else if (validation.kind === 'type') {
-        lastError = new Error(`logic_analysis 输出包含非法 type：${validation.type || '空'}，允许值只有：${allowedNames.join(', ')}`)
-      } else {
-        lastError = new Error(validation.message || 'logic_analysis 结构不合法')
-      }
+      const validation = validateTutorAnalysis(result, mathAnalysisJson)
+      if (validation.ok) return result
+      lastError = new Error(validation.message || 'tutor_analysis 结构不合法')
     } catch (error) {
       lastError = error
     }
   }
 
-  throw lastError || new Error('logic_analysis 生成失败')
+  throw lastError || new Error('tutor_analysis 生成失败')
 }
 
 function normalizeBody(body) {
@@ -608,7 +448,7 @@ export default async (req, res) => {
 
     const question = questionInsert.data[0]
 
-    // 4) 依次生成四个 JSON，并逐步回写
+    // 4) 生成 math/tutor，logic 由 math_analysis_json 通过代码映射得到
     const mathAnalysisJson = await runStrictMathAnalysis(questionText)
     await updateWhere('user_questions', { id: question.id }, {
       math_analysis_json: mathAnalysisJson,
@@ -616,32 +456,18 @@ export default async (req, res) => {
     })
 
     const logicTypes = await getLogicTypes()
-    const logicAnalysisJson = await runStrictLogicAnalysis(questionText, mathAnalysisJson, logicTypes)
+    const logicAnalysisJson = buildLogicAnalysis(mathAnalysisJson, logicTypes)
     await updateWhere('user_questions', { id: question.id }, {
       logic_analysis_json: logicAnalysisJson,
     })
 
-    const tutorAnalysisJson = await runAnalysisStep({
-      configKey: 'tutor_analysis',
+    const tutorAnalysisJson = await runStrictTutorAnalysis(
       questionText,
-      context: { mathAnalysisJson, logicAnalysisJson },
-    })
+      mathAnalysisJson,
+      logicAnalysisJson,
+    )
     await updateWhere('user_questions', { id: question.id }, {
       tutor_analysis_json: tutorAnalysisJson,
-    })
-
-    const componentAnalysisJson = await runAnalysisStep({
-      configKey: 'component_analysis',
-      questionText,
-      context: {
-        mathAnalysisJson,
-        logicAnalysisJson,
-        tutorAnalysisJson,
-        jsonSchema: getComponentSchemaFromLogicAnalysis(logicAnalysisJson, logicTypes),
-      },
-    })
-    await updateWhere('user_questions', { id: question.id }, {
-      component_analysis_json: componentAnalysisJson,
       status: 'completed',
     })
 
@@ -652,7 +478,6 @@ export default async (req, res) => {
       mathAnalysisJson,
       logicAnalysisJson,
       tutorAnalysisJson,
-      componentAnalysisJson,
     })
   } catch (error) {
     console.error('[user-questions/submit] error:', error)

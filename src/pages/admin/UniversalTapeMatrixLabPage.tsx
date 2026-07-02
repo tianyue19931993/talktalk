@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react'
+import Combine from '../../components/admin/Combine'
+import Partition from '../../components/admin/Partition'
+import Replicate from '../../components/admin/Replicate'
+import Separate from '../../components/admin/Separate'
 import UniversalTapeMatrixLabCompare from '../../components/admin/UniversalTapeMatrixLabCompare'
 import { GridGeometryPlayer } from '../../components/admin/UniversalTapeMatrixLabGridGeometry'
 import UniversalTapeMatrixLabMultiplyDivide from '../../components/admin/UniversalTapeMatrixLabMultiplyDivide'
@@ -11,6 +15,22 @@ type LabTab = {
 }
 
 const tabs: LabTab[] = [
+  {
+    name: 'Combine',
+    note: '加法组件：拖拽两个加数色块，在目标卡槽中吸附合并并展示结果。',
+  },
+  {
+    name: 'Separate',
+    note: '减法组件：点击剪刀裁去减数部分，观察剩余的差。',
+  },
+  {
+    name: 'Partition',
+    note: '除法组件：向上拖动切刀，将总量均分并观察每份的数量。',
+  },
+  {
+    name: 'Replicate',
+    note: '乘法组件：向上拖动倍数叠加舱，逐个复制相同数量并汇总乘积。',
+  },
   {
     name: 'UniversalTapeMatrixLab-multiply_divide',
     note: '认知模型：\n单量乘以数量等于总量。 multiply_divide (等分/矩阵模式)',
@@ -79,7 +99,23 @@ export default function UniversalTapeMatrixLabPage() {
           </div>
 
           <div className="mt-4 min-h-[320px] rounded-[24px] border border-dashed border-[var(--color-hairline)] bg-white p-4">
-            {currentTab.name === 'UniversalTapeMatrixLab-multiply_divide' ? (
+            {currentTab.name === 'Combine' ? (
+              <div className="flex justify-center">
+                <Combine />
+              </div>
+            ) : currentTab.name === 'Separate' ? (
+              <div className="flex justify-center">
+                <Separate />
+              </div>
+            ) : currentTab.name === 'Partition' ? (
+              <div className="flex justify-center">
+                <Partition />
+              </div>
+            ) : currentTab.name === 'Replicate' ? (
+              <div className="flex justify-center">
+                <Replicate />
+              </div>
+            ) : currentTab.name === 'UniversalTapeMatrixLab-multiply_divide' ? (
               <div className="flex justify-center">
                 <UniversalTapeMatrixLabMultiplyDivide />
               </div>

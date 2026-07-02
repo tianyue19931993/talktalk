@@ -2,6 +2,7 @@ import { query, insert, updateWhere } from '../../server/lib/supabase-admin.js'
 import { consumeGeneration } from '../../server/lib/membership.js'
 import { deepseekJson, isDeepSeekConfigured } from '../../server/lib/deepseek.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
+import { compileToComponentScript } from '../../server/lib/component-adapter.js'
 
 function toObject(value) {
   if (value !== null && typeof value === 'object') return value
@@ -472,8 +473,10 @@ export default async (req, res) => {
 
     const logicTypes = await getLogicTypes()
     const logicAnalysisJson = buildLogicAnalysis(mathAnalysisJson, logicTypes)
+    const componentAnalysisJson = compileToComponentScript(mathAnalysisJson, logicAnalysisJson)
     await updateWhere('user_questions', { id: question.id }, {
       logic_analysis_json: logicAnalysisJson,
+      component_analysis_json: componentAnalysisJson,
     })
 
     const tutorAnalysisJson = await runStrictTutorAnalysis(
@@ -493,6 +496,7 @@ export default async (req, res) => {
       mathAnalysisJson,
       logicAnalysisJson,
       tutorAnalysisJson,
+      componentAnalysisJson,
     })
   } catch (error) {
     console.error('[user-questions/submit] error:', error)

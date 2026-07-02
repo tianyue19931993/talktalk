@@ -17,6 +17,7 @@ export interface SubmitQuestionResult {
   mathAnalysisJson?: JsonValue
   logicAnalysisJson?: JsonValue
   tutorAnalysisJson?: JsonValue
+  componentAnalysisJson?: JsonValue
 }
 
 export async function submitQuestionForAnalysis(questionText: string): Promise<SubmitQuestionResult> {

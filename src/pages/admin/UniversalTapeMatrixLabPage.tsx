@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import UniversalTapeMatrixLabCompare from '../../components/admin/UniversalTapeMatrixLabCompare'
+import { GridGeometryPlayer } from '../../components/admin/UniversalTapeMatrixLabGridGeometry'
 import UniversalTapeMatrixLabMultiplyDivide from '../../components/admin/UniversalTapeMatrixLabMultiplyDivide'
+import { PointIntervalPlayer } from '../../components/admin/UniversalTapeMatrixLabPointInterval'
 import { SegmentChainPlayer } from '../../components/admin/UniversalTapeMatrixLabSegmentChain'
 
 type LabTab = {
@@ -88,6 +90,14 @@ export default function UniversalTapeMatrixLabPage() {
             ) : currentTab.name === 'UniversalTapeMatrixLab-segment_chain' ? (
               <div className="flex justify-center">
                 <SegmentChainPlayer />
+              </div>
+            ) : currentTab.name === 'UniversalTapeMatrixLab-point_interval' ? (
+              <div className="flex justify-center">
+                <PointIntervalPlayer />
+              </div>
+            ) : currentTab.name === 'UniversalTapeMatrixLab-grid_geometry' ? (
+              <div className="flex justify-center">
+                <GridGeometryPlayer />
               </div>
             ) : (
               <>

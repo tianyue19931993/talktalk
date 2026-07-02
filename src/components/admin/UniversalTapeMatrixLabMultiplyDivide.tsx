@@ -317,6 +317,14 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
     })
   }
 
+  const handleNext = () => {
+    if (currentStepIndex === timeline.length - 1) {
+      setCurrentStepIndex(0)
+      return
+    }
+    changeStep(1)
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.board}>
@@ -333,7 +341,10 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
         </div>
         <div style={styles.btnGroup}>
           <button
-            style={{ ...styles.btn, ...styles.prevBtn }}
+            style={{
+              ...styles.btn,
+              ...(currentStepIndex === 0 ? styles.btnDisabled : styles.btnPrimary),
+            }}
             disabled={currentStepIndex === 0}
             onClick={() => changeStep(-1)}
             type="button"
@@ -341,12 +352,11 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
             上一步
           </button>
           <button
-            style={{ ...styles.btn, ...styles.nextBtn }}
-            disabled={currentStepIndex === timeline.length - 1}
-            onClick={() => changeStep(1)}
+            style={{ ...styles.btn, ...styles.btnPrimary }}
+            onClick={handleNext}
             type="button"
           >
-            下一步
+            {currentStepIndex === timeline.length - 1 ? '重置播放' : '下一步'}
           </button>
         </div>
       </div>
@@ -359,6 +369,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     width: '100%',
     maxWidth: '600px',
     backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: '16px',
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
     padding: '24px',
@@ -368,11 +379,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     boxSizing: 'border-box',
   },
   board: {
-    backgroundColor: '#f1f5f9',
-    borderLeft: '4px solid #3b82f6',
-    padding: '16px',
-    borderRadius: '0 12px 12px 0',
-    minHeight: '72px',
+    backgroundColor: 'transparent',
+    padding: 0,
+    minHeight: '48px',
     display: 'flex',
     alignItems: 'center',
   },
@@ -419,13 +428,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
-  prevBtn: {
+  btnDisabled: {
     backgroundColor: '#e2e8f0',
-    color: '#475569',
+    color: '#94a3b8',
+    cursor: 'not-allowed',
   },
-  nextBtn: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
+  btnPrimary: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
   },
 }
 

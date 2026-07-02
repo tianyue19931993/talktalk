@@ -266,7 +266,10 @@ export const CompareModePlayer: React.FC = () => {
           </span>
           <div style={styles.btnGroup}>
             <button
-              style={{ ...styles.btn, ...styles.btnSecondary }}
+              style={{
+                ...styles.btn,
+                ...(currentStepIndex === 0 ? styles.btnDisabled : styles.btnSecondary),
+              }}
               disabled={currentStepIndex === 0}
               onClick={prevStep}
               type="button"
@@ -314,11 +317,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     maxWidth: '640px',
   },
   tutorBoard: {
-    background: '#f1f5f9',
-    borderRadius: '12px',
-    padding: '16px 20px',
-    minHeight: '80px',
-    borderLeft: '4px solid #2563eb',
+    background: 'transparent',
+    padding: 0,
+    minHeight: '48px',
     display: 'flex',
     alignItems: 'center',
   },
@@ -327,12 +328,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '15px',
     fontWeight: 500,
     lineHeight: 1.6,
+    margin: 0,
     wordBreak: 'break-all',
   },
   canvasStage: {
     position: 'relative',
     background: '#ffffff',
-    border: '1px solid #f1f5f9',
+    border: '1px solid #e2e8f0',
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column',
@@ -491,8 +493,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     transition: 'all 0.2s',
   },
   btnSecondary: {
-    backgroundColor: '#f1f5f9',
-    color: '#475569',
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+  },
+  btnDisabled: {
+    backgroundColor: '#e2e8f0',
+    color: '#94a3b8',
+    cursor: 'not-allowed',
   },
 }
 

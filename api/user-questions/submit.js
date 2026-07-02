@@ -253,6 +253,127 @@ async function runAnalysisStep({
   return toObject(result)
 }
 
+const ALLOWED_MATH_OPERATION_TYPES = new Set(['加', '减', '乘', '除以', '除'])
+
+function validateMathAnalysis(mathAnalysis) {
+  if (!Array.isArray(mathAnalysis?.known_conditions)) {
+    return { ok: false, message: 'math_analysis.known_conditions 必须是数组' }
+  }
+  if (!Array.isArray(mathAnalysis?.hidden_conditions)) {
+    return { ok: false, message: 'math_analysis.hidden_conditions 必须是数组' }
+  }
+  if (!mathAnalysis?.goal || typeof mathAnalysis.goal !== 'object' || Array.isArray(mathAnalysis.goal)) {
+    return { ok: false, message: 'math_analysis.goal 必须是对象' }
+  }
+
+  for (let index = 0; index < mathAnalysis.known_conditions.length; index += 1) {
+    const condition = mathAnalysis.known_conditions[index]
+    if (!safeText(condition?.name)) {
+      return { ok: false, message: `known_conditions 第 ${index + 1} 项的 name 不能为空` }
+    }
+    if (condition?.value !== null && !Number.isFinite(condition?.value)) {
+      return { ok: false, message: `known_conditions 第 ${index + 1} 项的 value 必须是数字或 null` }
+    }
+    if (typeof condition?.unit !== 'string') {
+      return { ok: false, message: `known_conditions 第 ${index + 1} 项的 unit 必须是字符串` }
+    }
+  }
+
+  for (let index = 0; index < mathAnalysis.hidden_conditions.length; index += 1) {
+    if (!safeText(mathAnalysis.hidden_conditions[index]?.text)) {
+      return { ok: false, message: `hidden_conditions 第 ${index + 1} 项的 text 不能为空` }
+    }
+  }
+
+  if (!safeText(mathAnalysis.goal.text) || !safeText(mathAnalysis.goal.target)) {
+    return { ok: false, message: 'math_analysis.goal.text 和 goal.target 不能为空' }
+  }
+
+  const stages = Array.isArray(mathAnalysis?.logic_stages) ? mathAnalysis.logic_stages : []
+  if (stages.length === 0) {
+    return { ok: false, message: 'math_analysis.logic_stages 不能为空' }
+  }
+
+  for (let index = 0; index < stages.length; index += 1) {
+    const stage = stages[index]
+    const expectedStep = index + 1
+    if (stage?.step !== expectedStep) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 step 必须等于 ${expectedStep}` }
+    }
+    if (!ALLOWED_MATH_OPERATION_TYPES.has(safeText(stage?.type))) {
+      return {
+        ok: false,
+        message: `logic_stages 第 ${expectedStep} 项的 type 非法，只允许：加、减、乘、除以、除`,
+      }
+    }
+    if (!safeText(stage?.formula_tag)) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 formula_tag 不能为空` }
+    }
+
+    if (!Array.isArray(stage?.math_object)) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object 必须是数组` }
+    }
+    const mathObjects = stage.math_object
+
+    for (let objectIndex = 0; objectIndex < mathObjects.length; objectIndex += 1) {
+      const mathObject = mathObjects[objectIndex]
+      const expectedOrder = objectIndex + 1
+      if (mathObject?.order !== expectedOrder) {
+        return {
+          ok: false,
+          message: `logic_stages 第 ${expectedStep} 项 math_object[${objectIndex}] 的 order 必须等于 ${expectedOrder}`,
+        }
+      }
+      if (!safeText(mathObject?.name)) {
+        return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.name 不能为空` }
+      }
+      if (!Number.isFinite(mathObject?.value)) {
+        return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.value 必须是数字` }
+      }
+      if (typeof mathObject?.unit !== 'string') {
+        return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.unit 必须是字符串` }
+      }
+    }
+
+    const stepAnswer = stage?.step_answer
+    if (!stepAnswer || typeof stepAnswer !== 'object' || Array.isArray(stepAnswer)) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项缺少 step_answer` }
+    }
+    if (!Number.isFinite(stepAnswer.value)) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 step_answer.value 必须是数字` }
+    }
+    if (typeof stepAnswer.unit !== 'string') {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 step_answer.unit 必须是字符串` }
+    }
+    if (!safeText(stepAnswer.name)) {
+      return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 step_answer.name 不能为空` }
+    }
+  }
+
+  return { ok: true }
+}
+
+async function runStrictMathAnalysis(questionText) {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const result = await runAnalysisStep({
+        configKey: 'math_analysis',
+        questionText,
+        context: {},
+      })
+      const validation = validateMathAnalysis(result)
+      if (validation.ok) return result
+      lastError = new Error(validation.message || 'math_analysis 结构不合法')
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error('math_analysis 生成失败')
+}
+
 function normalizeLogicAnalysis(result, logicTypes) {
   const blocks = Array.isArray(result?.logic_blocks) ? result.logic_blocks : []
   const byComponent = new Map(logicTypes.map((item) => [item.mathComponent, item]))
@@ -488,11 +609,7 @@ export default async (req, res) => {
     const question = questionInsert.data[0]
 
     // 4) 依次生成四个 JSON，并逐步回写
-    const mathAnalysisJson = await runAnalysisStep({
-      configKey: 'math_analysis',
-      questionText,
-      context: {},
-    })
+    const mathAnalysisJson = await runStrictMathAnalysis(questionText)
     await updateWhere('user_questions', { id: question.id }, {
       math_analysis_json: mathAnalysisJson,
       analysis_json: mathAnalysisJson,

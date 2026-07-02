@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { MHint, MInfo } from './stageOneBlocks'
+import UniversalTapeMatrixLabDiscovery from './UniversalTapeMatrixLabDiscovery'
 
 type ObservationHintData = {
   goal: {
@@ -30,6 +31,7 @@ export type BasicPageProps = {
   math_analysis_json: unknown
   logic_analysis_json: unknown
   tutor_analysis_json: unknown
+  component_analysis_json?: unknown
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -38,7 +40,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toObservationHintData(value: unknown, questionText: string): ObservationHintData {
   if (isRecord(value) && isRecord(value.goal) && Array.isArray(value.known_conditions) && Array.isArray(value.hidden_conditions)) {
-    return value as ObservationHintData
+    return {
+      goal: {
+        text: typeof value.goal.text === 'string' ? value.goal.text : questionText,
+        target: typeof value.goal.target === 'string' ? value.goal.target : '求解目标',
+      },
+      known_conditions: value.known_conditions
+        .filter(isRecord)
+        .map((condition) => ({
+          text: typeof condition.name === 'string'
+            ? condition.name
+            : typeof condition.text === 'string'
+              ? condition.text
+              : '',
+          value: typeof condition.value === 'number' || typeof condition.value === 'string'
+            ? condition.value
+            : undefined,
+          unit: typeof condition.unit === 'string' ? condition.unit : '',
+        }))
+        .filter((condition) => condition.text),
+      hidden_conditions: value.hidden_conditions
+        .filter(isRecord)
+        .map((condition) => ({
+          text: typeof condition.text === 'string' ? condition.text : '',
+        }))
+        .filter((condition) => condition.text),
+    }
   }
 
   return {
@@ -99,7 +126,9 @@ function ThreeZoneLayout({
 export default function BasicPage({
   question_text,
   math_analysis_json,
+  logic_analysis_json,
   tutor_analysis_json,
+  component_analysis_json,
 }: BasicPageProps) {
   const observationData = toObservationHintData(math_analysis_json, question_text)
   const challengeData = toChallengeInfoData(tutor_analysis_json)
@@ -119,7 +148,10 @@ export default function BasicPage({
         </div>
       )}
       discovery={(
-        <div className="min-h-[220px] rounded-[24px] border border-dashed border-[#D8D8D8] bg-[#FAFAFA]" />
+        <UniversalTapeMatrixLabDiscovery
+          logicAnalysisJson={logic_analysis_json}
+          componentAnalysisJson={component_analysis_json}
+        />
       )}
       challenge={(
         <MInfo data={challengeData} />

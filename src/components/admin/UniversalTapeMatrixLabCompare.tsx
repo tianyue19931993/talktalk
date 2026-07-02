@@ -23,7 +23,7 @@ interface TimelineStep {
   desc: string
 }
 
-interface ModelData {
+export interface CompareModelData {
   canvas: {
     width: number
     height: number
@@ -33,7 +33,7 @@ interface ModelData {
   timeline: TimelineStep[]
 }
 
-const jsonConfig: ModelData = {
+const jsonConfig: CompareModelData = {
   canvas: {
     width: 500,
     height: 260,
@@ -81,7 +81,11 @@ const jsonConfig: ModelData = {
   ],
 }
 
-export const CompareModePlayer: React.FC = () => {
+export interface CompareModePlayerProps {
+  modelData?: CompareModelData
+}
+
+export const CompareModePlayer: React.FC<CompareModePlayerProps> = ({ modelData = jsonConfig }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0)
   const [cutLineStyle, setCutLineStyle] = useState<React.CSSProperties>({
     opacity: 0,
@@ -94,8 +98,8 @@ export const CompareModePlayer: React.FC = () => {
 
   const stageRef = useRef<HTMLDivElement>(null)
 
-  const currentTimeline = jsonConfig.timeline[currentStepIndex]
-  const baseTotal = 1000
+  const currentTimeline = modelData.timeline[currentStepIndex]
+  const baseTotal = Math.max(...modelData.layers.map((layer) => layer.total), 1)
 
   useEffect(() => {
     if (!stageRef.current) return
@@ -142,7 +146,7 @@ export const CompareModePlayer: React.FC = () => {
   }, [currentStepIndex, currentTimeline.action])
 
   const nextStep = () => {
-    setCurrentStepIndex((prev) => (prev + 1 >= jsonConfig.timeline.length ? 0 : prev + 1))
+    setCurrentStepIndex((prev) => (prev + 1 >= modelData.timeline.length ? 0 : prev + 1))
   }
 
   const prevStep = () => {
@@ -168,7 +172,7 @@ export const CompareModePlayer: React.FC = () => {
             ) : null}
           </div>
 
-          {jsonConfig.layers.map((layer) => {
+          {modelData.layers.map((layer) => {
             const isLayerFocused =
               currentTimeline.focus.includes(layer.id) ||
               layer.blocks.some((b) => currentTimeline.focus.includes(b.id))
@@ -192,7 +196,7 @@ export const CompareModePlayer: React.FC = () => {
                     }}
                   >
                     <span style={styles.bracketLabel}>
-                      {layer.total} {jsonConfig.canvas.unit}
+                      {layer.total} {modelData.canvas.unit}
                     </span>
                   </div>
 
@@ -243,7 +247,7 @@ export const CompareModePlayer: React.FC = () => {
                             >
                               <span style={styles.cellText}>
                                 {currentTimeline.action === 'solve_unit' && block.type === 'repeat'
-                                  ? `${block.value}${jsonConfig.canvas.unit}`
+                                  ? `${block.value}${modelData.canvas.unit}`
                                   : isSplitState
                                     ? '?'
                                     : block.name}
@@ -262,7 +266,7 @@ export const CompareModePlayer: React.FC = () => {
 
         <div style={styles.controlBar}>
           <span style={styles.stepIndicator}>
-            步骤: {currentTimeline.step} / {jsonConfig.timeline.length}
+            步骤: {currentTimeline.step} / {modelData.timeline.length}
           </span>
           <div style={styles.btnGroup}>
             <button
@@ -277,7 +281,7 @@ export const CompareModePlayer: React.FC = () => {
               上一步
             </button>
             <button style={styles.btn} onClick={nextStep} type="button">
-              {currentStepIndex === jsonConfig.timeline.length - 1 ? '重置播放' : '下一步'}
+              {currentStepIndex === modelData.timeline.length - 1 ? '重置播放' : '下一步'}
             </button>
           </div>
         </div>

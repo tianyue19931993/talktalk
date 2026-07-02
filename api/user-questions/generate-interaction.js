@@ -27,7 +27,7 @@ function getObservationData(question) {
     goalText: safeText(goal.text || question.question_text || ''),
     goalTarget: safeText(goal.target || '求解目标'),
     knownConditions: normalizeArray(mathAnalysis.known_conditions).map((item) => ({
-      text: safeText(item?.text || ''),
+      text: safeText(item?.name || item?.text || ''),
       unit: safeText(item?.unit || ''),
       value: item?.value,
     })).filter((item) => item.text),

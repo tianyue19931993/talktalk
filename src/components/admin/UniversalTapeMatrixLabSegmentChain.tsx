@@ -23,7 +23,7 @@ interface ChainTimelineStep {
   desc: string
 }
 
-interface ChainModelData {
+export interface ChainModelData {
   canvas: {
     width: number
     height: number
@@ -78,7 +78,11 @@ const chainConfig: ChainModelData = {
   ],
 }
 
-export const SegmentChainPlayer: React.FC = () => {
+export interface SegmentChainPlayerProps {
+  modelData?: ChainModelData
+}
+
+export const SegmentChainPlayer: React.FC<SegmentChainPlayerProps> = ({ modelData = chainConfig }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0)
   const [cutLineStyle, setCutLineStyle] = useState<React.CSSProperties>({
     opacity: 0,
@@ -90,9 +94,9 @@ export const SegmentChainPlayer: React.FC = () => {
   })
 
   const stageRef = useRef<HTMLDivElement>(null)
-  const currentTimeline = chainConfig.timeline[currentStepIndex]
+  const currentTimeline = modelData.timeline[currentStepIndex]
 
-  const targetLayer = chainConfig.layers[0]
+  const targetLayer = modelData.layers[0]
   const baseTotal = targetLayer.total
 
   useEffect(() => {
@@ -130,7 +134,7 @@ export const SegmentChainPlayer: React.FC = () => {
   }, [currentStepIndex, currentTimeline.action])
 
   const nextStep = () => {
-    setCurrentStepIndex((prev) => (prev + 1 >= chainConfig.timeline.length ? 0 : prev + 1))
+    setCurrentStepIndex((prev) => (prev + 1 >= modelData.timeline.length ? 0 : prev + 1))
   }
 
   const prevStep = () => {
@@ -161,7 +165,7 @@ export const SegmentChainPlayer: React.FC = () => {
                 }}
               >
                 <span style={styles.bracketLabel}>
-                  {targetLayer.total} {chainConfig.canvas.unit}
+                  {targetLayer.total} {modelData.canvas.unit}
                 </span>
               </div>
 
@@ -212,7 +216,7 @@ export const SegmentChainPlayer: React.FC = () => {
                         >
                           <span style={styles.cellText}>
                             {currentTimeline.action === 'solve_unit' && block.type === 'remainder'
-                              ? `${block.value}${chainConfig.canvas.unit}`
+                              ? `${block.value}${modelData.canvas.unit}`
                               : isSplitState
                                 ? '?'
                                 : block.name}
@@ -229,7 +233,7 @@ export const SegmentChainPlayer: React.FC = () => {
 
         <div style={styles.controlBar}>
           <span style={styles.stepIndicator}>
-            步骤: {currentTimeline.step} / {chainConfig.timeline.length}
+            步骤: {currentTimeline.step} / {modelData.timeline.length}
           </span>
           <div style={styles.btnGroup}>
             <button
@@ -244,7 +248,7 @@ export const SegmentChainPlayer: React.FC = () => {
               上一步
             </button>
             <button style={styles.btn} onClick={nextStep} type="button">
-              {currentStepIndex === chainConfig.timeline.length - 1 ? '重置播放' : '下一步'}
+              {currentStepIndex === modelData.timeline.length - 1 ? '重置播放' : '下一步'}
             </button>
           </div>
         </div>

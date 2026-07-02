@@ -1,5 +1,15 @@
 import React, { useState } from 'react'
 
+export interface PointIntervalModelData {
+  canvas?: {
+    width: number
+    height: number
+    unit: string
+  }
+  layers: LayerConfig[]
+  timeline: TimelineStep[]
+}
+
 interface BlockConfig {
   id: string
   type: 'repeat' | 'fixed'
@@ -21,7 +31,7 @@ interface TimelineStep {
   desc: string
 }
 
-const JSON_CONFIG: { layers: LayerConfig[]; timeline: TimelineStep[] } = {
+const JSON_CONFIG: PointIntervalModelData = {
   layers: [
     {
       id: 'line_1',
@@ -62,16 +72,20 @@ const JSON_CONFIG: { layers: LayerConfig[]; timeline: TimelineStep[] } = {
   ],
 }
 
-export const PointIntervalPlayer: React.FC = () => {
+export interface PointIntervalPlayerProps {
+  modelData?: PointIntervalModelData
+}
+
+export const PointIntervalPlayer: React.FC<PointIntervalPlayerProps> = ({ modelData = JSON_CONFIG }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0)
 
-  const targetLayer = JSON_CONFIG.layers[0]
+  const targetLayer = modelData.layers[0]
   const targetBlock = targetLayer.blocks[0]
-  const currentStep = JSON_CONFIG.timeline[currentStepIndex]
+  const currentStep = modelData.timeline[currentStepIndex]
   const { action, desc, step } = currentStep
 
   const handleNext = () => {
-    if (currentStepIndex === JSON_CONFIG.timeline.length - 1) {
+    if (currentStepIndex === modelData.timeline.length - 1) {
       setCurrentStepIndex(0)
     } else {
       setCurrentStepIndex((prev) => prev + 1)
@@ -171,7 +185,7 @@ export const PointIntervalPlayer: React.FC = () => {
 
         <div style={styles.controlBar}>
           <span style={styles.stepIndicator}>
-            步骤: {step} / {JSON_CONFIG.timeline.length}
+            步骤: {step} / {modelData.timeline.length}
           </span>
           <div style={styles.btnGroup}>
             <button
@@ -183,7 +197,7 @@ export const PointIntervalPlayer: React.FC = () => {
               上一步
             </button>
             <button style={styles.btnPrimary} onClick={handleNext} type="button">
-              {currentStepIndex === JSON_CONFIG.timeline.length - 1 ? '重置播放' : '下一步'}
+              {currentStepIndex === modelData.timeline.length - 1 ? '重置播放' : '下一步'}
             </button>
           </div>
         </div>

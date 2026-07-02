@@ -152,6 +152,21 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
 
     const layer = layers[0]
     const totalValue = layer.total
+    const blockValues = layer.blocks.map((block) =>
+      block.type === 'repeat' ? block.count * block.value : block.value,
+    )
+    const configuredBlockTotal = blockValues.reduce((sum, value) => sum + value, 0)
+
+    // AI 偶尔会把“剩余块”填成 0；用总量补齐最后一块，避免整条线被压缩。
+    if (blockValues.length > 0 && totalValue > configuredBlockTotal) {
+      blockValues[blockValues.length - 1] += totalValue - configuredBlockTotal
+    }
+
+    const visualTotal = Math.max(
+      totalValue,
+      blockValues.reduce((sum, value) => sum + value, 0),
+      1,
+    )
 
     ctx.save()
     ctx.font = 'bold 14px sans-serif'
@@ -163,13 +178,18 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
 
     let currentX = startX
 
-    layer.blocks.forEach((block) => {
-      let blockWidth = 0
-      if (block.type === 'repeat') {
-        blockWidth = ((block.count * block.value) / totalValue) * availableWidth
-      } else {
-        blockWidth = (block.value / totalValue) * availableWidth
-      }
+    layer.blocks.forEach((block, blockIndex) => {
+      const blockValue = blockValues[blockIndex]
+      const blockWidth = (blockValue / visualTotal) * availableWidth
+      const isLastBlock = blockIndex === layer.blocks.length - 1
+      const unitValue = block.type === 'repeat' && block.count > 0
+        ? blockValue / block.count
+        : blockValue
+      const formattedUnitValue = Number.isInteger(unitValue)
+        ? String(unitValue)
+        : String(Number(unitValue.toFixed(2)))
+      const showRepeatSummary =
+        block.type === 'repeat' && (action === 'divide_grid' || action === 'solve_unit')
 
       const isFocused = focusIds.includes(block.id) || focusIds.includes(layer.id)
 
@@ -178,7 +198,7 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
         ctx.globalAlpha = 0.25
       }
 
-      if (action === 'highlight_base' && block.id === 'b2') {
+      if (action === 'highlight_base' && isLastBlock) {
         ctx.shadowColor = '#F5A623'
         ctx.shadowBlur = 10 + (1 - pulseAlphaRef.current) * 10
         ctx.fillStyle = `rgba(245, 166, 35, ${0.7 + pulseAlphaRef.current * 0.3})`
@@ -212,7 +232,7 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
           for (let i = 0; i < block.count; i += 1) {
             const textX = currentX + i * cellWidth + cellWidth / 2
             if (cellWidth > 15) {
-              ctx.fillText(String(block.value), textX, lineY + blockHeight / 2)
+              ctx.fillText(formattedUnitValue, textX, lineY + blockHeight / 2)
             }
           }
         } else {
@@ -220,36 +240,45 @@ const SegmentModel: React.FC<SegmentModelProps> = ({ modelData }) => {
           ctx.font = '14px sans-serif'
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(block.name, currentX + blockWidth / 2, lineY + blockHeight / 2)
+          ctx.fillText(
+            block.name,
+            currentX + blockWidth / 2,
+            lineY + blockHeight / 2,
+            Math.max(blockWidth - 8, 1),
+          )
         }
       } else {
         ctx.fillStyle = '#ffffff'
         ctx.font = 'bold 13px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(block.name, currentX + blockWidth / 2, lineY + blockHeight / 2)
+        ctx.fillText(
+          block.name,
+          currentX + blockWidth / 2,
+          lineY + blockHeight / 2,
+          Math.max(blockWidth - 8, 1),
+        )
       }
 
-      if (block.id === 'b2') {
+      if (isLastBlock || showRepeatSummary) {
         drawBracket(ctx, currentX, lineY + blockHeight + 8, currentX + blockWidth, lineY + blockHeight + 8, false)
-        ctx.fillStyle = '#e28743'
+        ctx.fillStyle = showRepeatSummary ? '#10B981' : '#e28743'
         ctx.font = 'bold 13px sans-serif'
         ctx.textAlign = 'center'
-        ctx.fillText(`${block.value}${canvasConfig.unit}`, currentX + blockWidth / 2, lineY + blockHeight + 30)
+        ctx.fillText(
+          showRepeatSummary
+            ? `${block.name}共: ${blockValue}${canvasConfig.unit}`
+            : `${blockValue}${canvasConfig.unit}`,
+          currentX + blockWidth / 2,
+          lineY + blockHeight + 30,
+          Math.max(blockWidth, 1),
+        )
 
         if (action === 'highlight_base') {
           ctx.fillStyle = '#ef4444'
           ctx.font = 'bold 18px sans-serif'
-          ctx.fillText('- 44', currentX + blockWidth / 2, lineY - 15)
+          ctx.fillText(`- ${blockValue}`, currentX + blockWidth / 2, lineY - 15)
         }
-      }
-
-      if (block.id === 'b1' && (action === 'divide_grid' || action === 'solve_unit')) {
-        drawBracket(ctx, currentX, lineY + blockHeight + 8, currentX + blockWidth, lineY + blockHeight + 8, false)
-        ctx.fillStyle = '#10B981'
-        ctx.font = 'bold 13px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(`12把共: 456${canvasConfig.unit}`, currentX + blockWidth / 2, lineY + blockHeight + 30)
       }
 
       ctx.restore()
@@ -439,6 +468,8 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 }
 
-export default function UniversalTapeMatrixLabMultiplyDivide() {
-  return <SegmentModel modelData={defaultModelData} />
+export default function UniversalTapeMatrixLabMultiplyDivide({
+  modelData = defaultModelData,
+}: Partial<SegmentModelProps>) {
+  return <SegmentModel modelData={modelData} />
 }

@@ -5,6 +5,13 @@ import { useAuth } from '../../stores/authStore'
 import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
 import { getUserQuestion } from '../../lib/user-questions'
 import { Button } from '../../components/ui/Button'
+import BasicPage from '../../components/preview/BasicPage'
+import type { UserQuestion } from '../../types/auth'
+
+type DemoRow = {
+  question_id?: string
+  html_url?: string
+}
 
 export default function MyDemoPage() {
   const { demoId } = useParams<{ demoId: string }>()
@@ -12,6 +19,7 @@ export default function MyDemoPage() {
   const { user, subscription, isLoggedIn, isLoading } = useAuth()
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
+  const [question, setQuestion] = useState<UserQuestion | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
 
   useEffect(() => {
@@ -23,10 +31,11 @@ export default function MyDemoPage() {
       setLoadState('loading')
       setHtmlContent(null)
       setHtmlUrl(null)
+      setQuestion(null)
 
-      const { data } = await authedRequest<any[]>(`/question_demos?id=eq.${demoId}`)
+      const { data } = await authedRequest<DemoRow[]>(`/question_demos?id=eq.${demoId}`)
       const demo = data?.[0]
-      if (!demo?.html_url || cancelled) {
+      if (!demo?.html_url || !demo.question_id || cancelled) {
         if (!cancelled) setLoadState('notfound')
         return
       }
@@ -38,6 +47,11 @@ export default function MyDemoPage() {
         setLoadState('locked')
         return
       }
+      if (!question || cancelled) {
+        if (!cancelled) setLoadState('notfound')
+        return
+      }
+      setQuestion(question)
 
       const url = demo.html_url
 
@@ -183,23 +197,18 @@ export default function MyDemoPage() {
         </button>
       )}
 
-      {htmlContent && (
-        <iframe
-          srcDoc={htmlContent}
-          title="演示"
-          className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin"
-          allowFullScreen
-        />
-      )}
-      {htmlUrl && (
-        <iframe
-          src={htmlUrl}
-          title="演示"
-          className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin"
-          allowFullScreen
-        />
+      {question && loadState === 'ready' && (
+        <div className="h-full overflow-y-auto bg-[#FAFAFA] px-4 py-16 sm:px-6">
+          <div className="mx-auto max-w-5xl">
+            <BasicPage
+              question_text={question.questionText}
+              math_analysis_json={question.mathAnalysisJson}
+              logic_analysis_json={question.logicAnalysisJson}
+              tutor_analysis_json={question.tutorAnalysisJson}
+              component_analysis_json={question.componentAnalysisJson}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

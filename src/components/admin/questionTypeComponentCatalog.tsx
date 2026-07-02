@@ -65,14 +65,14 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
     id: 'scene',
     label: 'Layout / Scene',
-    helper: '唯一的页面骨架，先把观察 - 发现 - 引导与思考三段切好。',
+    helper: '唯一的页面骨架，固定展示观察区和发现区。',
     choices: [
       {
         key: 'ThreeZoneLayout',
-        zh: '三区布局',
+        zh: '观察发现布局',
         en: 'ThreeZoneLayout',
-        description: '把一张页面固定切成观察区、发现区和引导与思考区。',
-        preview: miniCard('三区布局', 'ThreeZoneLayout', <div className="space-y-2"><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-link-bg-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /></div>),
+        description: '把一张页面固定切成观察区和发现区。',
+        preview: miniCard('观察发现布局', 'ThreeZoneLayout', <div className="space-y-2"><div className="h-10 rounded-[10px] bg-[var(--color-canvas-soft)]" /><div className="h-10 rounded-[10px] bg-[var(--color-link-bg-soft)]" /></div>),
       },
     ],
   },

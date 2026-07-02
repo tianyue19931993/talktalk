@@ -48,6 +48,97 @@ function getChallengeData(question) {
   }
 }
 
+function toStepNumber(value, fallback) {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function getDiscoveryData(question) {
+  const challengeByStep = new Map(
+    getChallengeData(question).steps.map((item, index) => [
+      toStepNumber(item.step, index + 1),
+      item,
+    ]),
+  )
+
+  return normalizeArray(question.component_analysis_json)
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item && typeof item === 'object')
+    .filter(({ item }) => ['Combine', 'Separate', 'Replicate', 'Partition'].includes(safeText(item.component)))
+    .sort((left, right) => {
+      const leftStep = toStepNumber(left.item?.step_info?.current, left.index + 1)
+      const rightStep = toStepNumber(right.item?.step_info?.current, right.index + 1)
+      return leftStep - rightStep || left.index - right.index
+    })
+    .map(({ item, index }) => {
+      const step = toStepNumber(item?.step_info?.current, index + 1)
+      return { config: item, step, challenge: challengeByStep.get(step) }
+    })
+}
+
+function renderModelBars(config) {
+  const component = safeText(config?.component)
+  const bars = normalizeArray(config?.bars)
+  const primary = bars[0] || {}
+  const color = safeText(primary.color) || '#7928CA'
+  const value = primary.value ?? ''
+  const unit = safeText(primary.unit || config?.step_info?.unit || '')
+
+  if (component === 'Partition') {
+    const parts = Math.max(1, Math.min(30, Math.floor(Number(config?.parts) || 1)))
+    return `<div class="model-row model-grid">${Array.from({ length: parts }, () => `
+      <div class="model-cell" style="background:${escapeHtml(color)}"><span>${escapeHtml(String(value))}</span></div>
+    `).join('')}</div>`
+  }
+
+  if (component === 'Replicate') {
+    const multiplier = Math.max(1, Math.min(30, Math.floor(Number(config?.multiplier) || 1)))
+    return `<div class="model-row model-grid">${Array.from({ length: multiplier }, (_, index) => `
+      <div class="model-cell ${index > 0 ? 'model-clone' : ''}" style="background:${escapeHtml(color)}"><span>${escapeHtml(String(value))}</span></div>
+    `).join('')}</div>`
+  }
+
+  return `<div class="model-row">${bars.map((bar, index) => `
+    <div class="model-bar ${component === 'Separate' && index === 1 ? 'model-cut' : ''}" style="background:${escapeHtml(safeText(bar?.color) || (index ? '#FF0080' : '#7928CA'))}">
+      ${escapeHtml(safeText(bar?.label) || `数量 ${index + 1}`)}：${escapeHtml(String(bar?.value ?? ''))}${escapeHtml(safeText(bar?.unit || unit))}
+    </div>
+  `).join('')}</div>`
+}
+
+function renderDiscoveryBlock({ config, step, challenge }, index) {
+  const component = safeText(config?.component)
+  const answerName = safeText(config?.step_info?.answer_name || '结果')
+  const answerValue = config?.step_info?.answer_value ?? ''
+  const answerUnit = safeText(config?.step_info?.unit || '')
+  const actionLabel = {
+    Combine: '合并数量',
+    Separate: '点击剪刀',
+    Replicate: '叠加倍数',
+    Partition: '均分总量',
+  }[component] || '开始互动'
+
+  return `
+    <article class="discovery-block" data-discovery-block>
+      <div class="discovery-prompt">
+        <span class="discovery-step">步骤 ${escapeHtml(String(step))}</span>
+        <div>
+          <div class="discovery-question">${escapeHtml(challenge?.question || '请观察下面的互动，想一想这一步该怎样解决？')}</div>
+          ${challenge?.hint ? `<div class="discovery-hint">提示：${escapeHtml(challenge.hint)}</div>` : ''}
+        </div>
+      </div>
+      <div class="component-stage">
+        <div class="component-formula">${escapeHtml(safeText(config?.formula || component))}</div>
+        <div class="model-track">${renderModelBars(config)}</div>
+        <div class="component-answer" data-component-answer>${escapeHtml(answerName)}：${escapeHtml(String(answerValue))}${escapeHtml(answerUnit)}</div>
+      </div>
+      <div class="component-actions">
+        <button type="button" class="reset-button" data-reset>重置</button>
+        <button type="button" class="action-button" data-run>${escapeHtml(actionLabel)}</button>
+      </div>
+      <span class="sr-only">逻辑块 ${index + 1}：${escapeHtml(component)}</span>
+    </article>`
+}
+
 function urlsafe(value) {
   const buffer = typeof value === 'string' ? Buffer.from(value) : value
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
@@ -113,7 +204,7 @@ async function getCurrentUser(authHeader) {
 
 function buildDemoHtml(question) {
   const observation = getObservationData(question)
-  const challenge = getChallengeData(question)
+  const discovery = getDiscoveryData(question)
 
   const knownConditionCards = observation.knownConditions.length > 0
     ? observation.knownConditions.map((item) => `
@@ -127,17 +218,9 @@ function buildDemoHtml(question) {
     `).join('')
     : '<div class="empty-card">暂无隐含条件</div>'
 
-  const challengeCards = challenge.steps.length > 0
-    ? challenge.steps.map((step, index) => `
-      <div class="challenge-card">
-        <div class="challenge-head">
-          <span class="challenge-step">步骤 ${escapeHtml(String(step.step ?? index + 1))}</span>
-          <span class="challenge-question">${escapeHtml(step.question || '未提供问题')}</span>
-        </div>
-        <div class="challenge-hint">${escapeHtml(step.hint || '未提供提示')}</div>
-      </div>
-    `).join('')
-    : '<div class="empty-card">暂无挑战步骤</div>'
+  const discoveryBlocks = discovery.length > 0
+    ? discovery.map(renderDiscoveryBlock).join('')
+    : '<div class="empty-card discovery-empty">互动组件配置暂不可用</div>'
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -168,7 +251,7 @@ function buildDemoHtml(question) {
       margin: 0 auto;
       padding: 24px 18px 40px;
     }
-    .zone, .panel, .condition-card, .challenge-card, .empty-card {
+    .zone, .panel, .condition-card, .empty-card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 24px;
@@ -259,46 +342,6 @@ function buildDemoHtml(question) {
       background: #FAFAFA;
       border-style: dashed;
     }
-    .challenge-list {
-      display: grid;
-      gap: 12px;
-    }
-    .challenge-card {
-      padding: 16px;
-    }
-    .challenge-head {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-align: left;
-    }
-    .challenge-step {
-      flex-shrink: 0;
-      border-radius: 999px;
-      background: rgba(0,112,243,0.08);
-      color: var(--blue);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 5px 10px;
-    }
-    .challenge-question {
-      flex: 1;
-      min-width: 0;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      text-align: left;
-      line-height: 1.6;
-    }
-    .challenge-hint {
-      margin-top: 10px;
-      border-radius: 16px;
-      background: #FAFAFA;
-      padding: 12px 14px;
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--body);
-    }
     .logic-json {
       margin-top: 16px;
       border-radius: 18px;
@@ -319,6 +362,35 @@ function buildDemoHtml(question) {
       color: var(--blue);
       font-size: 12px;
       text-align: left;
+    }
+    .discovery-list { display: grid; gap: 18px; margin-top: 16px; }
+    .discovery-block { border: 1px solid var(--border); border-radius: 24px; padding: 18px; background: #fff; }
+    .discovery-prompt { display: flex; align-items: flex-start; gap: 12px; border: 1px solid #DCE8F8; border-radius: 18px; background: #F8FBFF; padding: 14px; }
+    .discovery-step { flex: 0 0 auto; border-radius: 999px; background: var(--blue); color: #fff; padding: 5px 10px; font-size: 11px; font-weight: 700; }
+    .discovery-question { color: var(--text); font-size: 14px; font-weight: 650; line-height: 1.6; }
+    .discovery-hint { margin-top: 4px; color: #777; font-size: 12px; line-height: 1.6; }
+    .component-stage { margin-top: 14px; min-height: 190px; border: 1px solid #E2E8F0; border-radius: 20px; padding: 20px; overflow: hidden; }
+    .component-formula { width: fit-content; margin: 0 auto 22px; border-radius: 999px; background: #F1F5F9; padding: 8px 20px; color: #475569; font-size: 15px; font-weight: 700; }
+    .model-track { max-width: 560px; margin: 0 auto; border: 2px dashed #CBD5E1; border-radius: 16px; background: #F8FAFC; padding: 5px; }
+    .model-row { display: flex; min-height: 58px; gap: 4px; }
+    .model-bar { flex: 1 1 0; display: flex; align-items: center; justify-content: center; border-radius: 11px; color: #fff; padding: 8px; font-size: 12px; font-weight: 700; text-align: center; transition: transform .45s, opacity .45s; }
+    .model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12px, 1fr)); gap: 3px; }
+    .model-cell { min-width: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: #fff; font-size: 9px; font-weight: 800; transform: scale(.72); opacity: .18; transition: transform .35s, opacity .35s; }
+    .component-answer { margin-top: 16px; color: #059669; font-size: 18px; font-weight: 800; text-align: center; opacity: 0; transform: translateY(-5px); transition: opacity .35s, transform .35s; }
+    .component-actions { display: flex; gap: 10px; margin-top: 14px; }
+    .component-actions button { border: 0; border-radius: 12px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .reset-button { border: 1px solid #CBD5E1 !important; background: #fff; color: #64748B; }
+    .action-button { background: #075DCE; color: #fff; }
+    .discovery-block.is-complete .model-cell { transform: scale(1); opacity: 1; }
+    .discovery-block.is-complete .model-cut { transform: translateY(18px) rotate(2deg); opacity: .48; }
+    .discovery-block.is-complete .component-answer { opacity: 1; transform: translateY(0); }
+    .discovery-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; text-align: center; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 640px) {
+      .discovery-block { padding: 12px; }
+      .discovery-prompt { flex-direction: column; }
+      .component-stage { padding: 14px 10px; }
+      .model-bar { font-size: 10px; }
     }
   </style>
 </head>
@@ -356,18 +428,21 @@ function buildDemoHtml(question) {
 
     <section class="zone">
       <div class="zone-title" style="background: linear-gradient(135deg, #0070F3 0%, #7928CA 100%);">2. 发现区</div>
-      <div class="empty-card" style="min-height: 180px; display: flex; align-items: center; justify-content: center; text-align: center;">
-        先留空白，后续再填发现区组件
-      </div>
-    </section>
-
-    <section class="zone">
-      <div class="zone-title">3. 挑战区</div>
-      <div class="challenge-list">
-        ${challengeCards}
+      <div class="discovery-list">
+        ${discoveryBlocks}
       </div>
     </section>
   </div>
+  <script>
+    document.querySelectorAll('[data-discovery-block]').forEach(function (block) {
+      block.querySelector('[data-run]').addEventListener('click', function () {
+        block.classList.add('is-complete')
+      })
+      block.querySelector('[data-reset]').addEventListener('click', function () {
+        block.classList.remove('is-complete')
+      })
+    })
+  </script>
 </body>
 </html>`
 }
@@ -410,7 +485,7 @@ export default async function handler(req, res) {
 
     const { data: questionRows, error: questionError } = await query('user_questions', {
       filters: { id: questionId },
-      select: 'id,user_id,question_text,math_analysis_json,logic_analysis_json,tutor_analysis_json,status',
+      select: 'id,user_id,question_text,math_analysis_json,logic_analysis_json,tutor_analysis_json,component_analysis_json,status',
       limit: 1,
     })
     if (questionError) {

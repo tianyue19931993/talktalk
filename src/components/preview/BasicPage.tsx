@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { MHint, MInfo } from './stageOneBlocks'
+import { MHint } from './stageOneBlocks'
 import UniversalTapeMatrixLabDiscovery from './UniversalTapeMatrixLabDiscovery'
 
 type ObservationHintData = {
@@ -14,15 +14,6 @@ type ObservationHintData = {
   }>
   hidden_conditions: Array<{
     text: string
-  }>
-}
-
-type ChallengeInfoData = {
-  challenge_steps: Array<{
-    step?: number
-    hint: string
-    question: string
-    logic_type?: string
   }>
 }
 
@@ -78,24 +69,12 @@ function toObservationHintData(value: unknown, questionText: string): Observatio
   }
 }
 
-function toChallengeInfoData(value: unknown): ChallengeInfoData {
-  if (isRecord(value) && Array.isArray(value.challenge_steps)) {
-    return value as ChallengeInfoData
-  }
-
-  return {
-    challenge_steps: [],
-  }
-}
-
 function ThreeZoneLayout({
   observation,
   discovery,
-  challenge,
 }: {
   observation: ReactNode
   discovery: ReactNode
-  challenge: ReactNode
 }) {
   return (
     <div className="grid gap-5 bg-[#FAFAFA] text-[#171717]">
@@ -112,13 +91,6 @@ function ThreeZoneLayout({
         </div>
         <div className="mt-4">{discovery}</div>
       </section>
-
-      <section className="rounded-[28px] border border-[#E8E8E8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-        <div className="inline-flex rounded-full bg-gradient-to-r from-[#7928CA] to-[#FF0080] px-3 py-1 text-[11px] font-medium text-white">
-          3. 挑战区
-        </div>
-        <div className="mt-4">{challenge}</div>
-      </section>
     </div>
   )
 }
@@ -131,7 +103,6 @@ export default function BasicPage({
   component_analysis_json,
 }: BasicPageProps) {
   const observationData = toObservationHintData(math_analysis_json, question_text)
-  const challengeData = toChallengeInfoData(tutor_analysis_json)
 
   return (
     <ThreeZoneLayout
@@ -151,10 +122,8 @@ export default function BasicPage({
         <UniversalTapeMatrixLabDiscovery
           logicAnalysisJson={logic_analysis_json}
           componentAnalysisJson={component_analysis_json}
+          tutorAnalysisJson={tutor_analysis_json}
         />
-      )}
-      challenge={(
-        <MInfo data={challengeData} />
       )}
     />
   )

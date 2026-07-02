@@ -131,6 +131,11 @@ async function runAnalysisStep({
 
 const ALLOWED_MATH_OPERATION_TYPES = new Set(['加', '减', '乘', '除以', '除'])
 
+function isValidMathValue(value) {
+  if (Number.isFinite(value)) return true
+  return typeof value === 'string' && /^\d{1,2}[:：]\d{2}$/.test(value.trim())
+}
+
 function validateMathAnalysis(mathAnalysis) {
   if (!Array.isArray(mathAnalysis?.known_conditions)) {
     return { ok: false, message: 'math_analysis.known_conditions 必须是数组' }
@@ -147,8 +152,11 @@ function validateMathAnalysis(mathAnalysis) {
     if (!safeText(condition?.name)) {
       return { ok: false, message: `known_conditions 第 ${index + 1} 项的 name 不能为空` }
     }
-    if (condition?.value !== null && !Number.isFinite(condition?.value)) {
-      return { ok: false, message: `known_conditions 第 ${index + 1} 项的 value 必须是数字或 null` }
+    if (condition?.value !== null && !isValidMathValue(condition?.value)) {
+      return {
+        ok: false,
+        message: `known_conditions 第 ${index + 1} 项的 value 必须是数字、时刻字符串或 null`,
+      }
     }
     if (typeof condition?.unit !== 'string') {
       return { ok: false, message: `known_conditions 第 ${index + 1} 项的 unit 必须是字符串` }
@@ -203,10 +211,17 @@ function validateMathAnalysis(mathAnalysis) {
       if (!safeText(mathObject?.name)) {
         return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.name 不能为空` }
       }
-      if (!Number.isFinite(mathObject?.value)) {
-        return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.value 必须是数字` }
+      if (
+        mathObject?.value !== undefined
+        && mathObject.value !== null
+        && !isValidMathValue(mathObject.value)
+      ) {
+        return {
+          ok: false,
+          message: `logic_stages 第 ${expectedStep} 项的 math_object.value 必须是数字或时刻字符串`,
+        }
       }
-      if (typeof mathObject?.unit !== 'string') {
+      if (mathObject?.unit !== undefined && typeof mathObject.unit !== 'string') {
         return { ok: false, message: `logic_stages 第 ${expectedStep} 项的 math_object.unit 必须是字符串` }
       }
     }

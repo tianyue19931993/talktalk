@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import UniversalTapeMatrixLabCompare from '../../components/admin/UniversalTapeMatrixLabCompare'
+import UniversalTapeMatrixLabMultiplyDivide from '../../components/admin/UniversalTapeMatrixLabMultiplyDivide'
+import { SegmentChainPlayer } from '../../components/admin/UniversalTapeMatrixLabSegmentChain'
 
 type LabTab = {
   name: string
@@ -74,12 +77,28 @@ export default function UniversalTapeMatrixLabPage() {
           </div>
 
           <div className="mt-4 min-h-[320px] rounded-[24px] border border-dashed border-[var(--color-hairline)] bg-white p-4">
-            <div className="text-sm font-medium text-[var(--color-ink)]">
-              {currentTab.name}
-            </div>
-            <div className="mt-2 text-xs text-[var(--color-mute)]">
-              这里先留空，后续你可以直接往这个 Tab 里加组件。
-            </div>
+            {currentTab.name === 'UniversalTapeMatrixLab-multiply_divide' ? (
+              <div className="flex justify-center">
+                <UniversalTapeMatrixLabMultiplyDivide />
+              </div>
+            ) : currentTab.name === 'UniversalTapeMatrixLab-compare' ? (
+              <div className="flex justify-center">
+                <UniversalTapeMatrixLabCompare />
+              </div>
+            ) : currentTab.name === 'UniversalTapeMatrixLab-segment_chain' ? (
+              <div className="flex justify-center">
+                <SegmentChainPlayer />
+              </div>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-[var(--color-ink)]">
+                  {currentTab.name}
+                </div>
+                <div className="mt-2 text-xs text-[var(--color-mute)]">
+                  这里先留空，后续你可以直接往这个 Tab 里加组件。
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

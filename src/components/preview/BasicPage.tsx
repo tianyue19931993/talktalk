@@ -29,6 +29,7 @@ export type BasicPageProps = {
   logic_analysis_json: unknown
   tutor_analysis_json: unknown
   component_analysis_json?: unknown
+  discovery_mode?: 'components' | 'empty'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -179,6 +180,7 @@ export default function BasicPage({
   logic_analysis_json,
   tutor_analysis_json,
   component_analysis_json,
+  discovery_mode = 'components',
 }: BasicPageProps) {
   const observationData = toObservationHintData(math_analysis_json, question_text)
 
@@ -196,11 +198,15 @@ export default function BasicPage({
         </div>
       )}
       discovery={(
-        <UniversalTapeMatrixLabDiscovery
-          logicAnalysisJson={logic_analysis_json}
-          componentAnalysisJson={component_analysis_json}
-          tutorAnalysisJson={tutor_analysis_json}
-        />
+        discovery_mode === 'empty' ? (
+          <div className="min-h-[220px]" aria-label="生动演示发现区待完善" />
+        ) : (
+          <UniversalTapeMatrixLabDiscovery
+            logicAnalysisJson={logic_analysis_json}
+            componentAnalysisJson={component_analysis_json}
+            tutorAnalysisJson={tutor_analysis_json}
+          />
+        )
       )}
     />
   )

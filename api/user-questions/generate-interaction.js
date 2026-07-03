@@ -510,6 +510,7 @@ export default async function handler(req, res) {
   try {
     const body = normalizeBody(req.body)
     const questionId = safeText(body.questionId)
+    const mode = body.mode === 'vivid' ? 'vivid' : 'basic'
     if (!questionId) {
       return res.status(400).json({ success: false, error: '缺少 questionId' })
     }
@@ -546,7 +547,7 @@ export default async function handler(req, res) {
 
     const { data: demoRows, error: demoError } = await query('question_demos', {
       filters: { question_id: questionId },
-      select: 'id',
+      select: 'id,title',
       order: 'created_at',
       ascending: false,
     })
@@ -554,8 +555,24 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, error: `读取演示记录失败: ${demoError}` })
     }
 
-    const title = `演示 ${Array.isArray(demoRows) ? demoRows.length + 1 : 1}`
-    const html = buildComponentDemoHtml(question, getRequestOrigin(req)) || buildDemoHtml(question)
+    const hasBasicInteraction = Array.isArray(demoRows) && demoRows.some((demo) => {
+      const demoTitle = safeText(demo?.title)
+      return /^基础互动\s*\d+$/.test(demoTitle) || /^演示\s+\d+$/.test(demoTitle)
+    })
+    if (mode === 'basic' && hasBasicInteraction) {
+      return res.status(409).json({ success: false, error: '基础互动已经生成，不能重复生成' })
+    }
+
+    const vividCount = Array.isArray(demoRows)
+      ? demoRows.filter((demo) => /^演示\d+$/.test(safeText(demo?.title))).length
+      : 0
+    const title = mode === 'vivid' ? `演示${vividCount + 1}` : '基础互动 1'
+    const html = buildComponentDemoHtml(
+      question,
+      getRequestOrigin(req),
+      {},
+      { discoveryMode: mode === 'vivid' ? 'empty' : 'components' },
+    ) || buildDemoHtml(question)
     const htmlUrl = await uploadHtmlContent(html, questionId)
 
     const demoInsert = await insert('question_demos', {

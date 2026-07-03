@@ -88,6 +88,22 @@ function rowToDemo(row: DbRow): QuestionDemo {
   }
 }
 
+export function isVividDemo(demo: Pick<QuestionDemo, 'title'>): boolean {
+  return /^演示\d+$/.test((demo.title || '').trim())
+}
+
+export function isBasicInteractionDemo(demo: Pick<QuestionDemo, 'title'>): boolean {
+  const title = (demo.title || '').trim()
+  return /^基础互动\s*\d+$/.test(title) || /^演示\s+\d+$/.test(title)
+}
+
+export function getDemoDisplayTitle(demo: Pick<QuestionDemo, 'title'>): string {
+  const title = (demo.title || '').trim()
+  const legacyBasicNumber = title.match(/^演示\s+(\d+)$/)?.[1]
+  if (legacyBasicNumber) return `基础互动 ${legacyBasicNumber}`
+  return title || '基础互动 1'
+}
+
 export interface GenerateQuestionDemoResult {
   success?: boolean
   error?: string
@@ -135,7 +151,7 @@ export async function deleteQuestionDemo(id: string): Promise<void> {
 }
 
 /** 为题目生成一条新的互动演示记录 */
-export async function generateQuestionDemo(questionId: string): Promise<GenerateQuestionDemoResult> {
+export async function generateQuestionDemo(questionId: string, mode: 'basic' | 'vivid' = 'basic'): Promise<GenerateQuestionDemoResult> {
   const session = loadSession()
   if (!session) {
     return { success: false, error: 'Not authenticated' }
@@ -148,7 +164,7 @@ export async function generateQuestionDemo(questionId: string): Promise<Generate
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.accessToken}`,
       },
-      body: JSON.stringify({ questionId }),
+      body: JSON.stringify({ questionId, mode }),
     })
 
     const text = await res.text()

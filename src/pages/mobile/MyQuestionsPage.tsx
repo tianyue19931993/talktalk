@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Clock, CheckCircle, Play, Search, RefreshCw, Sparkles, Download } from 'lucide-react'
-import { downloadQuestionDemo, generateQuestionDemo, getMyQuestions, getQuestionDemosBatch } from '../../lib/user-questions'
+import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemosBatch, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -21,6 +21,7 @@ export default function MyQuestionsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [vividGeneratingId, setVividGeneratingId] = useState<string | null>(null)
   const [generateHint, setGenerateHint] = useState<{ id: string; text: string } | null>(null)
 
   const filteredQuestions = useMemo(() => {
@@ -75,9 +76,30 @@ export default function MyQuestionsPage() {
     }
   }
 
+  const handleGenerateVividDemo = async (question: UserQuestion) => {
+    if (vividGeneratingId) return
+
+    setVividGeneratingId(question.id)
+    setGenerateHint({ id: question.id, text: '正在生成生动演示...' })
+    try {
+      const result = await generateQuestionDemo(question.id, 'vivid')
+      if (result.success) {
+        setGenerateHint({ id: question.id, text: `观看 ${result.demo?.title || '演示1'}` })
+        await loadAll()
+      } else {
+        setGenerateHint({ id: question.id, text: result.error || '生成失败，请重试' })
+      }
+    } finally {
+      window.setTimeout(() => {
+        setVividGeneratingId(null)
+        setGenerateHint(null)
+      }, 2200)
+    }
+  }
+
   const handleDownloadDemo = async (demo: QuestionDemo) => {
     try {
-      await downloadQuestionDemo(demo.id, demo.title || '演示')
+      await downloadQuestionDemo(demo.id, getDemoDisplayTitle(demo))
     } catch (error) {
       alert(error instanceof Error ? error.message : '下载失败')
     }
@@ -99,7 +121,7 @@ export default function MyQuestionsPage() {
 
   const formatStatusTime = (q: UserQuestion, demo?: QuestionDemo) => {
     if (demo) return `生成于 ${formatDateTime(demo.createdAt)}`
-    return `提交于 ${formatDateTime(q.createdAt)}`
+    return formatDateTime(q.createdAt)
   }
 
   if (!isLoggedIn) return null
@@ -169,7 +191,8 @@ export default function MyQuestionsPage() {
             const StatusIcon = st.icon
             const canGenerateInteraction = q.status !== 'pending'
             const generatedLabel = generateHint?.id === q.id ? generateHint.text : ''
-            const generateButtonLabel = demos.length > 0 ? '重新生成' : '生成互动'
+            const hasBasicInteraction = demos.some(isBasicInteractionDemo)
+            const hasVividDemo = demos.some(isVividDemo)
             return (
               <div
                 key={q.id}
@@ -179,7 +202,7 @@ export default function MyQuestionsPage() {
                   {q.questionText}
                 </p>
 
-                <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span className={`inline-flex items-center gap-1 shrink-0 text-[10px] px-2 py-0.5 rounded-full ${st.color}`}>
                       <StatusIcon className="w-3 h-3" />
@@ -192,17 +215,30 @@ export default function MyQuestionsPage() {
                     </span>
                   </div>
                   {canGenerateInteraction && (
-                    <button
-                      onClick={() => handleGenerateInteraction(q)}
-                      disabled={generatingId === q.id}
-                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
-                        bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                        hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                        transition-all duration-200 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${generatingId === q.id ? 'animate-spin' : ''}`} />
-                      {generatingId === q.id ? '生成中...' : generateButtonLabel}
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!hasBasicInteraction && (
+                        <button
+                          onClick={() => handleGenerateInteraction(q)}
+                          disabled={generatingId === q.id}
+                          className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
+                            bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                            hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                            transition-all duration-200 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${generatingId === q.id ? 'animate-spin' : ''}`} />
+                          {generatingId === q.id ? '生成中...' : '生成基础互动'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateVividDemo(q)}
+                        disabled={vividGeneratingId === q.id}
+                        className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Sparkles className={`h-3 w-3 ${vividGeneratingId === q.id ? 'animate-pulse' : ''}`} />
+                        {vividGeneratingId === q.id ? '生成中...' : hasVividDemo ? '再次生动演示' : '生动演示'}
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -221,7 +257,7 @@ export default function MyQuestionsPage() {
                             transition-all duration-200 cursor-pointer"
                         >
                           <Play className="w-3 h-3" />
-                          观看 {demo.title || '演示'}
+                          观看 {getDemoDisplayTitle(demo)}
                         </button>
                         <button
                           onClick={() => void handleDownloadDemo(demo)}

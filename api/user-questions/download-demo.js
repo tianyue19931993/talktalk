@@ -127,7 +127,13 @@ export default async function handler(req, res) {
 
     const origin = getRequestOrigin(req)
     const runtimeAssets = await loadRuntimeAssets(origin)
-    const html = buildComponentDemoHtml(question, origin, runtimeAssets)
+    const isVivid = /^演示\d+$/.test(safeText(demo.title))
+    const html = buildComponentDemoHtml(
+      question,
+      origin,
+      runtimeAssets,
+      { discoveryMode: isVivid ? 'empty' : 'components' },
+    )
 
     if (!html) {
       return res.status(500).json({ success: false, error: '演示内容为空' })

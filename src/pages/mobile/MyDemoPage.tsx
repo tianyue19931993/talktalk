@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Crown, Download } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
-import { downloadQuestionDemo, getUserQuestion } from '../../lib/user-questions'
+import { downloadQuestionDemo, getDemoDisplayTitle, getUserQuestion, isVividDemo } from '../../lib/user-questions'
 import { Button } from '../../components/ui/Button'
 import BasicPage from '../../components/preview/BasicPage'
 import type { UserQuestion } from '../../types/auth'
 
 type DemoRow = {
   question_id?: string
+  title?: string
 }
 
 export default function MyDemoPage() {
@@ -17,6 +18,8 @@ export default function MyDemoPage() {
   const navigate = useNavigate()
   const { user, subscription, isLoggedIn, isLoading } = useAuth()
   const [question, setQuestion] = useState<UserQuestion | null>(null)
+  const [demoTitle, setDemoTitle] = useState('基础互动 1')
+  const [isVivid, setIsVivid] = useState(false)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
 
   useEffect(() => {
@@ -34,6 +37,8 @@ export default function MyDemoPage() {
         if (!cancelled) setLoadState('notfound')
         return
       }
+      setDemoTitle(getDemoDisplayTitle({ title: demo.title || '' }))
+      setIsVivid(isVividDemo({ title: demo.title || '' }))
 
       const question = await getUserQuestion(demo.question_id)
       const isOwner = !!user && question?.userId === user.id
@@ -57,7 +62,7 @@ export default function MyDemoPage() {
   const handleDownload = async () => {
     if (!demoId) return
     try {
-      await downloadQuestionDemo(demoId, '演示.html')
+      await downloadQuestionDemo(demoId, demoTitle)
     } catch {
       alert('下载失败')
     }
@@ -145,6 +150,7 @@ export default function MyDemoPage() {
               logic_analysis_json={question.logicAnalysisJson}
               tutor_analysis_json={question.tutorAnalysisJson}
               component_analysis_json={question.componentAnalysisJson}
+              discovery_mode={isVivid ? 'empty' : 'components'}
             />
           </div>
         </div>

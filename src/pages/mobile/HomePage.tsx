@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Sparkles, BookOpen, Play, Clock, Send, Loader2, CheckCircle, Download, RefreshCw } from 'lucide-react'
 import { useAuth, refreshUserData } from '../../stores/authStore'
 import { getRemainingGenerations } from '../../lib/supabase-auth'
-import { downloadQuestionDemo, generateQuestionDemo, getMyQuestions, getQuestionDemos } from '../../lib/user-questions'
+import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemos, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
 import { submitQuestionForAnalysis } from '../../lib/question-submit'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -18,6 +18,7 @@ export default function HomePage() {
   const [latestDemos, setLatestDemos] = useState<QuestionDemo[]>([])
   const [latestActionMessage, setLatestActionMessage] = useState('')
   const [latestActionBusy, setLatestActionBusy] = useState(false)
+  const [latestVividBusy, setLatestVividBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const remainingGenerations = getRemainingGenerations(subscription, generation)
@@ -85,6 +86,27 @@ export default function HomePage() {
     } finally {
       window.setTimeout(() => {
         setLatestActionBusy(false)
+      }, 2200)
+    }
+  }
+
+  const handleGenerateVividDemo = async () => {
+    if (!latestQuestion || latestVividBusy) return
+
+    setLatestVividBusy(true)
+    setLatestActionMessage('正在生成生动演示...')
+    try {
+      const result = await generateQuestionDemo(latestQuestion.id, 'vivid')
+      if (result.success) {
+        setLatestActionMessage(`观看 ${result.demo?.title || '演示1'}`)
+        await loadLatest()
+      } else {
+        setLatestActionMessage(result.error || '生成失败，请重试')
+      }
+    } finally {
+      window.setTimeout(() => {
+        setLatestVividBusy(false)
+        setLatestActionMessage('')
       }, 2200)
     }
   }
@@ -169,7 +191,8 @@ export default function HomePage() {
   const latestStatus = latestQuestion?.status || 'pending'
   const latestIsCompleted = latestQuestion?.status === 'completed'
   const latestHasDemo = latestDemos.length > 0 || latestQuestion?.status === 'uploaded'
-  const latestGenerateLabel = latestHasDemo ? '重新生成' : '生成互动'
+  const latestHasBasicInteraction = latestDemos.some(isBasicInteractionDemo) || (latestDemos.length === 0 && latestQuestion?.status === 'uploaded')
+  const latestHasVividDemo = latestDemos.some(isVividDemo)
   const latestStatusMeta = latestHasDemo
     ? { label: '已生成互动', color: 'text-blue-700 bg-blue-50', icon: Sparkles }
     : latestIsCompleted
@@ -257,7 +280,7 @@ export default function HomePage() {
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              {submitting ? '分析中...' : '立即生成'}
+              {submitting ? '分析中...' : '开始分析'}
             </button>
           </div>
         </div>
@@ -274,7 +297,7 @@ export default function HomePage() {
             {latestQuestion.questionText}
           </p>
 
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <span className={`inline-flex items-center gap-1 shrink-0 text-[10px] px-2 py-0.5 rounded-full ${latestStatusMeta.color}`}>
                 <LatestStatusIcon className="w-3 h-3" />
@@ -283,22 +306,35 @@ export default function HomePage() {
               <span className="shrink-0 text-[10px] text-[var(--color-mute)] whitespace-nowrap">
                 {latestStatus === 'completed' && latestDemos.length > 0 && latestDemos[0]
                   ? `生成于 ${formatDateTime(latestDemos[0].createdAt)}`
-                  : `提交于 ${formatDateTime(latestQuestion.createdAt)}`
+                  : formatDateTime(latestQuestion.createdAt)
                 }
               </span>
             </div>
             {latestQuestion?.status !== 'pending' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); void handleGenerateInteraction() }}
-                disabled={latestActionBusy}
-                className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
-                  bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                  hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-200 cursor-pointer"
-              >
-                <RefreshCw className={`w-3 h-3 ${latestActionBusy ? 'animate-spin' : ''}`} />
-                {latestActionBusy ? '生成中...' : latestGenerateLabel}
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {!latestHasBasicInteraction && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void handleGenerateInteraction() }}
+                    disabled={latestActionBusy}
+                    className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium text-white rounded-full
+                      bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                      hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                      transition-all duration-200 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${latestActionBusy ? 'animate-spin' : ''}`} />
+                    {latestActionBusy ? '生成中...' : '生成基础互动'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); void handleGenerateVividDemo() }}
+                  disabled={latestVividBusy}
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Sparkles className={`h-3 w-3 ${latestVividBusy ? 'animate-pulse' : ''}`} />
+                  {latestVividBusy ? '生成中...' : latestHasVividDemo ? '再次生动演示' : '生动演示'}
+                </button>
+              </div>
             )}
           </div>
 
@@ -318,10 +354,10 @@ export default function HomePage() {
                         transition-all duration-200 cursor-pointer"
                     >
                       <Play className="w-3 h-3" />
-                      观看 {demo.title || '演示'}
+                      观看 {getDemoDisplayTitle(demo)}
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); void handleDownloadDemo(demo.id, demo.title) }}
+                      onClick={(e) => { e.stopPropagation(); void handleDownloadDemo(demo.id, getDemoDisplayTitle(demo)) }}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium
                         text-[var(--color-body)] bg-white border border-[var(--color-hairline)]
                         rounded-full hover:border-[var(--color-mute)] hover:text-[var(--color-ink)]

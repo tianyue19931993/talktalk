@@ -14,7 +14,7 @@ export function getRequestOrigin(req) {
   return `${protocol}://${host}`
 }
 
-export function buildComponentDemoHtml(question, origin, runtimeAssets = {}) {
+export function buildComponentDemoHtml(question, origin, runtimeAssets = {}, options = {}) {
   const cleanOrigin = String(origin || '').replace(/\/$/, '')
   const isLocal = /localhost|127\.0\.0\.1/.test(cleanOrigin)
   const runtimeScript = isLocal
@@ -33,6 +33,7 @@ export function buildComponentDemoHtml(question, origin, runtimeAssets = {}) {
     logic_analysis_json: question?.logic_analysis_json || {},
     tutor_analysis_json: question?.tutor_analysis_json || {},
     component_analysis_json: question?.component_analysis_json || [],
+    discovery_mode: options.discoveryMode === 'empty' ? 'empty' : 'components',
   }
 
   return `<!DOCTYPE html>

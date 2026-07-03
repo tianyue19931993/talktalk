@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Clock, Play, Sparkles, CheckCircle, Download, RefreshCw } from 'lucide-react'
-import { downloadQuestionDemo, generateQuestionDemo, getUserQuestion, getQuestionDemos } from '../../lib/user-questions'
+import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getUserQuestion, getQuestionDemos, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -24,6 +24,7 @@ export default function MyQuestionDetailPage() {
   const [demos, setDemos] = useState<QuestionDemo[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [vividGenerating, setVividGenerating] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
 
   useEffect(() => {
@@ -71,9 +72,30 @@ export default function MyQuestionDetailPage() {
     }
   }
 
+  const handleGenerateVividDemo = async () => {
+    if (!question || vividGenerating) return
+
+    setVividGenerating(true)
+    setActionMessage('正在生成生动演示...')
+    try {
+      const result = await generateQuestionDemo(question.id, 'vivid')
+      if (result.success) {
+        setActionMessage(`观看 ${result.demo?.title || '演示1'}`)
+        setDemos(await getQuestionDemos(question.id))
+      } else {
+        setActionMessage(result.error || '生成失败，请重试')
+      }
+    } finally {
+      window.setTimeout(() => {
+        setVividGenerating(false)
+        setActionMessage('')
+      }, 2200)
+    }
+  }
+
   const handleDownloadDemo = async (demo: QuestionDemo) => {
     try {
-      await downloadQuestionDemo(demo.id, demo.title || '演示')
+      await downloadQuestionDemo(demo.id, getDemoDisplayTitle(demo))
     } catch (error) {
       alert(error instanceof Error ? error.message : '下载失败')
     }
@@ -102,6 +124,8 @@ export default function MyQuestionDetailPage() {
 
   const st = STATUS_MAP[question.status] || STATUS_MAP.pending
   const hasDemo = demos.length > 0
+  const hasBasicInteraction = demos.some(isBasicInteractionDemo)
+  const hasVividDemo = demos.some(isVividDemo)
   const isCompleted = question.status === 'completed'
   const StatusIcon = question.status === 'uploaded'
     ? Sparkles
@@ -128,25 +152,38 @@ export default function MyQuestionDetailPage() {
 
       <section className="mt-4">
         <div className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${st.color}`}>
               <StatusIcon className="w-3 h-3" />
               {st.label}
             </span>
             <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
-              <span className="shrink-0 text-xs text-[var(--color-mute)]">提交于 {formatDateTime(question.createdAt)}</span>
+              <span className="shrink-0 text-xs text-[var(--color-mute)]">{formatDateTime(question.createdAt)}</span>
               {question.status !== 'pending' && (
-                <button
-                  onClick={handleGenerateInteraction}
-                  disabled={generating}
-                  className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
-                    bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
-                    hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-                    transition-all duration-200 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
-                  {generating ? '生成中...' : hasDemo ? '重新生成' : '生成互动'}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!hasBasicInteraction && (
+                    <button
+                      onClick={handleGenerateInteraction}
+                      disabled={generating}
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-full
+                        bg-gradient-to-r from-[var(--color-gradient-start)] to-[var(--color-highlight-pink)]
+                        hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                        transition-all duration-200 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
+                      {generating ? '生成中...' : '生成基础互动'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerateVividDemo}
+                    disabled={vividGenerating}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Sparkles className={`h-3 w-3 ${vividGenerating ? 'animate-pulse' : ''}`} />
+                    {vividGenerating ? '生成中...' : hasVividDemo ? '再次生动演示' : '生动演示'}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -162,7 +199,7 @@ export default function MyQuestionDetailPage() {
                     rounded-full hover:bg-blue-100 hover:scale-[1.02] active:scale-[0.98]
                     transition-all duration-200 cursor-pointer"
                 >
-                  <Play className="w-3 h-3" />观看 {demo.title || '演示'}
+                  <Play className="w-3 h-3" />观看 {getDemoDisplayTitle(demo)}
                 </button>
               )) : !isCompleted ? (
                 <span className="text-[10px] text-[var(--color-mute)]">暂无演示动画</span>
@@ -181,7 +218,7 @@ export default function MyQuestionDetailPage() {
           <div className="space-y-3">
             {demos.map((demo) => (
               <div key={demo.id} className="bg-[var(--color-canvas)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-l2)] p-5 border border-[var(--color-hairline)]">
-                <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{demo.title || '演示'}</p>
+                <p className="text-sm font-medium text-[var(--color-ink)] mb-3">{getDemoDisplayTitle(demo)}</p>
                 <p className="text-[10px] text-[var(--color-mute)] mb-3">生成于 {formatDateTime(demo.createdAt)}</p>
                 <div className="flex flex-wrap items-center gap-3">
                   <button

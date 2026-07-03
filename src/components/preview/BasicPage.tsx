@@ -17,6 +17,12 @@ type ObservationHintData = {
   }>
 }
 
+type KnownCondition = ObservationHintData['known_conditions'][number]
+
+type QuestionPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'condition'; text: string; label: string }
+
 export type BasicPageProps = {
   question_text: string
   math_analysis_json: unknown
@@ -27,6 +33,78 @@ export type BasicPageProps = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function conditionCandidates(condition: KnownCondition) {
+  if (condition.value === undefined || condition.value === null) return []
+  const value = String(condition.value).trim()
+  const unit = condition.unit?.trim() || ''
+  const timeInLabel = condition.text.match(/\b\d{1,2}:\d{2}\b/)?.[0]
+  return Array.from(new Set([
+    unit ? `${value} ${unit}` : '',
+    unit ? `${value}${unit}` : '',
+    timeInLabel || '',
+    value,
+  ].filter(Boolean))).sort((left, right) => right.length - left.length)
+}
+
+function annotateQuestion(question: string, conditions: KnownCondition[]): QuestionPart[] {
+  const used = new Set<number>()
+  const parts: QuestionPart[] = []
+  let cursor = 0
+
+  while (cursor < question.length) {
+    let match: { conditionIndex: number; index: number; text: string } | undefined
+
+    conditions.forEach((condition, conditionIndex) => {
+      if (used.has(conditionIndex)) return
+      conditionCandidates(condition).forEach((candidate) => {
+        const index = question.indexOf(candidate, cursor)
+        if (index < 0) return
+        if (!match || index < match.index || (index === match.index && candidate.length > match.text.length)) {
+          match = { conditionIndex, index, text: candidate }
+        }
+      })
+    })
+
+    if (!match) {
+      parts.push({ kind: 'text', text: question.slice(cursor) })
+      break
+    }
+    if (match.index > cursor) parts.push({ kind: 'text', text: question.slice(cursor, match.index) })
+    parts.push({ kind: 'condition', text: match.text, label: conditions[match.conditionIndex].text })
+    used.add(match.conditionIndex)
+    cursor = match.index + match.text.length
+  }
+
+  return parts.length > 0 ? parts : [{ kind: 'text', text: question }]
+}
+
+function ConditionBox({ text, label }: { text: string; label: string }) {
+  return (
+    <span className="relative mx-1 inline-block whitespace-nowrap rounded-lg border-2 border-dashed border-[#EF4444] bg-[#FEF2F2] px-2 align-middle font-bold leading-[1.4] text-[#EF4444]">
+      {text}
+      <span className="absolute left-1/2 top-full z-10 mt-1 inline-flex -translate-x-1/2 flex-col items-center">
+        <span className="h-0 w-0 border-x-[5px] border-b-[6px] border-x-transparent border-b-[#EF4444]" />
+        <span className="mt-0.5 whitespace-nowrap rounded bg-[#EF4444] px-2 py-0.5 text-[11px] font-bold leading-[1.2] tracking-wide text-white shadow-[0_2px_6px_rgba(239,68,68,0.15)]">
+          {label}
+        </span>
+      </span>
+    </span>
+  )
+}
+
+function AnnotatedQuestion({ question, conditions }: { question: string; conditions: KnownCondition[] }) {
+  const parts = annotateQuestion(question, conditions)
+  return (
+    <p className="m-0 text-left text-base font-medium tracking-[0.5px] text-[#334155]" style={{ lineHeight: 3.6 }}>
+      {parts.map((part, index) => part.kind === 'condition' ? (
+        <ConditionBox key={`${part.label}-${part.text}-${index}`} text={part.text} label={part.label} />
+      ) : (
+        <span key={`text-${index}`}>{part.text}</span>
+      ))}
+    </p>
+  )
 }
 
 function toObservationHintData(value: unknown, questionText: string): ObservationHintData {
@@ -110,11 +188,10 @@ export default function BasicPage({
         <div className="space-y-4">
           <div className="rounded-[24px] border border-[#EAEAEA] bg-[#FAFAFA] p-4">
             <div className="text-xs font-medium text-[#888888]">题目原文</div>
-            <div className="mt-2 text-sm leading-7 text-[#171717] whitespace-pre-wrap">
-              {question_text}
+            <div className="mt-2 rounded-2xl border border-[#F1F5F9] bg-[#F8FAFC] px-5 pb-10 pt-5 sm:px-8 sm:pb-12 sm:pt-6">
+              <AnnotatedQuestion question={question_text} conditions={observationData.known_conditions} />
             </div>
           </div>
-
           <MHint data={observationData} />
         </div>
       )}

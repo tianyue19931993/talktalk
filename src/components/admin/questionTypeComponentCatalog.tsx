@@ -79,13 +79,13 @@ export const COMPONENT_GROUPS: ComponentGroup[] = [
   {
     id: 'look',
     label: '观察区',
-    helper: '只保留 MHint，用于展示已知条件、隐含关系和求解目标。',
+    helper: '只保留 MHint，用于展示隐含条件和求解目标。',
     choices: [
       {
         key: 'MHint',
         zh: '提示标签',
         en: 'MHint',
-        description: '展示已知条件、隐含关系和求解目标。',
+        description: '展示隐含条件和求解目标。',
         preview: (
           <MHint
             data={{

@@ -104,36 +104,20 @@ export function MTitle({ children }: { children: ReactNode }) {
 export function MHint({ data, children }: { data?: ObservationHintData; children?: ReactNode }) {
   if (data) {
     return (
-      <div className="rounded-[var(--radius-2xl)] border border-[var(--color-hairline)] bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-4">
-            <div className="space-y-2">
-              {data.known_conditions.map((item, index) => (
-                <div key={`${item.text}-${index}`} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)]">
-                  {item.text}
-                </div>
-              ))}
-            </div>
+      <div className="space-y-2">
+        {data.hidden_conditions.length > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
+            {data.hidden_conditions.map((item, index) => (
+              <span key={`${item.text}-${index}`} className="text-xs leading-5 text-[#7928CA]">
+                {item.text}
+              </span>
+            ))}
           </div>
+        )}
 
-          <div className="space-y-3">
-            <div className="rounded-[var(--radius-xl)] bg-[var(--color-canvas-soft)] p-4">
-              <div className="space-y-2">
-                {data.hidden_conditions.map((item, index) => (
-                  <div key={`${item.text}-${index}`} className="rounded-[var(--radius-md)] border border-[var(--color-hairline)] bg-white px-3 py-2 text-sm text-[var(--color-ink)]">
-                    {item.text}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[var(--radius-xl)] bg-[var(--color-link-bg-soft)] p-4">
-              <div className="rounded-[var(--radius-md)] border border-[var(--color-link)]/20 bg-white px-3 py-2">
-                <div className="text-sm font-medium text-[var(--color-ink)]">{data.goal.text}</div>
-                <div className="mt-1 text-xs text-[var(--color-link)]">{data.goal.target}</div>
-              </div>
-            </div>
-          </div>
+        <div className="rounded-xl bg-[#EFF6FF] px-3 py-2">
+          <div className="text-xs font-medium leading-5 text-[#334155]">{data.goal.text}</div>
+          <div className="text-[11px] leading-4 text-[#0070F3]">{data.goal.target}</div>
         </div>
       </div>
     )
@@ -610,6 +594,12 @@ export function FallbackTemplatePreview({
 
   const questionType = String(analysis.question_type || '暂未分类')
   const coreDiscovery = String(analysis.core_discovery || questionType)
+  const analysisRecord = analysis as Record<string, unknown>
+  const analysisGoal = analysisRecord.goal && typeof analysisRecord.goal === 'object'
+    ? analysisRecord.goal as Record<string, unknown>
+    : {}
+  const goalText = String(analysisGoal.text || questionText)
+  const goalTarget = String(analysisGoal.target || analysis.verification_target || '求解目标')
   const knownConditions = normalizeList(analysis.known_conditions)
   const hiddenConditions = normalizeList(analysis.hidden_conditions)
   const challengeSteps = normalizeList(analysis.challenge_steps)
@@ -708,28 +698,21 @@ export function FallbackTemplatePreview({
       </PreviewCard>
 
       <div className="flex flex-col gap-4">
-      <PreviewCard title="1. 观察区" hint="只放题目原文、已知条件、隐含条件。">
+      <PreviewCard title="1. 观察区" hint="只展示隐含条件和求解目标。">
         <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-2">
-            <MCard title="已知条件" hint="显式条件">
-              <div className="space-y-2">
-                {knownConditions.map((item) => (
-                  <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </MCard>
-            <MCard title="隐含条件" hint="解题必须补出来的关系">
-              <div className="space-y-2">
-                {hiddenConditions.map((item) => (
-                  <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </MCard>
-          </div>
+          <MCard title="隐含条件" hint="解题必须补出来的关系">
+            <div className="space-y-2">
+              {hiddenConditions.map((item) => (
+                <div key={item} className="rounded-[var(--radius-md)] bg-white px-3 py-2 text-xs leading-5 text-[var(--color-body)] border border-[var(--color-hairline)]">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </MCard>
+          <MCard title="求解目标">
+            <div className="text-sm font-medium text-[var(--color-ink)]">{goalText}</div>
+            <div className="mt-1 text-xs text-[var(--color-link)]">{goalTarget}</div>
+          </MCard>
         </div>
       </PreviewCard>
 
@@ -899,11 +882,11 @@ export const STAGE_ONE_SECTIONS: StageOneSection[] = [
   {
     key: 'observation',
     title: '观察区组件',
-    subtitle: '只展示已知条件、隐含关系和求解目标。',
+    subtitle: '只展示隐含条件和求解目标。',
     items: [
       {
         name: 'MHint',
-        description: '根据题目 JSON 展示已知条件、隐含关系和求解目标。',
+        description: '根据题目 JSON 展示隐含条件和求解目标。',
         node: <MHint data={OBSERVATION_HINT_SAMPLE} />,
       },
     ],

@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { query, insert, updateWhere } from '../../server/lib/supabase-admin.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
+import { buildComponentDemoHtml, getRequestOrigin } from '../../server/lib/component-demo-html.js'
 
 function safeText(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -8,6 +9,15 @@ function safeText(value) {
 
 function escapeHtml(value) {
   return safeText(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeHtmlRaw(value) {
+  return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -35,6 +45,50 @@ function getObservationData(question) {
       text: safeText(item?.text || ''),
     })).filter((item) => item.text),
   }
+}
+
+function getConditionCandidates(condition) {
+  if (condition?.value === undefined || condition?.value === null) return []
+  const value = String(condition.value).trim()
+  const unit = safeText(condition.unit || '')
+  const timeInLabel = safeText(condition.text).match(/\b\d{1,2}:\d{2}\b/)?.[0] || ''
+  return Array.from(new Set([
+    unit ? `${value} ${unit}` : '',
+    unit ? `${value}${unit}` : '',
+    timeInLabel,
+    value,
+  ].filter(Boolean))).sort((left, right) => right.length - left.length)
+}
+
+function renderAnnotatedQuestion(question, conditions) {
+  const used = new Set()
+  const pieces = []
+  let cursor = 0
+
+  while (cursor < question.length) {
+    let match
+    conditions.forEach((condition, conditionIndex) => {
+      if (used.has(conditionIndex)) return
+      getConditionCandidates(condition).forEach((candidate) => {
+        const index = question.indexOf(candidate, cursor)
+        if (index < 0) return
+        if (!match || index < match.index || (index === match.index && candidate.length > match.text.length)) {
+          match = { conditionIndex, index, text: candidate }
+        }
+      })
+    })
+
+    if (!match) {
+      pieces.push(escapeHtmlRaw(question.slice(cursor)))
+      break
+    }
+    if (match.index > cursor) pieces.push(escapeHtmlRaw(question.slice(cursor, match.index)))
+    pieces.push(`<span class="known-condition-box">${escapeHtmlRaw(match.text)}<span class="edu-scaffold"><span class="arrow-up"></span><span class="condition-name">${escapeHtml(conditions[match.conditionIndex].text)}</span></span></span>`)
+    used.add(match.conditionIndex)
+    cursor = match.index + match.text.length
+  }
+
+  return pieces.length > 0 ? pieces.join('') : escapeHtmlRaw(question)
 }
 
 function getChallengeData(question) {
@@ -206,17 +260,11 @@ function buildDemoHtml(question) {
   const observation = getObservationData(question)
   const discovery = getDiscoveryData(question)
 
-  const knownConditionCards = observation.knownConditions.length > 0
-    ? observation.knownConditions.map((item) => `
-      <div class="condition-card">${escapeHtml(item.text)}</div>
-    `).join('')
-    : '<div class="empty-card">暂无已知条件</div>'
-
-  const hiddenConditionCards = observation.hiddenConditions.length > 0
+  const hiddenConditionText = observation.hiddenConditions.length > 0
     ? observation.hiddenConditions.map((item) => `
-      <div class="condition-card">${escapeHtml(item.text)}</div>
+      <span class="hidden-condition">${escapeHtml(item.text)}</span>
     `).join('')
-    : '<div class="empty-card">暂无隐含条件</div>'
+    : ''
 
   const discoveryBlocks = discovery.length > 0
     ? discovery.map(renderDiscoveryBlock).join('')
@@ -251,7 +299,7 @@ function buildDemoHtml(question) {
       margin: 0 auto;
       padding: 24px 18px 40px;
     }
-    .zone, .panel, .condition-card, .empty-card {
+    .zone, .panel, .empty-card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 24px;
@@ -325,16 +373,17 @@ function buildDemoHtml(question) {
       color: var(--text);
       white-space: pre-wrap;
     }
-    .hint-list {
-      display: grid;
-      gap: 10px;
-    }
-    .condition-card {
-      padding: 12px 14px;
-      font-size: 14px;
-      line-height: 1.7;
-      color: var(--text);
-    }
+    .question-container { margin-top: 8px; border: 1px solid #F1F5F9; border-radius: 16px; background: #F8FAFC; padding: 24px 32px 48px; }
+    .question-text { margin: 0; color: #334155; font-size: 16px; font-weight: 500; line-height: 3.6; letter-spacing: .5px; text-align: left; white-space: pre-wrap; }
+    .known-condition-box { position: relative; display: inline-block; box-sizing: border-box; margin: 0 4px; border: 2px dashed #EF4444; border-radius: 8px; background: #FEF2F2; padding: 0 8px; color: #EF4444; font-weight: 700; line-height: 1.4; vertical-align: middle; white-space: nowrap; }
+    .edu-scaffold { position: absolute; top: 100%; left: 50%; z-index: 10; display: inline-flex; flex-direction: column; align-items: center; margin-top: 4px; transform: translateX(-50%); }
+    .arrow-up { width: 0; height: 0; margin-bottom: 2px; border-right: 5px solid transparent; border-bottom: 6px solid #EF4444; border-left: 5px solid transparent; }
+    .condition-name { border-radius: 4px; background: #EF4444; padding: 2px 8px; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.2; letter-spacing: .5px; white-space: nowrap; box-shadow: 0 2px 6px rgba(239,68,68,.15); }
+    .observation-summary { display: grid; gap: 8px; margin-top: 10px; }
+    .hidden-list { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 4px; }
+    .hidden-condition { color: #7928CA; font-size: 12px; line-height: 1.6; }
+    .goal-card { border-radius: 12px; background: #EFF6FF; padding: 8px 12px; }
+    .goal-text { color: #334155; font-size: 12px; font-weight: 600; line-height: 1.6; }
     .empty-card {
       padding: 18px;
       font-size: 13px;
@@ -358,9 +407,9 @@ function buildDemoHtml(question) {
       white-space: pre-wrap;
     }
     .goal-target {
-      margin-top: 4px;
       color: var(--blue);
-      font-size: 12px;
+      font-size: 11px;
+      line-height: 1.5;
       text-align: left;
     }
     .discovery-list { display: grid; gap: 18px; margin-top: 16px; }
@@ -391,6 +440,8 @@ function buildDemoHtml(question) {
       .discovery-prompt { flex-direction: column; }
       .component-stage { padding: 14px 10px; }
       .model-bar { font-size: 10px; }
+      .question-container { padding: 20px 18px 44px; }
+      .question-text { font-size: 15px; }
     }
   </style>
 </head>
@@ -400,27 +451,15 @@ function buildDemoHtml(question) {
       <div class="zone-title">1. 观察区</div>
       <div class="subcard">
         <div class="subcard-title">题目原文</div>
-        <div class="subcard-body">${escapeHtml(observation.questionText)}</div>
-      </div>
-
-      <div class="subcard">
-        <div class="subcard-title">已知条件</div>
-        <div class="hint-list">
-          ${knownConditionCards}
+        <div class="question-container">
+          <p class="question-text">${renderAnnotatedQuestion(observation.questionText, observation.knownConditions)}</p>
         </div>
       </div>
 
-      <div class="subcard">
-        <div class="subcard-title">隐含条件</div>
-        <div class="hint-list">
-          ${hiddenConditionCards}
-        </div>
-      </div>
-
-      <div class="subcard">
-        <div class="subcard-title">求解目标</div>
-        <div class="subcard-body">
-          ${escapeHtml(observation.goalText)}
+      <div class="observation-summary">
+        ${hiddenConditionText ? `<div class="hidden-list">${hiddenConditionText}</div>` : ''}
+        <div class="goal-card">
+          <div class="goal-text">${escapeHtml(observation.goalText)}</div>
           <div class="goal-target">${escapeHtml(observation.goalTarget)}</div>
         </div>
       </div>
@@ -516,7 +555,7 @@ export default async function handler(req, res) {
     }
 
     const title = `演示 ${Array.isArray(demoRows) ? demoRows.length + 1 : 1}`
-    const html = buildDemoHtml(question)
+    const html = buildComponentDemoHtml(question, getRequestOrigin(req)) || buildDemoHtml(question)
     const htmlUrl = await uploadHtmlContent(html, questionId)
 
     const demoInsert = await insert('question_demos', {

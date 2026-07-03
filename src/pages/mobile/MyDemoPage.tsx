@@ -3,22 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Crown, Download } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
-import { getUserQuestion } from '../../lib/user-questions'
+import { downloadQuestionDemo, getUserQuestion } from '../../lib/user-questions'
 import { Button } from '../../components/ui/Button'
 import BasicPage from '../../components/preview/BasicPage'
 import type { UserQuestion } from '../../types/auth'
 
 type DemoRow = {
   question_id?: string
-  html_url?: string
 }
 
 export default function MyDemoPage() {
   const { demoId } = useParams<{ demoId: string }>()
   const navigate = useNavigate()
   const { user, subscription, isLoggedIn, isLoading } = useAuth()
-  const [htmlContent, setHtmlContent] = useState<string | null>(null)
-  const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
   const [question, setQuestion] = useState<UserQuestion | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'notfound' | 'locked'>('loading')
 
@@ -29,13 +26,11 @@ export default function MyDemoPage() {
       if (!demoId || isLoading) return
 
       setLoadState('loading')
-      setHtmlContent(null)
-      setHtmlUrl(null)
       setQuestion(null)
 
       const { data } = await authedRequest<DemoRow[]>(`/question_demos?id=eq.${demoId}`)
       const demo = data?.[0]
-      if (!demo?.html_url || !demo.question_id || cancelled) {
+      if (!demo?.question_id || cancelled) {
         if (!cancelled) setLoadState('notfound')
         return
       }
@@ -52,39 +47,7 @@ export default function MyDemoPage() {
         return
       }
       setQuestion(question)
-
-      const url = demo.html_url
-
-      if (url.startsWith('data:text/html')) {
-        // data:URL → 解码后用 srcdoc 渲染
-        try {
-          const encoded = url.split(',')[1]
-          if (!encoded) throw new Error('empty data url')
-          setHtmlContent(decodeURIComponent(encoded))
-          if (!cancelled) setLoadState('ready')
-        } catch {
-          if (!cancelled) setLoadState('notfound')
-        }
-      } else if (url.startsWith('http')) {
-        // Kodo URL → 获取内容后用 srcdoc 渲染（避免跨域 iframe 限制）
-        try {
-          const res = await fetch(url)
-          if (!res.ok) { if (!cancelled) setLoadState('notfound'); return }
-          const content = await res.text()
-          if (!cancelled) {
-            setHtmlContent(content)
-            setLoadState('ready')
-          }
-        } catch {
-          // 如果 fetch 失败（CORS 未配置），退而直接用 iframe src
-          if (!cancelled) {
-            setHtmlUrl(url)
-            setLoadState('ready')
-          }
-        }
-      } else if (!cancelled) {
-        setLoadState('notfound')
-      }
+      if (!cancelled) setLoadState('ready')
     }
 
     void loadDemo()
@@ -92,36 +55,12 @@ export default function MyDemoPage() {
   }, [demoId, isLoading, isLoggedIn, subscription, user])
 
   const handleDownload = async () => {
-    const content = htmlContent
-    const url = htmlUrl
-    let finalHtml = content || ''
-
-    if (!finalHtml && url) {
-      if (url.startsWith('data:text/html')) {
-        const encoded = url.split(',')[1] || ''
-        finalHtml = decodeURIComponent(encoded)
-      } else {
-        const res = await fetch(url)
-        if (!res.ok) {
-          alert('下载失败')
-          return
-        }
-        finalHtml = await res.text()
-      }
-    }
-
-    if (!finalHtml) {
+    if (!demoId) return
+    try {
+      await downloadQuestionDemo(demoId, '演示.html')
+    } catch {
       alert('下载失败')
-      return
     }
-
-    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' })
-    const objectUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = objectUrl
-    a.download = '演示.html'
-    a.click()
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
   }
 
   // 权限不足 → 锁定页面
@@ -187,7 +126,7 @@ export default function MyDemoPage() {
         <ArrowLeft className="w-3.5 h-3.5" />
         返回
       </button>
-      {(htmlContent || htmlUrl) && loadState === 'ready' && (
+      {demoId && loadState === 'ready' && (
         <button
           onClick={handleDownload}
           className="absolute top-4 right-4 z-50 inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full transition-colors cursor-pointer"

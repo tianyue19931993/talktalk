@@ -1,5 +1,8 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { query } from '../../server/lib/supabase-admin.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
+import { buildComponentDemoHtml, getRequestOrigin } from '../../server/lib/component-demo-html.js'
 
 function safeText(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -25,24 +28,45 @@ async function getCurrentUser(authHeader) {
   return await userRes.json()
 }
 
-function decodeDataUrl(value) {
-  const raw = safeText(value)
-  if (!raw.startsWith('data:text/html')) return raw
-
-  const commaIndex = raw.indexOf(',')
-  if (commaIndex < 0) return ''
-
-  const encoded = raw.slice(commaIndex + 1)
-  try {
-    return decodeURIComponent(encoded)
-  } catch {
-    return encoded
-  }
-}
-
 function guessFilename(title, questionId) {
   const base = safeText(title) || `演示_${safeText(questionId) || 'html'}`
   return `${base}.html`
+}
+
+async function loadRuntimeAssets(origin) {
+  if (/localhost|127\.0\.0\.1/.test(origin)) {
+    try {
+      const runtimeDirectory = path.resolve(process.cwd(), 'dist/demo-runtime')
+      const [script, css] = await Promise.all([
+        readFile(path.join(runtimeDirectory, 'demo-standalone.js'), 'utf8'),
+        readFile(path.join(runtimeDirectory, 'demo-standalone.css'), 'utf8'),
+      ])
+      return { script, css }
+    } catch {
+      return {}
+    }
+  }
+
+  try {
+    const [scriptResponse, cssResponse] = await Promise.all([
+      fetch(`${origin}/demo-runtime/demo-standalone.js`),
+      fetch(`${origin}/demo-runtime/demo-standalone.css`),
+    ])
+    const scriptType = safeText(scriptResponse.headers.get('content-type') || '').toLowerCase()
+    const cssType = safeText(cssResponse.headers.get('content-type') || '').toLowerCase()
+    if (
+      !scriptResponse.ok
+      || !cssResponse.ok
+      || !scriptType.includes('javascript')
+      || !cssType.includes('text/css')
+    ) return {}
+    return {
+      script: await scriptResponse.text(),
+      css: await cssResponse.text(),
+    }
+  } catch {
+    return {}
+  }
 }
 
 export default async function handler(req, res) {
@@ -71,7 +95,7 @@ export default async function handler(req, res) {
 
     const { data: demoRows, error: demoError } = await query('question_demos', {
       filters: { id: demoId },
-      select: 'id,question_id,html_url,title',
+      select: 'id,question_id,title',
       limit: 1,
     })
     if (demoError) {
@@ -85,7 +109,7 @@ export default async function handler(req, res) {
 
     const { data: questionRows, error: questionError } = await query('user_questions', {
       filters: { id: demo.question_id },
-      select: 'id,user_id',
+      select: 'id,user_id,question_text,math_analysis_json,logic_analysis_json,tutor_analysis_json,component_analysis_json',
       limit: 1,
     })
     if (questionError) {
@@ -101,18 +125,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ success: false, error: '无权操作该题目' })
     }
 
-    const htmlUrl = safeText(demo.html_url)
-    let html = ''
-
-    if (htmlUrl.startsWith('data:text/html')) {
-      html = decodeDataUrl(htmlUrl)
-    } else if (htmlUrl.startsWith('http')) {
-      const response = await fetch(htmlUrl)
-      if (!response.ok) {
-        return res.status(500).json({ success: false, error: '读取演示内容失败' })
-      }
-      html = await response.text()
-    }
+    const origin = getRequestOrigin(req)
+    const runtimeAssets = await loadRuntimeAssets(origin)
+    const html = buildComponentDemoHtml(question, origin, runtimeAssets)
 
     if (!html) {
       return res.status(500).json({ success: false, error: '演示内容为空' })

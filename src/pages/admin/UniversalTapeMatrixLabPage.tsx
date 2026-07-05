@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import MultiAxisTrackStateEngine from '../../components/admin/MultiAxisTrackStateEngine'
 import Combine from '../../components/admin/Combine'
 import Partition from '../../components/admin/Partition'
 import Replicate from '../../components/admin/Replicate'
@@ -30,6 +31,10 @@ const tabs: LabTab[] = [
   {
     name: 'Replicate',
     note: '乘法组件：向上拖动倍数叠加舱，逐个复制相同数量并汇总乘积。',
+  },
+  {
+    name: 'MultiAxisTrackStateEngine 多轴轨迹状态引擎',
+    note: '线段图驱动：根据 lines 动态渲染多条线段，并按 steps 播放显示线段、大括号、公式和答案。',
   },
   {
     name: 'UniversalTapeMatrixLab-multiply_divide',
@@ -67,7 +72,7 @@ export default function UniversalTapeMatrixLabPage() {
         <div className="rounded-[24px] border border-[var(--color-hairline)] bg-white p-4">
           <div className="text-lg font-semibold text-[var(--color-ink)]">UniversalTapeMatrixLab</div>
           <div className="mt-1 text-sm text-[var(--color-body)]">
-            先把 5 个 Tab 的壳子搭起来，后续再逐个往里面填组件。
+            先把各个 Tab 的壳子搭起来，后续再逐个往里面填组件。
           </div>
         </div>
 
@@ -114,6 +119,10 @@ export default function UniversalTapeMatrixLabPage() {
             ) : currentTab.name === 'Replicate' ? (
               <div className="flex justify-center">
                 <Replicate />
+              </div>
+            ) : currentTab.name === 'MultiAxisTrackStateEngine 多轴轨迹状态引擎' ? (
+              <div className="flex justify-center">
+                <MultiAxisTrackStateEngine />
               </div>
             ) : currentTab.name === 'UniversalTapeMatrixLab-multiply_divide' ? (
               <div className="flex justify-center">

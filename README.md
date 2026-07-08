@@ -42,10 +42,9 @@ npm install
 npm run dev
 ```
 
-### 本地测试 API（需要安装 Vercel CLI）
+### 本地测试 API
 ```bash
-npm i -g vercel
-npx vercel dev
+npm run dev
 ```
 
 ### 腾讯云 Docker 部署
@@ -55,6 +54,24 @@ docker compose --env-file .env.production up -d --build
 
 详细步骤见 [deploy/tencent-cloud.md](/Users/leoli/talk/talk-app-new1/deploy/tencent-cloud.md)。
 
+### 自动部署
+
+推送到 `main` 后，GitHub Actions 会通过 SSH 登录腾讯云服务器并执行：
+
+```bash
+cd /www/talktalk
+bash deploy/deploy.sh
+```
+
+需要先在 GitHub 仓库配置 `TENCENT_HOST`、`TENCENT_USER`、`TENCENT_SSH_KEY` 三个 Actions Secrets。
+
+### 手动更新生产环境
+
+```bash
+cd /www/talktalk
+bash deploy/deploy.sh
+```
+
 ## 微信支付集成
 
 ### 前置条件
@@ -62,7 +79,7 @@ docker compose --env-file .env.production up -d --build
 2. 已备案域名 `www.next.digit3ds.com`
 3. 商户平台配置好 APIv3 密钥和证书
 
-### 环境变量配置（Vercel Dashboard）
+### 环境变量配置（腾讯云 `/www/talktalk/.env.production`）
 | 变量名 | 说明 |
 |--------|------|
 | `SUPABASE_URL` | Supabase 项目 URL |

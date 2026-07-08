@@ -91,7 +91,24 @@ systemctl reload nginx
 
 ```bash
 cd /www/talktalk
-git pull
-docker compose --env-file .env.production up -d --build
-docker image prune -f
+bash deploy/deploy.sh
 ```
+
+## 7. GitHub Actions Auto Deploy
+
+Add these repository secrets in GitHub:
+
+```text
+TENCENT_HOST=124.221.18.231
+TENCENT_USER=root
+TENCENT_SSH_KEY=<private ssh key>
+```
+
+After that, every push to `main` runs `.github/workflows/deploy-tencent-cloud.yml`
+and executes `bash deploy/deploy.sh` on the server.
+
+The server must already have:
+
+- `/www/talktalk` cloned
+- `/www/talktalk/.env.production` configured
+- Docker and Docker Compose running

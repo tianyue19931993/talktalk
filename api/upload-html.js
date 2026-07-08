@@ -13,6 +13,12 @@ function urlsafe(s) {
   return b.toString('base64').replace(/\+/g,'-').replace(/\//g,'_')
 }
 
+function normalizePublicUrlDomain(value) {
+  const domain = String(value || '').trim().replace(/\/+$/, '')
+  if (!domain) return ''
+  return /^https?:\/\//i.test(domain) ? domain : `https://${domain}`
+}
+
 export default async function handler(req, res) {
   // 强制禁止缓存（绕过 Cloudflare 缓存）
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
@@ -27,7 +33,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && url.searchParams.get('action') === 'test') {
     const ak = process.env.QINIU_ACCESS_KEY
     const sk = process.env.QINIU_SECRET_KEY
-    const domain = process.env.QINIU_DOMAIN
+    const domain = normalizePublicUrlDomain(process.env.QINIU_DOMAIN)
     const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
     const uploadHost = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
 
@@ -78,7 +84,7 @@ export default async function handler(req, res) {
 
     const ak = process.env.QINIU_ACCESS_KEY
     const sk = process.env.QINIU_SECRET_KEY
-    const domain = process.env.QINIU_DOMAIN
+    const domain = normalizePublicUrlDomain(process.env.QINIU_DOMAIN)
     const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
 
     if (ak && sk && domain) {

@@ -198,10 +198,16 @@ function urlsafe(value) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
 }
 
+function normalizePublicUrlDomain(value) {
+  const domain = safeText(value).replace(/\/+$/, '')
+  if (!domain) return ''
+  return /^https?:\/\//i.test(domain) ? domain : `https://${domain}`
+}
+
 async function uploadHtmlContent(content, refId) {
   const ak = process.env.QINIU_ACCESS_KEY
   const sk = process.env.QINIU_SECRET_KEY
-  const domain = process.env.QINIU_DOMAIN
+  const domain = normalizePublicUrlDomain(process.env.QINIU_DOMAIN)
   const bucket = process.env.QINIU_BUCKET || 'chengzhangbiaoda-lab'
   const host = process.env.QINIU_UPLOAD_HOST || 'https://up.qiniup.com'
 

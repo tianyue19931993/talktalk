@@ -76,7 +76,7 @@ bash deploy/deploy.sh
 
 ### 前置条件
 1. 微信商户号（企业资质）已开通
-2. 已备案域名 `www.next.digit3ds.com`
+2. 已备案域名 `next.digit3ds.com`
 3. 商户平台配置好 APIv3 密钥和证书
 
 ### 环境变量配置（腾讯云 `/www/talktalk/.env.production`）

@@ -5,8 +5,9 @@
 ## Tech Stack
 
 - React 19 + TypeScript + Vite 8 + Tailwind CSS v4
-- Supabase（原生 fetch REST API）
-- Vercel 部署 + Cloudflare CDN
+- Supabase（原生 fetch REST API，当前阶段继续使用）
+- 七牛云（HTML 演示文件上传，当前阶段继续使用）
+- Docker + 腾讯云服务器 + Nginx
 
 ## 项目结构
 
@@ -28,7 +29,8 @@ talk-app-new1/
 │   ├── stores/                # 状态管理
 │   ├── lib/                   # 前端工具库
 │   └── types/                 # 类型定义
-├── vercel.json
+├── Dockerfile
+├── docker-compose.yml
 └── package.json
 ```
 
@@ -46,10 +48,12 @@ npm i -g vercel
 npx vercel dev
 ```
 
-### 部署到生产
+### 腾讯云 Docker 部署
 ```bash
-git push  # Vercel 自动部署
+docker compose --env-file .env.production up -d --build
 ```
+
+详细步骤见 [deploy/tencent-cloud.md](/Users/leoli/talk/talk-app-new1/deploy/tencent-cloud.md)。
 
 ## 微信支付集成
 

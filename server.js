@@ -38,7 +38,7 @@ console.log('[server] SUPABASE_URL configured:', !!process.env.SUPABASE_URL)
 console.log('[server] SUPABASE_SERVICE_ROLE_KEY configured:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
 
 const dist = path.join(__dirname, 'dist');
-const port = 5173;
+const port = Number(process.env.PORT || 5173);
 
 const mime = {
   '.html':'text/html','.js':'application/javascript','.css':'text/css',
@@ -55,6 +55,8 @@ const apiRoutes = {
   '/api/pay/query': 'api/pay/query.js',
   '/api/subscription/check': 'api/subscription/check.js',
   '/api/upload-html': 'api/upload-html.js',
+  '/api/user-questions/download-demo': 'api/user-questions/download-demo.js',
+  '/api/user-questions/generate-interaction': 'api/user-questions/generate-interaction.js',
 }
 
 const handlerCache = new Map()
@@ -145,6 +147,10 @@ http.createServer(async (req, res) => {
     if (apiRoutes[pathname]) {
       await handleApi(req, res, pathname, parsedUrl)
       return
+    }
+
+    if (pathname.startsWith('/demo-runtime/')) {
+      res.setHeader('Access-Control-Allow-Origin', '*')
     }
 
     let url = pathname

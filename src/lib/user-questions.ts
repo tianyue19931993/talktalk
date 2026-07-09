@@ -4,6 +4,63 @@ import type { JsonValue, UserQuestion, QuestionDemo } from '../types/auth'
 
 type DbRow = Record<string, unknown>
 
+const VIVID_DEMO_PENDING_STORAGE_KEY = 'talk:vivid-demo-pending-question-ids'
+const VIVID_DEMO_PENDING_TTL_MS = 30 * 60 * 1000
+
+type PendingVividDemoMap = Record<string, number>
+
+function readPendingVividDemoMap(): PendingVividDemoMap {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(VIVID_DEMO_PENDING_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const result: PendingVividDemoMap = {}
+    const now = Date.now()
+    for (const [questionId, timestamp] of Object.entries(parsed as Record<string, unknown>)) {
+      const numericTimestamp = typeof timestamp === 'number' ? timestamp : Number(timestamp)
+      if (!questionId || !Number.isFinite(numericTimestamp)) continue
+      if (now - numericTimestamp > VIVID_DEMO_PENDING_TTL_MS) continue
+      result[questionId] = numericTimestamp
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
+function writePendingVividDemoMap(map: PendingVividDemoMap): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(VIVID_DEMO_PENDING_STORAGE_KEY, JSON.stringify(map))
+    window.dispatchEvent(new CustomEvent('vivid-demo-pending-changed'))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function markVividDemoPending(questionId: string): void {
+  if (!questionId || typeof window === 'undefined') return
+  const map = readPendingVividDemoMap()
+  map[questionId] = Date.now()
+  writePendingVividDemoMap(map)
+}
+
+export function clearVividDemoPending(questionId: string): void {
+  if (!questionId || typeof window === 'undefined') return
+  const map = readPendingVividDemoMap()
+  if (!map[questionId]) return
+  delete map[questionId]
+  writePendingVividDemoMap(map)
+}
+
+export function isVividDemoPending(questionId: string): boolean {
+  if (!questionId || typeof window === 'undefined') return false
+  const map = readPendingVividDemoMap()
+  return Boolean(map[questionId])
+}
+
 function getString(row: DbRow, key: string, fallback = ''): string {
   const value = row[key]
   return typeof value === 'string' ? value : fallback
@@ -107,7 +164,9 @@ export function getDemoDisplayTitle(demo: Pick<QuestionDemo, 'title'>): string {
 
 export interface GenerateQuestionDemoResult {
   success?: boolean
+  pending?: boolean
   error?: string
+  message?: string
   demo?: QuestionDemo | null
   htmlUrl?: string
 }

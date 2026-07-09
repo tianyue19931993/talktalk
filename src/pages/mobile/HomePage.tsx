@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Sparkles, BookOpen, Play, Clock, Send, Loader2, CheckCircle, Download, RefreshCw } from 'lucide-react'
 import { useAuth, refreshUserData } from '../../stores/authStore'
 import { getRemainingGenerations } from '../../lib/supabase-auth'
-import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemos, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
+import { clearVividDemoPending, downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemos, isBasicInteractionDemo, isVividDemo, isVividDemoPending, markVividDemoPending } from '../../lib/user-questions'
 import { submitQuestionForAnalysis } from '../../lib/question-submit'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
@@ -19,6 +19,7 @@ export default function HomePage() {
   const [latestActionMessage, setLatestActionMessage] = useState('')
   const [latestActionBusy, setLatestActionBusy] = useState(false)
   const [latestVividBusy, setLatestVividBusy] = useState(false)
+  const [, forceVividPendingRefresh] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const remainingGenerations = getRemainingGenerations(subscription, generation)
@@ -51,6 +52,17 @@ export default function HomePage() {
 
     void run()
   }, [isLoggedIn])
+
+  useEffect(() => {
+    const handlePendingChange = () => {
+      forceVividPendingRefresh((value) => value + 1)
+    }
+
+    window.addEventListener('vivid-demo-pending-changed', handlePendingChange)
+    return () => {
+      window.removeEventListener('vivid-demo-pending-changed', handlePendingChange)
+    }
+  }, [])
 
   const loadLatest = async () => {
     const list = await getMyQuestions()
@@ -91,23 +103,25 @@ export default function HomePage() {
   }
 
   const handleGenerateVividDemo = async () => {
-    if (!latestQuestion || latestVividBusy) return
+    if (!latestQuestion || latestVividPending) return
 
+    markVividDemoPending(latestQuestion.id)
     setLatestVividBusy(true)
     setLatestActionMessage('正在生成生动演示...')
     try {
       const result = await generateQuestionDemo(latestQuestion.id, 'vivid')
-      if (result.success) {
+      if (result.pending) {
+        setLatestActionMessage('请耐心等待 1～3 分钟')
+        await loadLatest()
+      } else if (result.success) {
         setLatestActionMessage(`观看 ${result.demo?.title || '演示1'}`)
         await loadLatest()
       } else {
         setLatestActionMessage(result.error || '生成失败，请重试')
+        clearVividDemoPending(latestQuestion.id)
       }
     } finally {
-      window.setTimeout(() => {
-        setLatestVividBusy(false)
-        setLatestActionMessage('')
-      }, 2200)
+      setLatestVividBusy(false)
     }
   }
 
@@ -193,6 +207,47 @@ export default function HomePage() {
   const latestHasDemo = latestDemos.length > 0 || latestQuestion?.status === 'uploaded'
   const latestHasBasicInteraction = latestDemos.some(isBasicInteractionDemo) || (latestDemos.length === 0 && latestQuestion?.status === 'uploaded')
   const latestHasVividDemo = latestDemos.some(isVividDemo)
+  const latestVividPending = Boolean(
+    latestQuestion &&
+    !latestHasVividDemo &&
+    (latestVividBusy || isVividDemoPending(latestQuestion.id))
+  )
+
+  useEffect(() => {
+    if (!latestQuestion) return
+    if (latestHasVividDemo) {
+      clearVividDemoPending(latestQuestion.id)
+    }
+  }, [latestQuestion?.id, latestHasVividDemo])
+
+  useEffect(() => {
+    if (!latestQuestion?.id || !latestVividPending) return
+
+    let cancelled = false
+
+    const refresh = async () => {
+      if (cancelled) return
+      await loadLatest()
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(() => {
+      void refresh()
+    }, 5000)
+    const timeoutId = window.setTimeout(() => {
+      if (cancelled) return
+      clearVividDemoPending(latestQuestion.id)
+      setLatestVividBusy(false)
+      setLatestActionMessage('生成失败，请重试')
+    }, 240000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [latestQuestion?.id, latestVividPending])
+
   const latestStatusMeta = latestHasDemo
     ? { label: '已生成互动', color: 'text-blue-700 bg-blue-50', icon: Sparkles }
     : latestIsCompleted
@@ -328,11 +383,11 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void handleGenerateVividDemo() }}
-                  disabled={latestVividBusy}
+                  disabled={latestVividPending}
                   className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Sparkles className={`h-3 w-3 ${latestVividBusy ? 'animate-pulse' : ''}`} />
-                  {latestVividBusy ? '生成中...' : latestHasVividDemo ? '再次演示' : '演示'}
+                  <Sparkles className={`h-3 w-3 ${latestVividPending ? 'animate-pulse' : ''}`} />
+                  {latestVividPending ? '生成中...' : latestHasVividDemo ? '再次演示' : '演示'}
                 </button>
               </div>
             )}

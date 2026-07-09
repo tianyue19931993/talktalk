@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Clock, Play, Sparkles, CheckCircle, Download, RefreshCw } from 'lucide-react'
-import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getUserQuestion, getQuestionDemos, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
+import { clearVividDemoPending, downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getUserQuestion, getQuestionDemos, isBasicInteractionDemo, isVividDemo, isVividDemoPending, markVividDemoPending } from '../../lib/user-questions'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -25,7 +25,18 @@ export default function MyQuestionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [vividGenerating, setVividGenerating] = useState(false)
+  const [, forceVividPendingRefresh] = useState(0)
   const [actionMessage, setActionMessage] = useState('')
+
+  const refreshData = async () => {
+    if (!id) return
+    const q = await getUserQuestion(id)
+    setQuestion(q)
+    if (q) {
+      const d = await getQuestionDemos(q.id)
+      setDemos(d)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -33,19 +44,62 @@ export default function MyQuestionDetailPage() {
     const loadAll = async () => {
       if (!id) return
       setLoading(true)
-      const q = await getUserQuestion(id)
-      if (cancelled) return
-      setQuestion(q)
-      if (q) {
-        const d = await getQuestionDemos(q.id)
-        if (!cancelled) setDemos(d)
-      }
+      await refreshData()
       if (!cancelled) setLoading(false)
     }
 
     void loadAll()
     return () => { cancelled = true }
   }, [id])
+
+  useEffect(() => {
+    const handlePendingChange = () => {
+      forceVividPendingRefresh((value) => value + 1)
+    }
+
+    window.addEventListener('vivid-demo-pending-changed', handlePendingChange)
+    return () => {
+      window.removeEventListener('vivid-demo-pending-changed', handlePendingChange)
+    }
+  }, [])
+
+  const hasVividDemo = demos.some(isVividDemo)
+  const vividPending = Boolean(question && !hasVividDemo && (vividGenerating || isVividDemoPending(question.id)))
+
+  useEffect(() => {
+    if (!question) return
+    if (hasVividDemo) {
+      clearVividDemoPending(question.id)
+    }
+  }, [question?.id, hasVividDemo])
+
+  useEffect(() => {
+    if (!question?.id || !vividPending) return
+
+    let cancelled = false
+
+    const refresh = async () => {
+      if (cancelled) return
+      await refreshData()
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(() => {
+      void refresh()
+    }, 5000)
+    const timeoutId = window.setTimeout(() => {
+      if (cancelled) return
+      clearVividDemoPending(question.id)
+      setVividGenerating(false)
+      setActionMessage('生成失败，请重试')
+    }, 240000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [question?.id, vividPending])
 
   const handleGenerateInteraction = async () => {
     if (!question || generating) return
@@ -73,25 +127,25 @@ export default function MyQuestionDetailPage() {
   }
 
   const handleGenerateVividDemo = async () => {
-    if (!question || vividGenerating) return
+    if (!question || vividPending) return
 
+    markVividDemoPending(question.id)
     setVividGenerating(true)
     setActionMessage('正在生成生动演示...')
     try {
       const result = await generateQuestionDemo(question.id, 'vivid')
-      if (result.success) {
+      if (result.pending) {
+        setActionMessage('请耐心等待 1～3 分钟')
+        await refreshData()
+      } else if (result.success) {
         setActionMessage(`观看 ${result.demo?.title || '演示1'}`)
-        setDemos(await getQuestionDemos(question.id))
-        const nextQuestion = await getUserQuestion(question.id)
-        if (nextQuestion) setQuestion(nextQuestion)
+        await refreshData()
       } else {
         setActionMessage(result.error || '生成失败，请重试')
+        clearVividDemoPending(question.id)
       }
     } finally {
-      window.setTimeout(() => {
-        setVividGenerating(false)
-        setActionMessage('')
-      }, 2200)
+      setVividGenerating(false)
     }
   }
 
@@ -127,7 +181,6 @@ export default function MyQuestionDetailPage() {
   const st = STATUS_MAP[question.status] || STATUS_MAP.pending
   const hasDemo = demos.length > 0
   const hasBasicInteraction = demos.some(isBasicInteractionDemo)
-  const hasVividDemo = demos.some(isVividDemo)
   const isCompleted = question.status === 'completed'
   const StatusIcon = question.status === 'uploaded'
     ? Sparkles
@@ -179,11 +232,11 @@ export default function MyQuestionDetailPage() {
                   <button
                     type="button"
                     onClick={handleGenerateVividDemo}
-                    disabled={vividGenerating}
+                    disabled={vividPending}
                     className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <Sparkles className={`h-3 w-3 ${vividGenerating ? 'animate-pulse' : ''}`} />
-                    {vividGenerating ? '生成中...' : hasVividDemo ? '再次演示' : '演示'}
+                    <Sparkles className={`h-3 w-3 ${vividPending ? 'animate-pulse' : ''}`} />
+                    {vividPending ? '生成中...' : hasVividDemo ? '再次演示' : '演示'}
                   </button>
                 </div>
               )}

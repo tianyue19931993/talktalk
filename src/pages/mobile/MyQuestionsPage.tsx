@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Clock, CheckCircle, Play, Search, RefreshCw, Sparkles, Download } from 'lucide-react'
-import { downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemosBatch, isBasicInteractionDemo, isVividDemo } from '../../lib/user-questions'
+import { clearVividDemoPending, downloadQuestionDemo, generateQuestionDemo, getDemoDisplayTitle, getMyQuestions, getQuestionDemosBatch, isBasicInteractionDemo, isVividDemo, isVividDemoPending, markVividDemoPending } from '../../lib/user-questions'
 import { useAuth } from '../../stores/authStore'
 import { Button } from '../../components/ui/Button'
 import type { UserQuestion, QuestionDemo } from '../../types/auth'
@@ -22,6 +22,7 @@ export default function MyQuestionsPage() {
   const [search, setSearch] = useState('')
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [vividGeneratingId, setVividGeneratingId] = useState<string | null>(null)
+  const [, forceVividPendingRefresh] = useState(0)
   const [generateHint, setGenerateHint] = useState<{ id: string; text: string } | null>(null)
 
   const filteredQuestions = useMemo(() => {
@@ -40,18 +41,72 @@ export default function MyQuestionsPage() {
       navigate('/login?redirect=/my/questions')
       return
     }
-    loadAll()
+    void loadAll({ showLoading: true })
   }, [isLoggedIn, navigate])
 
-  async function loadAll() {
-    setLoading(true)
+  useEffect(() => {
+    const handlePendingChange = () => {
+      forceVividPendingRefresh((value) => value + 1)
+    }
+
+    window.addEventListener('vivid-demo-pending-changed', handlePendingChange)
+    return () => {
+      window.removeEventListener('vivid-demo-pending-changed', handlePendingChange)
+    }
+  }, [])
+
+  async function loadAll(options: { showLoading?: boolean } = {}) {
+    const { showLoading = false } = options
+    if (showLoading) setLoading(true)
     const list = await getMyQuestions()
     setQuestions(list)
 
     const map = await getQuestionDemosBatch(list.map((q) => q.id))
+    for (const [questionId, demos] of Object.entries(map)) {
+      if (demos.some(isVividDemo)) {
+        clearVividDemoPending(questionId)
+      }
+    }
     setDemosMap(map)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
+
+  const hasAnyVividPending = questions.some((question) => {
+    const demos = demosMap[question.id] || []
+    return !demos.some(isVividDemo) && isVividDemoPending(question.id)
+  })
+
+  useEffect(() => {
+    if (!hasAnyVividPending) return
+
+    let cancelled = false
+
+    const refresh = async () => {
+      if (cancelled) return
+      await loadAll()
+    }
+
+    void refresh()
+    const intervalId = window.setInterval(() => {
+      void refresh()
+    }, 5000)
+    const timeoutId = window.setTimeout(() => {
+      if (cancelled) return
+      for (const question of questions) {
+        if (isVividDemoPending(question.id)) {
+          clearVividDemoPending(question.id)
+        }
+      }
+      setVividGeneratingId(null)
+      setGenerateHint(null)
+    }, 240000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [hasAnyVividPending, questions])
 
   const handleGenerateInteraction = async (question: UserQuestion) => {
     if (generatingId) return
@@ -77,23 +132,25 @@ export default function MyQuestionsPage() {
   }
 
   const handleGenerateVividDemo = async (question: UserQuestion) => {
-    if (vividGeneratingId) return
+    if (vividGeneratingId === question.id || isVividDemoPending(question.id)) return
 
+    markVividDemoPending(question.id)
     setVividGeneratingId(question.id)
     setGenerateHint({ id: question.id, text: '正在生成生动演示...' })
     try {
       const result = await generateQuestionDemo(question.id, 'vivid')
-      if (result.success) {
+      if (result.pending) {
+        setGenerateHint({ id: question.id, text: '请耐心等待 1～3 分钟' })
+        await loadAll()
+      } else if (result.success) {
         setGenerateHint({ id: question.id, text: `观看 ${result.demo?.title || '演示1'}` })
         await loadAll()
       } else {
         setGenerateHint({ id: question.id, text: result.error || '生成失败，请重试' })
+        clearVividDemoPending(question.id)
       }
     } finally {
-      window.setTimeout(() => {
-        setVividGeneratingId(null)
-        setGenerateHint(null)
-      }, 2200)
+      setVividGeneratingId(null)
     }
   }
 
@@ -190,9 +247,10 @@ export default function MyQuestionsPage() {
             const st = getStatusMeta(q, demos)
             const StatusIcon = st.icon
             const canGenerateInteraction = q.status !== 'pending'
-            const generatedLabel = generateHint?.id === q.id ? generateHint.text : ''
             const hasBasicInteraction = demos.some(isBasicInteractionDemo)
             const hasVividDemo = demos.some(isVividDemo)
+            const vividPending = !hasVividDemo && (vividGeneratingId === q.id || isVividDemoPending(q.id))
+            const generatedLabel = generateHint?.id === q.id ? generateHint.text : ''
             return (
               <div
                 key={q.id}
@@ -232,11 +290,11 @@ export default function MyQuestionsPage() {
                       <button
                         type="button"
                         onClick={() => handleGenerateVividDemo(q)}
-                        disabled={vividGeneratingId === q.id}
+                        disabled={vividPending}
                         className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Sparkles className={`h-3 w-3 ${vividGeneratingId === q.id ? 'animate-pulse' : ''}`} />
-                        {vividGeneratingId === q.id ? '生成中...' : hasVividDemo ? '再次演示' : '演示'}
+                        <Sparkles className={`h-3 w-3 ${vividPending ? 'animate-pulse' : ''}`} />
+                        {vividPending ? '生成中...' : hasVividDemo ? '再次演示' : '演示'}
                       </button>
                     </div>
                   )}

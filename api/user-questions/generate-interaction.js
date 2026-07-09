@@ -4,6 +4,8 @@ import { deepseekJson, isDeepSeekConfigured } from '../../server/lib/deepseek.js
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 import { buildComponentDemoHtml, getRequestOrigin } from '../../server/lib/component-demo-html.js'
 
+const vividGenerationJobs = new Set()
+
 function safeText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -603,6 +605,44 @@ function normalizeBody(body) {
   return body
 }
 
+async function runVividDemoGeneration({ questionId, question, req, title }) {
+  try {
+    let lineAnalysisJson = question.line_analysis_json
+    if (!hasRenderableLineAnalysis(lineAnalysisJson)) {
+      lineAnalysisJson = await runLineAnalysis(question)
+      const saveResult = await updateWhere('user_questions', { id: questionId }, { line_analysis_json: lineAnalysisJson })
+      if (saveResult.error) {
+        throw new Error(`保存 line_analysis_json 失败: ${saveResult.error}`)
+      }
+      question.line_analysis_json = lineAnalysisJson
+    }
+
+    const html = buildComponentDemoHtml(
+      question,
+      getRequestOrigin(req),
+      {},
+      { discoveryMode: 'empty' },
+    ) || buildDemoHtml(question)
+    const htmlUrl = await uploadHtmlContent(html, questionId)
+
+    const demoInsert = await insert('question_demos', {
+      question_id: questionId,
+      html_url: htmlUrl,
+      title,
+    })
+
+    if (demoInsert.error || !demoInsert.data || demoInsert.data.length === 0) {
+      throw new Error(`创建演示失败: ${demoInsert.error || '未知错误'}`)
+    }
+
+    await updateWhere('user_questions', { id: questionId }, { status: 'uploaded' })
+  } catch (error) {
+    console.error('[user-questions/generate-interaction] vivid background job error:', error)
+  } finally {
+    vividGenerationJobs.delete(questionId)
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -674,22 +714,27 @@ export default async function handler(req, res) {
     const title = mode === 'vivid' ? `演示${vividCount + 1}` : '基础互动 1'
 
     if (mode === 'vivid') {
-      let lineAnalysisJson = question.line_analysis_json
-      if (!hasRenderableLineAnalysis(lineAnalysisJson)) {
-        lineAnalysisJson = await runLineAnalysis(question)
-        const saveResult = await updateWhere('user_questions', { id: questionId }, { line_analysis_json: lineAnalysisJson })
-        if (saveResult.error) {
-          return res.status(500).json({ success: false, error: `保存 line_analysis_json 失败: ${saveResult.error}` })
-        }
-        question.line_analysis_json = lineAnalysisJson
+      if (vividGenerationJobs.has(questionId)) {
+        return res.status(202).json({
+          success: true,
+          pending: true,
+          message: '生成中',
+        })
       }
+      vividGenerationJobs.add(questionId)
+      void runVividDemoGeneration({ questionId, question, req, title })
+      return res.status(202).json({
+        success: true,
+        pending: true,
+        message: '生成中',
+      })
     }
 
     const html = buildComponentDemoHtml(
       question,
       getRequestOrigin(req),
       {},
-      { discoveryMode: mode === 'vivid' ? 'empty' : 'components' },
+      { discoveryMode: 'components' },
     ) || buildDemoHtml(question)
     const htmlUrl = await uploadHtmlContent(html, questionId)
 

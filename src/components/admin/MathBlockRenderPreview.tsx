@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   bindInteractiveBoxDrag,
   renderAllElements,
@@ -26,8 +26,13 @@ export interface MathBlockTestDsl {
 }
 
 interface MathBlockRenderPreviewProps {
-  dsl: MathBlockTestDsl
-  stepCount: number
+  dsl?: MathBlockTestDsl
+  stepCount?: number
+  lineAnalysisJson?: unknown
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
 function buildVisibleElementIds(dsl: MathBlockTestDsl, stepCount: number) {
@@ -46,26 +51,127 @@ function buildVisibleElementIds(dsl: MathBlockTestDsl, stepCount: number) {
   return visibleIds
 }
 
-export function MathBlockRenderPreview({ dsl, stepCount }: MathBlockRenderPreviewProps) {
-  const svgRef = useRef<SVGSVGElement | null>(null)
-  const elementsRef = useRef<BasicAtomElement[]>(dsl.elements)
+function extractElements(lineAnalysisJson: unknown): BasicAtomElement[] {
+  if (Array.isArray(lineAnalysisJson)) {
+    return lineAnalysisJson.filter(isRecord) as unknown as BasicAtomElement[]
+  }
 
-  const visibleIds = useMemo(() => buildVisibleElementIds(dsl, stepCount), [dsl, stepCount])
+  if (!isRecord(lineAnalysisJson)) return []
+
+  if (Array.isArray(lineAnalysisJson.elements)) {
+    return lineAnalysisJson.elements.filter(isRecord) as unknown as BasicAtomElement[]
+  }
+
+  if (isRecord(lineAnalysisJson.dsl) && Array.isArray(lineAnalysisJson.dsl.elements)) {
+    return lineAnalysisJson.dsl.elements.filter(isRecord) as unknown as BasicAtomElement[]
+  }
+
+  if (isRecord(lineAnalysisJson.data) && Array.isArray(lineAnalysisJson.data.elements)) {
+    return lineAnalysisJson.data.elements.filter(isRecord) as unknown as BasicAtomElement[]
+  }
+
+  return []
+}
+
+function extractDsl(lineAnalysisJson: unknown): MathBlockTestDsl | null {
+  if (!isRecord(lineAnalysisJson)) return null
+  if (!Array.isArray(lineAnalysisJson.elements) || !Array.isArray(lineAnalysisJson.rules)) return null
+
+  return {
+    interactionType: lineAnalysisJson.interactionType === 'button' ? 'button' : 'button',
+    elements: extractElements(lineAnalysisJson),
+    rules: lineAnalysisJson.rules.filter(isRecord).map((rule) => ({
+      trigger: 'click',
+      targetId: typeof rule.targetId === 'string' ? rule.targetId : 'nextBtn',
+      stepIndex: typeof rule.stepIndex === 'number' ? rule.stepIndex : Number(rule.stepIndex) || 1,
+      showElementIds: Array.isArray(rule.showElementIds)
+        ? rule.showElementIds.filter((item): item is string => typeof item === 'string')
+        : [],
+      stepText: typeof rule.stepText === 'string' ? rule.stepText : '',
+      logic: typeof rule.logic === 'string' ? rule.logic : '',
+      updateElements: Array.isArray(rule.updateElements) ? rule.updateElements : [],
+    })),
+    finalCalculation: {
+      formula: isRecord(lineAnalysisJson.finalCalculation) && typeof lineAnalysisJson.finalCalculation.formula === 'string'
+        ? lineAnalysisJson.finalCalculation.formula
+        : '',
+      answer: isRecord(lineAnalysisJson.finalCalculation) && typeof lineAnalysisJson.finalCalculation.answer === 'string'
+        ? lineAnalysisJson.finalCalculation.answer
+        : '',
+    },
+  }
+}
+
+export function MathBlockRenderPreview({ dsl, stepCount = 0, lineAnalysisJson }: MathBlockRenderPreviewProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const [lineAnalysisStepCount, setLineAnalysisStepCount] = useState(0)
+  const lineAnalysisDsl = useMemo(() => extractDsl(lineAnalysisJson), [lineAnalysisJson])
+  const normalizedElements = useMemo(() => {
+    if (lineAnalysisJson !== undefined) {
+      return extractElements(lineAnalysisJson)
+    }
+    return dsl?.elements || []
+  }, [dsl?.elements, lineAnalysisJson])
+
+  const elementsRef = useRef<BasicAtomElement[]>(normalizedElements)
+
+  const visibleIds = useMemo(() => {
+    if (lineAnalysisDsl) return buildVisibleElementIds(lineAnalysisDsl, lineAnalysisStepCount)
+    if (!dsl) return new Set<string>()
+    return buildVisibleElementIds(dsl, stepCount)
+  }, [dsl, stepCount, lineAnalysisDsl, lineAnalysisStepCount])
 
   const renderedElements = useMemo(
-    () =>
-      dsl.elements.map((element) => ({
+    () => {
+      if (lineAnalysisDsl) {
+        return lineAnalysisDsl.elements.map((element) => ({
+          ...element,
+          visible: visibleIds.has(element.id) ? true : element.visible !== false,
+        }))
+      }
+
+      if (lineAnalysisJson !== undefined) {
+        return normalizedElements
+      }
+
+      if (!dsl) return []
+
+      return dsl.elements.map((element) => ({
         ...element,
         visible: visibleIds.has(element.id) ? true : element.visible !== false,
-      })),
-    [dsl.elements, visibleIds],
+      }))
+    },
+    [dsl, lineAnalysisJson, normalizedElements, visibleIds],
   )
 
   const svgInner = useMemo(() => renderAllElements(renderedElements), [renderedElements])
 
   useEffect(() => {
-    elementsRef.current = dsl.elements
-  }, [dsl.elements])
+    elementsRef.current = renderedElements
+  }, [renderedElements])
+
+  useEffect(() => {
+    setLineAnalysisStepCount(0)
+  }, [lineAnalysisJson])
+
+  useEffect(() => {
+    if (!lineAnalysisDsl) return undefined
+
+    const handleButtonClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{ id?: string }>
+      const buttonId = customEvent.detail?.id
+      if (!buttonId) return
+
+      const nextRuleIndex = lineAnalysisStepCount
+      const nextRule = lineAnalysisDsl.rules[nextRuleIndex]
+      if (!nextRule || nextRule.targetId !== buttonId) return
+
+      setLineAnalysisStepCount((current) => Math.min(current + 1, lineAnalysisDsl.rules.length))
+    }
+
+    window.addEventListener('basic-atom-button-click', handleButtonClick as EventListener)
+    return () => window.removeEventListener('basic-atom-button-click', handleButtonClick as EventListener)
+  }, [lineAnalysisDsl, lineAnalysisStepCount])
 
   useEffect(() => {
     if (!svgRef.current) return undefined

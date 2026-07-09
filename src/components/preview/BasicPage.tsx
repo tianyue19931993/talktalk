@@ -30,6 +30,7 @@ export type BasicPageProps = {
   tutor_analysis_json: unknown
   component_analysis_json?: unknown
   discovery_mode?: 'components' | 'empty'
+  hideDiscovery?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -153,7 +154,7 @@ function ThreeZoneLayout({
   discovery,
 }: {
   observation: ReactNode
-  discovery: ReactNode
+  discovery?: ReactNode | null
 }) {
   return (
     <div className="grid gap-5 bg-[#FAFAFA] text-[#171717]">
@@ -164,12 +165,14 @@ function ThreeZoneLayout({
         <div className="mt-4">{observation}</div>
       </section>
 
-      <section className="rounded-[28px] border border-[#E8E8E8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
-        <div className="inline-flex rounded-full bg-gradient-to-r from-[#0070F3] to-[#7928CA] px-3 py-1 text-[11px] font-medium text-white">
-          2. 发现区
-        </div>
-        <div className="mt-4">{discovery}</div>
-      </section>
+      {discovery !== null && discovery !== undefined ? (
+        <section className="rounded-[28px] border border-[#E8E8E8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+          <div className="inline-flex rounded-full bg-gradient-to-r from-[#0070F3] to-[#7928CA] px-3 py-1 text-[11px] font-medium text-white">
+            2. 发现区
+          </div>
+          <div className="mt-4">{discovery}</div>
+        </section>
+      ) : null}
     </div>
   )
 }
@@ -181,6 +184,7 @@ export default function BasicPage({
   tutor_analysis_json,
   component_analysis_json,
   discovery_mode = 'components',
+  hideDiscovery = false,
 }: BasicPageProps) {
   const observationData = toObservationHintData(math_analysis_json, question_text)
 
@@ -197,7 +201,7 @@ export default function BasicPage({
           <MHint data={observationData} />
         </div>
       )}
-      discovery={(
+      discovery={hideDiscovery ? null : (
         discovery_mode === 'empty' ? (
           <div className="min-h-[220px]" aria-label="生动演示发现区待完善" />
         ) : (

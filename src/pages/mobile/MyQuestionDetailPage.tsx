@@ -82,6 +82,8 @@ export default function MyQuestionDetailPage() {
       if (result.success) {
         setActionMessage(`观看 ${result.demo?.title || '演示1'}`)
         setDemos(await getQuestionDemos(question.id))
+        const nextQuestion = await getUserQuestion(question.id)
+        if (nextQuestion) setQuestion(nextQuestion)
       } else {
         setActionMessage(result.error || '生成失败，请重试')
       }

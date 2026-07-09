@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { query, insert, updateWhere } from '../../server/lib/supabase-admin.js'
+import { deepseekJson, isDeepSeekConfigured } from '../../server/lib/deepseek.js'
 import { getSupabaseEnv } from '../../server/lib/supabase-env.js'
 import { buildComponentDemoHtml, getRequestOrigin } from '../../server/lib/component-demo-html.js'
 
@@ -29,8 +30,106 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function getJsonValue(value, fallback = {}) {
+  if (value === null || value === undefined) return fallback
+  return value
+}
+
+function hasRenderableLineAnalysis(value) {
+  if (Array.isArray(value)) return value.length > 0
+  if (!value || typeof value !== 'object') return false
+  if (Array.isArray(value.elements) && value.elements.length > 0) return true
+  if (Array.isArray(value.rules) && value.rules.length > 0) return true
+  if (typeof value.interactionType === 'string') return true
+  return Object.keys(value).length > 0
+}
+
+async function getConfigValue(key) {
+  const { data, error } = await query('configs', {
+    filters: { key },
+    select: 'key,value',
+    limit: 1,
+  })
+  if (error) throw new Error(`读取配置 ${key} 失败: ${error}`)
+  const row = data?.[0]
+  return safeText(row?.value)
+}
+
+function buildPrompt(configValue, questionText, context = {}) {
+  let promptValue = configValue
+  const hasMathAnalysisPlaceholder = promptValue.includes('{{math_analysis_json}}')
+  const hasLogicAnalysisPlaceholder = promptValue.includes('{{logic_analysis_json}}')
+
+  if (context.mathAnalysisJson !== undefined) {
+    promptValue = promptValue.replaceAll(
+      '{{math_analysis_json}}',
+      JSON.stringify(context.mathAnalysisJson, null, 2),
+    )
+  }
+  if (context.logicAnalysisJson !== undefined) {
+    promptValue = promptValue.replaceAll(
+      '{{logic_analysis_json}}',
+      JSON.stringify(context.logicAnalysisJson, null, 2),
+    )
+  }
+
+  const sections = [
+    promptValue,
+    '',
+    '题目原文：',
+    questionText,
+  ]
+
+  if (context.mathAnalysisJson && !hasMathAnalysisPlaceholder) {
+    sections.push('', 'math_analysis_json：', JSON.stringify(context.mathAnalysisJson, null, 2))
+  }
+
+  if (context.logicAnalysisJson && !hasLogicAnalysisPlaceholder) {
+    sections.push('', 'logic_analysis_json：', JSON.stringify(context.logicAnalysisJson, null, 2))
+  }
+
+  if (context.tutorAnalysisJson) {
+    sections.push('', 'tutor_analysis_json：', JSON.stringify(context.tutorAnalysisJson, null, 2))
+  }
+
+  if (context.outputInstruction) {
+    sections.push('', context.outputInstruction)
+  }
+
+  sections.push('', '要求：只输出 JSON，不要输出 markdown、解释或多余文本。')
+  return sections.join('\n')
+}
+
+async function runLineAnalysis(question) {
+  if (!isDeepSeekConfigured()) {
+    throw new Error('DeepSeek 未配置')
+  }
+
+  const prompt = await getConfigValue('line_analysis')
+  if (!prompt) {
+    throw new Error('configs 中缺少 key = line_analysis 的配置')
+  }
+
+  const result = await deepseekJson({
+    systemPrompt: '你是一个严格输出 JSON 的线段图分析助手。请只返回 JSON 对象或数组。',
+    userPrompt: buildPrompt(prompt, safeText(question.question_text), {
+      mathAnalysisJson: question.math_analysis_json,
+      logicAnalysisJson: question.logic_analysis_json,
+      tutorAnalysisJson: question.tutor_analysis_json,
+      outputInstruction: '请输出用于线段图发现区的 line_analysis_json。优先返回 {"elements":[...]} 结构，elements 只使用 line / rect / circle / text / brace / button 六种基础原子，所有坐标限制在 700×480 画布内。',
+    }),
+    temperature: 0.2,
+  })
+
+  if (!result || typeof result !== 'object') {
+    throw new Error('line_analysis 返回结果非法')
+  }
+
+  return result
+}
+
 function getObservationData(question) {
-  const mathAnalysis = question.math_analysis_json || {}
+  const mathAnalysis = getJsonValue(question.math_analysis_json, {})
   const goal = mathAnalysis.goal && typeof mathAnalysis.goal === 'object' ? mathAnalysis.goal : {}
   return {
     questionText: safeText(question.question_text || ''),
@@ -92,7 +191,7 @@ function renderAnnotatedQuestion(question, conditions) {
 }
 
 function getChallengeData(question) {
-  const tutorAnalysis = question.tutor_analysis_json || {}
+  const tutorAnalysis = getJsonValue(question.tutor_analysis_json, {})
   return {
     steps: normalizeArray(tutorAnalysis.challenge_steps).map((item, index) => ({
       step: item?.step ?? index + 1,
@@ -115,7 +214,7 @@ function getDiscoveryData(question) {
     ]),
   )
 
-  return normalizeArray(question.component_analysis_json)
+  return normalizeArray(getJsonValue(question.component_analysis_json, []))
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => item && typeof item === 'object')
     .filter(({ item }) => ['Combine', 'Separate', 'Replicate', 'Partition'].includes(safeText(item.component)))
@@ -531,7 +630,7 @@ export default async function handler(req, res) {
 
     const { data: questionRows, error: questionError } = await query('user_questions', {
       filters: { id: questionId },
-      select: 'id,user_id,question_text,math_analysis_json,logic_analysis_json,tutor_analysis_json,component_analysis_json,status',
+      select: 'id,user_id,question_text,math_analysis_json,logic_analysis_json,tutor_analysis_json,component_analysis_json,line_analysis_json,status',
       limit: 1,
     })
     if (questionError) {
@@ -573,6 +672,19 @@ export default async function handler(req, res) {
       ? demoRows.filter((demo) => /^演示\d+$/.test(safeText(demo?.title))).length
       : 0
     const title = mode === 'vivid' ? `演示${vividCount + 1}` : '基础互动 1'
+
+    if (mode === 'vivid') {
+      let lineAnalysisJson = question.line_analysis_json
+      if (!hasRenderableLineAnalysis(lineAnalysisJson)) {
+        lineAnalysisJson = await runLineAnalysis(question)
+        const saveResult = await updateWhere('user_questions', { id: questionId }, { line_analysis_json: lineAnalysisJson })
+        if (saveResult.error) {
+          return res.status(500).json({ success: false, error: `保存 line_analysis_json 失败: ${saveResult.error}` })
+        }
+        question.line_analysis_json = lineAnalysisJson
+      }
+    }
+
     const html = buildComponentDemoHtml(
       question,
       getRequestOrigin(req),

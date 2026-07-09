@@ -33,6 +33,7 @@ export function buildComponentDemoHtml(question, origin, runtimeAssets = {}, opt
     logic_analysis_json: question?.logic_analysis_json || {},
     tutor_analysis_json: question?.tutor_analysis_json || {},
     component_analysis_json: question?.component_analysis_json || [],
+    line_analysis_json: question?.line_analysis_json ?? null,
     discovery_mode: options.discoveryMode === 'empty' ? 'empty' : 'components',
   }
 

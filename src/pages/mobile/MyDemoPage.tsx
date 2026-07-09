@@ -6,6 +6,7 @@ import { authedRequest, canViewDemo } from '../../lib/supabase-auth'
 import { downloadQuestionDemo, getDemoDisplayTitle, getUserQuestion, isVividDemo } from '../../lib/user-questions'
 import { Button } from '../../components/ui/Button'
 import BasicPage from '../../components/preview/BasicPage'
+import { MathBlockRenderPreview } from '../../components/admin/MathBlockRenderPreview'
 import type { UserQuestion } from '../../types/auth'
 
 type DemoRow = {
@@ -144,14 +145,36 @@ export default function MyDemoPage() {
       {question && loadState === 'ready' && (
         <div className="h-full overflow-y-auto bg-[#FAFAFA] px-4 py-16 sm:px-6">
           <div className="mx-auto max-w-5xl">
-            <BasicPage
-              question_text={question.questionText}
-              math_analysis_json={question.mathAnalysisJson}
-              logic_analysis_json={question.logicAnalysisJson}
-              tutor_analysis_json={question.tutorAnalysisJson}
-              component_analysis_json={question.componentAnalysisJson}
-              discovery_mode={isVivid ? 'empty' : 'components'}
-            />
+            {isVivid ? (
+              <div className="grid gap-5">
+                <BasicPage
+                  question_text={question.questionText}
+                  math_analysis_json={question.mathAnalysisJson}
+                  logic_analysis_json={question.logicAnalysisJson}
+                  tutor_analysis_json={question.tutorAnalysisJson}
+                  component_analysis_json={question.componentAnalysisJson}
+                  hideDiscovery
+                />
+
+                <section className="rounded-[28px] border border-[#E8E8E8] bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
+                  <div className="inline-flex rounded-full bg-gradient-to-r from-[#0070F3] to-[#7928CA] px-3 py-1 text-[11px] font-medium text-white">
+                    2. 发现区
+                  </div>
+                  <div className="mt-4">
+                    <MathBlockRenderPreview lineAnalysisJson={question.lineAnalysisJson} />
+                  </div>
+                </section>
+              </div>
+            ) : (
+              <BasicPage
+                question_text={question.questionText}
+                math_analysis_json={question.mathAnalysisJson}
+                logic_analysis_json={question.logicAnalysisJson}
+                tutor_analysis_json={question.tutorAnalysisJson}
+                component_analysis_json={question.componentAnalysisJson}
+                discovery_mode="components"
+              />
+            )}
           </div>
         </div>
       )}

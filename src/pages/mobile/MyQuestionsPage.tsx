@@ -236,7 +236,7 @@ export default function MyQuestionsPage() {
                         className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-medium text-blue-600 transition-all hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Sparkles className={`h-3 w-3 ${vividGeneratingId === q.id ? 'animate-pulse' : ''}`} />
-                        {vividGeneratingId === q.id ? '生成中...' : hasVividDemo ? '再次生动演示' : '生动演示'}
+                        {vividGeneratingId === q.id ? '生成中...' : hasVividDemo ? '再次演示' : '演示'}
                       </button>
                     </div>
                   )}

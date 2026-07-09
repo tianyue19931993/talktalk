@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, NavLink, useLocation, Link, useNavigate } from 'react-router-dom'
-import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings, Eye, Sigma } from 'lucide-react'
+import { FileText, Tags, BookType, Users, Crown, Receipt, ChevronLeft, MoreHorizontal, Settings, Eye, Sigma, Grid2x2 } from 'lucide-react'
 import { useAuth } from '../../stores/authStore'
 
 interface SidebarItem {
@@ -20,9 +20,10 @@ const sidebarItems: SidebarItem[] = [
   { path: '/admin/orders', label: '订单管理', icon: Receipt },
   { path: '/admin/plans', label: '套餐管理', icon: Crown },
   { path: '/admin/math-components', label: '数学组件', icon: Sigma },
-  { path: '/admin/universal-tape-matrix-lab', label: 'UniversalTapeMatrixLab', icon: Sigma },
+  { path: '/admin/universal-tape-matrix-lab', label: '基础互动：加减乘除', icon: Sigma },
+  { path: '/admin/basic-atom-render-units', label: '6 种基础原子渲染单元', icon: Grid2x2 },
   { path: '/admin/component-preview', label: '页面组件', icon: Eye },
-  { path: '/admin/math-block-test', label: '数学测试', icon: Eye },
+  { path: '/admin/math-block-test', label: '演示：线段图', icon: Eye },
   { path: '/admin/configs', label: '系统配置', icon: Settings },
 ]
 

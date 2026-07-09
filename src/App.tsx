@@ -25,6 +25,7 @@ import ComponentPreviewPage from './pages/admin/ComponentPreviewPage'
 import MathComponentPreviewPage from './pages/admin/MathComponentPreviewPage'
 import UniversalTapeMatrixLabPage from './pages/admin/UniversalTapeMatrixLabPage'
 import MathBlockTestPage from './pages/admin/MathBlockTestPage'
+import BasicAtomRenderUnitsPage from './pages/admin/BasicAtomRenderUnitsPage'
 
 export default function App() {
   return (
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="component-preview" element={<ComponentPreviewPage />} />
         <Route path="math-components" element={<MathComponentPreviewPage />} />
         <Route path="universal-tape-matrix-lab" element={<UniversalTapeMatrixLabPage />} />
+        <Route path="basic-atom-render-units" element={<BasicAtomRenderUnitsPage />} />
         <Route path="math-block-test" element={<MathBlockTestPage />} />
       </Route>
 
